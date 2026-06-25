@@ -296,7 +296,6 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 <script>
 var docType = 'estimate';
 var rowId = 0;
@@ -478,53 +477,10 @@ function togglePreview() {
 }
 
 function doPrint() {
+  var el = document.getElementById('printArea');
+  el.classList.remove('show-preview');
   updatePreview();
-  var btn = document.querySelector('.btn-print');
-  btn.textContent = 'PDF作成中...';
-  btn.disabled = true;
-
-  var original = document.getElementById('printArea');
-  original.classList.remove('show-preview');
-
-  var clone = original.cloneNode(true);
-  clone.style.display = 'block';
-  clone.style.width = '210mm';
-  clone.style.minHeight = '297mm';
-  clone.style.padding = '15mm 18mm';
-  clone.style.fontSize = '11pt';
-  clone.style.color = '#000';
-  clone.style.background = '#fff';
-  clone.style.position = 'absolute';
-  clone.style.left = '-9999px';
-  clone.style.top = '0';
-  document.body.appendChild(clone);
-
-  var d = new Date();
-  var issueDateVal = document.getElementById('issueDate').value;
-  var dateStr;
-  if (issueDateVal) {
-    var p = issueDateVal.split('-');
-    dateStr = p[0].slice(2) + p[1] + p[2];
-  } else {
-    dateStr = d.getFullYear().toString().slice(2) + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
-  }
-  var customer = document.getElementById('customerName').value || '宛名なし';
-  var typeName = docType === 'estimate' ? 'お見積書' : 'ご請求書';
-  var filename = dateStr + '_' + customer + '様_' + typeName + '.pdf';
-
-  setTimeout(function() {
-    html2pdf().set({
-      margin: 0,
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: clone.scrollWidth },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(clone).save().then(function() {
-      document.body.removeChild(clone);
-      btn.textContent = 'PDF保存';
-      btn.disabled = false;
-    });
-  }, 500);
+  window.print();
 }
 
 function buildDefaultNotes() {
