@@ -563,6 +563,7 @@ function calculate() {
   document.getElementById('dispTotal').textContent = formatYen(total);
 
   updatePreview();
+  autosave();
 }
 
 function getDefaultDate() {
@@ -666,6 +667,7 @@ function doPrint() {
   updatePreview();
   saveHistory();
   window.print();
+  resetForm();
 }
 
 function getHistoryData() {
@@ -793,6 +795,80 @@ function deleteHistory(index) {
   renderHistory();
 }
 
+function autosave() {
+  var data = {
+    docType: docType,
+    docNumber: document.getElementById('docNumber').value,
+    issueDate: document.getElementById('issueDate').value,
+    dueDate: document.getElementById('dueDate').value,
+    customerName: document.getElementById('customerName').value,
+    contactName: document.getElementById('contactName').value,
+    rows: getRows(),
+    transportation: parseInt(document.getElementById('transportation').value) || 0,
+    discount: parseInt(document.getElementById('discount').value) || 0,
+    notes: document.getElementById('notes').value
+  };
+  localStorage.setItem('nandeya_draft', JSON.stringify(data));
+}
+
+function autoload() {
+  var json = localStorage.getItem('nandeya_draft');
+  if (!json) return false;
+  var h = JSON.parse(json);
+
+  docType = h.docType || 'estimate';
+  document.getElementById('btnEstimate').className = docType === 'estimate' ? 'active' : '';
+  document.getElementById('btnInvoice').className = docType === 'invoice' ? 'active' : '';
+  document.getElementById('docNumber').value = h.docNumber || '';
+  document.getElementById('issueDate').value = h.issueDate || '';
+  document.getElementById('dueDate').value = h.dueDate || '';
+  document.getElementById('customerName').value = h.customerName || '';
+  document.getElementById('contactName').value = h.contactName || '';
+  document.getElementById('transportation').value = h.transportation || 0;
+  document.getElementById('discount').value = h.discount || 0;
+  document.getElementById('notes').value = h.notes || buildDefaultNotes();
+
+  document.getElementById('detailRows').innerHTML = '';
+  rowId = 0;
+  if (h.rows && h.rows.length > 0) {
+    for (var i = 0; i < h.rows.length; i++) {
+      quickAdd(h.rows[i].name, h.rows[i].price);
+      if (h.rows[i].qty !== 1) {
+        var allRows = document.querySelectorAll('.detail-row');
+        var lastRow = allRows[allRows.length - 1];
+        lastRow.querySelectorAll('input')[1].value = h.rows[i].qty;
+      }
+    }
+  }
+  calculate();
+  return true;
+}
+
+function clearDraft() {
+  localStorage.removeItem('nandeya_draft');
+}
+
+function resetForm() {
+  docType = 'estimate';
+  document.getElementById('btnEstimate').className = 'active';
+  document.getElementById('btnInvoice').className = '';
+  document.getElementById('issueDate').value = '';
+  document.getElementById('dueDate').value = '';
+  document.getElementById('customerName').value = '';
+  document.getElementById('contactName').value = '';
+  document.getElementById('transportation').value = 0;
+  document.getElementById('discount').value = 0;
+  document.getElementById('notes').value = buildDefaultNotes();
+  document.getElementById('detailRows').innerHTML = '';
+  document.getElementById('magicianSelect').value = '';
+  document.getElementById('magicianMenu').innerHTML = '';
+  document.getElementById('optionMenu').innerHTML = '';
+  rowId = 0;
+  generateDocNumber();
+  calculate();
+  clearDraft();
+}
+
 function buildDefaultNotes() {
   return '［内容詳細］\n' +
     '大変お世話になっております。お手数ですがご確認をお願いいたします。\n' +
@@ -809,8 +885,10 @@ function initNotes() {
   document.getElementById('notes').value = buildDefaultNotes();
 }
 
-initNotes();
-generateDocNumber();
+if (!autoload()) {
+  initNotes();
+  generateDocNumber();
+}
 </script>
 </body>
 </html>
