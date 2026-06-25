@@ -81,7 +81,7 @@
   .preview-styles .summary-box td { padding: 1.5mm 2mm; font-size: 9pt; border-bottom: 1px solid #ccc; }
   .preview-styles .summary-box td:last-child { text-align: right; }
   .preview-styles .summary-box .total td { font-size: 11pt; font-weight: bold; border-top: 2px solid #333; border-bottom: 2px solid #333; }
-  .preview-styles .notes { border: 1px solid #ccc; padding: 2mm; font-size: 7.5pt; white-space: pre-wrap; line-height: 1.4; height: 100%; }
+  .preview-styles .notes { border: 1px solid #ccc; padding: 2mm; font-size: 7.5pt; white-space: pre-wrap; line-height: 1.4; min-height: 100%; }
   .preview-styles .notes-title { font-size: 8pt; font-weight: bold; margin-bottom: 1mm; }
   .preview-styles .bank-info { color: #c0392b; font-weight: bold; }
 
@@ -138,7 +138,7 @@
     .print-area .summary-box td:last-child { text-align: right; }
     .print-area .summary-box .total td { font-size: 12pt; font-weight: bold; border-top: 2px solid #333; border-bottom: 2px solid #333; }
 
-    .print-area .notes { border: 1px solid #ccc; padding: 2mm; font-size: 8pt; white-space: pre-wrap; line-height: 1.4; height: 100%; }
+    .print-area .notes { border: 1px solid #ccc; padding: 2mm; font-size: 8pt; white-space: pre-wrap; line-height: 1.4; min-height: 100%; }
     .print-area .notes-title { font-size: 9pt; font-weight: bold; margin-bottom: 1mm; }
     .print-area .bank-info { color: #c0392b !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
@@ -296,6 +296,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 <script>
 var docType = 'estimate';
 var rowId = 0;
@@ -477,10 +478,33 @@ function togglePreview() {
 }
 
 function doPrint() {
+  updatePreview();
   var el = document.getElementById('printArea');
   el.classList.remove('show-preview');
-  updatePreview();
-  window.print();
+  el.style.display = 'block';
+  el.style.width = '210mm';
+  el.style.padding = '15mm 18mm';
+  el.style.fontSize = '11pt';
+  el.style.color = '#000';
+  el.style.background = '#fff';
+
+  var docNum = document.getElementById('docNumber').value || 'document';
+  var filename = (docType === 'estimate' ? '見積書' : '請求書') + '_' + docNum + '.pdf';
+
+  html2pdf().set({
+    margin: 0,
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(el).save().then(function() {
+    el.style.display = '';
+    el.style.width = '';
+    el.style.padding = '';
+    el.style.fontSize = '';
+    el.style.color = '';
+    el.style.background = '';
+  });
 }
 
 function buildDefaultNotes() {
