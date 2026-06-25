@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>見積書・請求書作成ツール</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; background: #f0f2f5; color: #333; }
+
+  /* === 入力フォーム === */
+  .input-area { max-width: 600px; margin: 0 auto; padding: 12px; }
+  .input-area h1 { font-size: 18px; text-align: center; margin-bottom: 12px; }
+  .section { background: #fff; border-radius: 8px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .section-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #555; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+  label { display: block; font-size: 13px; margin-bottom: 3px; color: #666; }
+  input, textarea, select { width: 100%; padding: 8px; font-size: 15px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px; -webkit-appearance: none; }
+  textarea { height: 60px; resize: vertical; }
+  select { background: #fff; }
+
+  .type-toggle { display: flex; gap: 8px; margin-bottom: 10px; }
+  .type-toggle button { flex: 1; padding: 12px; font-size: 18px; border: 3px solid #4a90d9; border-radius: 8px; background: #fff; color: #4a90d9; cursor: pointer; font-weight: 900; letter-spacing: 2px; }
+  .type-toggle button.active { background: #4a90d9; color: #fff; }
+
+  .row { display: flex; gap: 6px; align-items: flex-end; }
+  .row > div { flex: 1; }
+  .row .col-name { flex: 3; }
+  .row .col-qty { flex: 1; }
+  .row .col-price { flex: 2; }
+  .row .col-amt { flex: 2; text-align: right; font-size: 14px; padding: 8px 0; color: #333; font-weight: bold; }
+  .row .col-del { flex: 0 0 36px; }
+  .row input { margin-bottom: 0; }
+
+  .detail-header { display: flex; gap: 6px; font-size: 12px; color: #888; margin-bottom: 4px; }
+  .detail-header > div { flex: 1; }
+  .detail-header .col-name { flex: 3; }
+  .detail-header .col-qty { flex: 1; }
+  .detail-header .col-price { flex: 2; }
+  .detail-header .col-amt { flex: 2; text-align: right; }
+  .detail-header .col-del { flex: 0 0 36px; }
+
+  .detail-row { margin-bottom: 6px; }
+
+  .btn { display: inline-block; padding: 8px 16px; font-size: 14px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+  .btn-add { background: #4a90d9; color: #fff; width: 100%; margin-top: 6px; }
+  .btn-del { background: #e74c3c; color: #fff; width: 36px; height: 36px; padding: 0; font-size: 18px; line-height: 36px; text-align: center; border-radius: 5px; border: none; cursor: pointer; }
+  .btn-print { background: #27ae60; color: #fff; width: 100%; padding: 14px; font-size: 16px; margin-top: 4px; }
+
+  .summary-table { width: 100%; font-size: 14px; }
+  .summary-table td { padding: 4px 0; }
+  .summary-table td:last-child { text-align: right; font-weight: bold; }
+  .summary-table .total-row td { font-size: 16px; color: #c0392b; border-top: 2px solid #333; padding-top: 8px; }
+
+  .doc-number-row { display: flex; gap: 8px; align-items: flex-end; }
+  .doc-number-row > div { flex: 1; }
+  .doc-number-row > div:last-child { flex: 0 0 auto; }
+  .btn-gen { background: #8e44ad; color: #fff; padding: 8px 12px; font-size: 13px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 10px; white-space: nowrap; }
+
+  /* === プレビュー／印刷エリア共通 === */
+  .print-area { display: none; }
+
+  .preview-styles .doc-title { font-size: 20pt; text-align: center; margin-bottom: 8mm; letter-spacing: 6pt; border-bottom: 3px double #333; padding-bottom: 4mm; font-weight: 900; }
+  .preview-styles .header-section { display: flex; justify-content: space-between; margin-bottom: 6mm; }
+  .preview-styles .left-col { flex: 1; }
+  .preview-styles .right-col { flex: 1; text-align: right; font-size: 9pt; }
+  .preview-styles .customer-name { font-size: 14pt; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 2mm; display: inline-block; margin-bottom: 2mm; }
+  .preview-styles .customer-name::after { content: " 様"; font-size: 11pt; }
+  .preview-styles .company-info { line-height: 1.8; }
+  .preview-styles .greeting { font-size: 10pt; margin-bottom: 3mm; }
+  .preview-styles .amount-box { background: #f5f5f5; border: 1px solid #333; text-align: center; padding: 3mm; margin-bottom: 5mm; font-size: 14pt; font-weight: bold; }
+  .preview-styles .amount-box .label { font-size: 9pt; font-weight: normal; }
+  .preview-styles table.detail-table { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+  .preview-styles table.detail-table th { background: #e8e8e8; border: 1px solid #999; padding: 2mm; font-size: 8pt; }
+  .preview-styles table.detail-table td { border: 1px solid #999; padding: 2mm; font-size: 9pt; }
+  .preview-styles table.detail-table td.num { text-align: right; }
+  .preview-styles .summary-section { display: flex; justify-content: flex-end; margin-bottom: 4mm; }
+  .preview-styles .summary-box { width: 60%; }
+  .preview-styles .summary-box table { width: 100%; border-collapse: collapse; }
+  .preview-styles .summary-box td { padding: 1.5mm 2mm; font-size: 9pt; border-bottom: 1px solid #ccc; }
+  .preview-styles .summary-box td:last-child { text-align: right; }
+  .preview-styles .summary-box .total td { font-size: 11pt; font-weight: bold; border-top: 2px solid #333; border-bottom: 2px solid #333; }
+  .preview-styles .notes { border: 1px solid #ccc; padding: 3mm; font-size: 8pt; min-height: 10mm; white-space: pre-wrap; margin-top: 3mm; }
+  .preview-styles .notes-title { font-size: 8pt; font-weight: bold; margin-bottom: 1mm; }
+  .preview-styles .bank-info { color: #c0392b; }
+
+  .print-area.show-preview {
+    display: block;
+    max-width: 600px;
+    margin: 0 auto 20px;
+    padding: 20px;
+    background: #fff;
+    border: 2px solid #4a90d9;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    font-size: 10pt;
+    color: #000;
+  }
+
+  .btn-preview { background: #f39c12; color: #fff; width: 100%; padding: 14px; font-size: 16px; }
+
+  /* === 印刷時 === */
+  @media print {
+    body { background: #fff; }
+    .input-area { display: none !important; }
+    .print-area {
+      display: block !important;
+      width: 210mm;
+      min-height: 290mm;
+      padding: 15mm 18mm;
+      margin: 0;
+      font-size: 11pt;
+      color: #000;
+    }
+    .print-area .doc-title { font-size: 22pt !important; text-align: center; margin-bottom: 10mm; letter-spacing: 6pt; border-bottom: 3px double #333; padding-bottom: 4mm; font-weight: 900; }
+    .print-area .header-section { display: flex; justify-content: space-between; margin-bottom: 8mm; }
+    .print-area .left-col { flex: 1; }
+    .print-area .right-col { flex: 1; text-align: right; font-size: 10pt; }
+    .print-area .customer-name { font-size: 15pt !important; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 2mm; display: inline-block; margin-bottom: 2mm; }
+    .print-area .customer-name::after { content: " 様"; font-size: 12pt; }
+    .print-area .company-info { line-height: 1.8; }
+    .print-area .greeting { font-size: 10pt; margin-bottom: 4mm; }
+    .print-area .amount-box { background: #f5f5f5; border: 1px solid #333; text-align: center; padding: 3mm; margin-bottom: 6mm; font-size: 16pt !important; font-weight: bold; }
+    .print-area .amount-box .label { font-size: 10pt; font-weight: normal; }
+
+    .print-area table.detail-table { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+    .print-area table.detail-table th { background: #e8e8e8; border: 1px solid #999; padding: 2mm; font-size: 9pt; }
+    .print-area table.detail-table td { border: 1px solid #999; padding: 2mm; font-size: 10pt; }
+    .print-area table.detail-table td.num { text-align: right; }
+
+    .print-area .summary-section { display: flex; justify-content: flex-end; margin-bottom: 4mm; }
+    .print-area .summary-box { width: 55%; }
+    .print-area .summary-box table { width: 100%; border-collapse: collapse; }
+    .print-area .summary-box td { padding: 1.5mm 2mm; font-size: 10pt; border-bottom: 1px solid #ccc; }
+    .print-area .summary-box td:last-child { text-align: right; }
+    .print-area .summary-box .total td { font-size: 12pt; font-weight: bold; border-top: 2px solid #333; border-bottom: 2px solid #333; }
+
+    .print-area .notes { border: 1px solid #ccc; padding: 3mm; font-size: 9pt; min-height: 15mm; white-space: pre-wrap; margin-top: 4mm; }
+    .print-area .notes-title { font-size: 9pt; font-weight: bold; margin-bottom: 1mm; }
+    .print-area .bank-info { color: #c0392b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    @page { size: A4 portrait; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ 入力フォーム ============ -->
+<div class="input-area">
+  <h1>見積書・請求書作成ツール</h1>
+
+  <!-- 書類タイプ切り替え -->
+  <div class="section">
+    <div class="type-toggle">
+      <button id="btnEstimate" class="active" onclick="setType('estimate')">見積書</button>
+      <button id="btnInvoice" onclick="setType('invoice')">請求書</button>
+    </div>
+  </div>
+
+  <!-- 基本情報 -->
+  <div class="section">
+    <div class="section-title">基本情報</div>
+    <label>書類番号</label>
+    <div class="doc-number-row">
+      <div><input type="text" id="docNumber" placeholder="自動生成されます" oninput="updatePreview()"></div>
+      <div><button class="btn-gen" onclick="generateDocNumber()">自動採番</button></div>
+    </div>
+    <label>発行日（空欄で今日の日付）</label>
+    <input type="date" id="issueDate" oninput="updatePreview()">
+    <label>支払期限（空欄で来月末）</label>
+    <input type="date" id="dueDate" oninput="updatePreview()">
+  </div>
+
+  <!-- 宛先 -->
+  <div class="section">
+    <div class="section-title">宛先</div>
+    <label>宛名（会社名または個人名）</label>
+    <input type="text" id="customerName" placeholder="例: 株式会社サンプル" oninput="updatePreview()">
+    <label>担当者名</label>
+    <input type="text" id="contactName" placeholder="例: 山田太郎" oninput="updatePreview()">
+  </div>
+
+  <!-- 明細 -->
+  <div class="section">
+    <div class="section-title">明細</div>
+    <div class="detail-header">
+      <div class="col-name">項目</div>
+      <div class="col-qty">数量</div>
+      <div class="col-price">単価</div>
+      <div class="col-amt">金額</div>
+      <div class="col-del"></div>
+    </div>
+    <div id="detailRows"></div>
+    <button class="btn btn-add" onclick="addRow()">＋ 行を追加</button>
+  </div>
+
+  <!-- 交通費・値引き -->
+  <div class="section">
+    <div class="section-title">交通費・値引き</div>
+    <label>交通費（税込）</label>
+    <input type="number" id="transportation" value="0" min="0" oninput="calculate()">
+    <label>値引き</label>
+    <input type="number" id="discount" value="0" min="0" oninput="calculate()">
+  </div>
+
+  <!-- 合計表示 -->
+  <div class="section">
+    <div class="section-title">合計</div>
+    <table class="summary-table">
+      <tr><td>小計</td><td id="dispSubtotal">¥0</td></tr>
+      <tr><td>消費税（10%）</td><td id="dispTax">¥0</td></tr>
+      <tr><td>交通費</td><td id="dispTransport">¥0</td></tr>
+      <tr><td>値引き</td><td id="dispDiscount">¥0</td></tr>
+      <tr class="total-row"><td>合計金額</td><td id="dispTotal">¥0</td></tr>
+    </table>
+  </div>
+
+  <!-- 備考 -->
+  <div class="section">
+    <div class="section-title">備考</div>
+    <textarea id="notes" rows="12" style="height:auto;" oninput="updatePreview()"></textarea>
+  </div>
+
+  <!-- プレビュー＆PDF保存ボタン -->
+  <div class="section">
+    <button class="btn btn-preview" onclick="togglePreview()">プレビューを表示</button>
+    <button class="btn btn-print" onclick="doPrint()" style="margin-top:8px;">PDF保存</button>
+  </div>
+</div>
+
+<!-- ============ 印刷用エリア ============ -->
+<div class="print-area preview-styles" id="printArea">
+  <div class="doc-title" id="printTitle">見 積 書</div>
+
+  <div class="header-section">
+    <div class="left-col">
+      <div class="customer-name" id="printCustomer"></div>
+      <div id="printContact" style="font-size:10pt; margin-top:2mm;"></div>
+    </div>
+    <div class="right-col">
+      <div id="printDocNumber" style="margin-bottom:2mm;"></div>
+      <div id="printDate"></div>
+      <div id="printDue" style="margin-top:2mm;"></div>
+      <div class="company-info" style="margin-top:5mm;">
+        株式会社なんで屋<br>
+        代表　橋本大輝<br>
+        〒650-0011<br>
+        兵庫県神戸市中央区下山手通2丁目17-10<br>
+        ライオンビル002<br>
+        TEL: 078-945-8060<br>
+        Mail: nandeya.haken@gmail.com<br>
+        登録番号: T2140001132396
+      </div>
+    </div>
+  </div>
+
+  <div class="greeting" id="printGreeting">下記の通り御見積申し上げます</div>
+
+  <div class="amount-box">
+    <div class="label">合計金額（税込）</div>
+    <div id="printTotal">¥0</div>
+  </div>
+
+  <table class="detail-table">
+    <thead>
+      <tr>
+        <th style="width:5%">No.</th>
+        <th style="width:40%">項目</th>
+        <th style="width:12%">数量</th>
+        <th style="width:18%">単価</th>
+        <th style="width:25%">金額</th>
+      </tr>
+    </thead>
+    <tbody id="printDetailBody"></tbody>
+  </table>
+
+  <div class="summary-section">
+    <div class="summary-box">
+      <table>
+        <tr><td>小計</td><td id="printSubtotal">¥0</td></tr>
+        <tr><td>消費税（10%）</td><td id="printTax">¥0</td></tr>
+        <tr><td>交通費</td><td id="printTransport">¥0</td></tr>
+        <tr><td>値引き</td><td id="printDiscount">¥0</td></tr>
+        <tr class="total"><td>合計金額</td><td id="printGrandTotal">¥0</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="printNotesSection" style="margin-top:4mm;">
+    <div class="notes-title">備考</div>
+    <div class="notes" id="printNotes"></div>
+  </div>
+</div>
+
+<script>
+var docType = 'estimate';
+var rowId = 0;
+
+function setType(type) {
+  docType = type;
+  document.getElementById('btnEstimate').className = type === 'estimate' ? 'active' : '';
+  document.getElementById('btnInvoice').className = type === 'invoice' ? 'active' : '';
+  generateDocNumber();
+  updatePreview();
+}
+
+function generateDocNumber() {
+  var prefix = docType === 'estimate' ? 'EST' : 'INV';
+  var d = new Date();
+  var dateStr = d.getFullYear().toString() +
+    ('0' + (d.getMonth() + 1)).slice(-2) +
+    ('0' + d.getDate()).slice(-2);
+  var key = 'nandeya_seq_' + prefix + '_' + dateStr;
+  var seq = parseInt(localStorage.getItem(key) || '0') + 1;
+  localStorage.setItem(key, seq.toString());
+  var seqStr = ('000' + seq).slice(-3);
+  document.getElementById('docNumber').value = prefix + '-' + dateStr + '-' + seqStr;
+  updatePreview();
+}
+
+function addRow() {
+  rowId++;
+  var div = document.createElement('div');
+  div.className = 'detail-row row';
+  div.id = 'row-' + rowId;
+  div.innerHTML =
+    '<div class="col-name"><input type="text" placeholder="項目名" oninput="calculate()"></div>' +
+    '<div class="col-qty"><input type="number" value="1" min="0" oninput="calculate()"></div>' +
+    '<div class="col-price"><input type="number" value="0" min="0" oninput="calculate()"></div>' +
+    '<div class="col-amt"><span>¥0</span></div>' +
+    '<div class="col-del"><button class="btn-del" onclick="delRow(\'' + div.id + '\')">×</button></div>';
+  document.getElementById('detailRows').appendChild(div);
+  calculate();
+}
+
+function delRow(id) {
+  var el = document.getElementById(id);
+  if (el) el.remove();
+  calculate();
+}
+
+function getRows() {
+  var rows = [];
+  var els = document.querySelectorAll('.detail-row');
+  for (var i = 0; i < els.length; i++) {
+    var inputs = els[i].querySelectorAll('input');
+    var name = inputs[0].value;
+    var qty = parseInt(inputs[1].value) || 0;
+    var price = parseInt(inputs[2].value) || 0;
+    var amount = qty * price;
+    rows.push({ name: name, qty: qty, price: price, amount: amount });
+    els[i].querySelector('.col-amt span').textContent = formatYen(amount);
+  }
+  return rows;
+}
+
+function formatYen(n) {
+  return '¥' + n.toLocaleString('ja-JP');
+}
+
+function calculate() {
+  var rows = getRows();
+  var subtotal = 0;
+  for (var i = 0; i < rows.length; i++) subtotal += rows[i].amount;
+
+  var tax = Math.floor(subtotal * 0.1);
+  var transport = parseInt(document.getElementById('transportation').value) || 0;
+  var discount = parseInt(document.getElementById('discount').value) || 0;
+  var total = subtotal + tax + transport - discount;
+
+  document.getElementById('dispSubtotal').textContent = formatYen(subtotal);
+  document.getElementById('dispTax').textContent = formatYen(tax);
+  document.getElementById('dispTransport').textContent = formatYen(transport);
+  document.getElementById('dispDiscount').textContent = formatYen(discount);
+  document.getElementById('dispTotal').textContent = formatYen(total);
+
+  updatePreview();
+}
+
+function getDefaultDate() {
+  var d = new Date();
+  return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+}
+
+function getDefaultDue() {
+  var d = new Date();
+  var next = new Date(d.getFullYear(), d.getMonth() + 2, 0);
+  return next.getFullYear() + '年' + (next.getMonth() + 1) + '月' + next.getDate() + '日';
+}
+
+function formatDateInput(val) {
+  if (!val) return '';
+  var parts = val.split('-');
+  return parseInt(parts[0]) + '年' + parseInt(parts[1]) + '月' + parseInt(parts[2]) + '日';
+}
+
+function updatePreview() {
+  document.getElementById('printTitle').textContent = docType === 'estimate' ? '見 積 書' : '請 求 書';
+  document.getElementById('printGreeting').textContent = docType === 'estimate' ? '下記の通り御見積申し上げます' : '下記の通り御請求申し上げます';
+
+  document.getElementById('printCustomer').textContent = document.getElementById('customerName').value || '　';
+  var contact = document.getElementById('contactName').value;
+  document.getElementById('printContact').textContent = contact ? '担当: ' + contact + ' 様' : '';
+
+  var docNum = document.getElementById('docNumber').value;
+  document.getElementById('printDocNumber').textContent = docNum ? 'No. ' + docNum : '';
+
+  var issueDateVal = document.getElementById('issueDate').value;
+  document.getElementById('printDate').textContent = '発行日: ' + (issueDateVal ? formatDateInput(issueDateVal) : getDefaultDate());
+
+  var dueDateVal = document.getElementById('dueDate').value;
+  document.getElementById('printDue').textContent = '支払期限: ' + (dueDateVal ? formatDateInput(dueDateVal) : getDefaultDue());
+
+  var rows = getRows();
+  var subtotal = 0;
+  var tbody = '';
+  for (var i = 0; i < rows.length; i++) {
+    subtotal += rows[i].amount;
+    tbody += '<tr>' +
+      '<td class="num">' + (i + 1) + '</td>' +
+      '<td>' + escapeHtml(rows[i].name) + '</td>' +
+      '<td class="num">' + rows[i].qty + '</td>' +
+      '<td class="num">' + formatYen(rows[i].price) + '</td>' +
+      '<td class="num">' + formatYen(rows[i].amount) + '</td>' +
+      '</tr>';
+  }
+  document.getElementById('printDetailBody').innerHTML = tbody;
+
+  var tax = Math.floor(subtotal * 0.1);
+  var transport = parseInt(document.getElementById('transportation').value) || 0;
+  var discount = parseInt(document.getElementById('discount').value) || 0;
+  var total = subtotal + tax + transport - discount;
+
+  document.getElementById('printSubtotal').textContent = formatYen(subtotal);
+  document.getElementById('printTax').textContent = formatYen(tax);
+  document.getElementById('printTransport').textContent = formatYen(transport);
+  document.getElementById('printDiscount').textContent = formatYen(discount);
+  document.getElementById('printGrandTotal').textContent = formatYen(total);
+  document.getElementById('printTotal').textContent = formatYen(total);
+
+  var notesText = document.getElementById('notes').value;
+  var notesHtml = escapeHtml(notesText);
+  notesHtml = notesHtml.replace(
+    /【振込先】([\s\S]*?)(?=\n\n|$)/,
+    function(match) {
+      return '<span class="bank-info">' + match + '</span>';
+    }
+  );
+  document.getElementById('printNotes').innerHTML = notesHtml;
+  document.getElementById('printNotesSection').style.display = notesText ? 'block' : 'none';
+}
+
+function escapeHtml(str) {
+  var d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function togglePreview() {
+  var el = document.getElementById('printArea');
+  var btn = document.querySelector('.btn-preview');
+  if (el.classList.contains('show-preview')) {
+    el.classList.remove('show-preview');
+    btn.textContent = 'プレビューを表示';
+  } else {
+    updatePreview();
+    el.classList.add('show-preview');
+    btn.textContent = 'プレビューを閉じる';
+    el.scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+function doPrint() {
+  var el = document.getElementById('printArea');
+  el.classList.remove('show-preview');
+  updatePreview();
+  window.print();
+}
+
+function buildDefaultNotes() {
+  return '［内容詳細］\n' +
+    '大変お世話になっております。お手数ですがご確認をお願いいたします。\n' +
+    'ご不明な点やご質問等がございましたら、お気軽にお問合せ下さい。\n' +
+    '※お振込み手数料はご負担をお願いいたします。\n\n' +
+    '【振込先】\n' +
+    '住信SBIネット銀行\n' +
+    '法人第一支店　支店番号 106\n' +
+    '普通　2385254\n' +
+    'カ）ナンデヤ';
+}
+
+function initNotes() {
+  document.getElementById('notes').value = buildDefaultNotes();
+}
+
+addRow();
+initNotes();
+generateDocNumber();
+</script>
+</body>
+</html>
