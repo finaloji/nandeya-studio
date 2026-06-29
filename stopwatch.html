@@ -160,11 +160,16 @@
 
   /* 下部タブバー */
   .tab-bar {
-    border-top: 0.5px solid #38383a;
-    background: #1C1C1E;
+    background: #000;
+    padding: 0 8px env(safe-area-inset-bottom);
+  }
+
+  .tab-bar-inner {
     display: flex;
     justify-content: space-around;
-    padding: 6px 0 env(safe-area-inset-bottom);
+    background: #2C2C2E;
+    border-radius: 22px;
+    padding: 6px 4px;
   }
 
   .tab {
@@ -173,26 +178,41 @@
     align-items: center;
     gap: 2px;
     flex: 1;
-    padding: 4px 0;
+    padding: 6px 0;
     color: #8e8e93;
+    border-radius: 16px;
   }
 
   .tab.active {
     color: #FF9F0A;
-    background: rgba(255, 159, 10, 0.15);
-    border-radius: 18px;
-    margin: 0 4px;
-    padding: 4px 8px;
+  }
+
+  .tab .icon-wrap {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+
+  .tab.active .icon-wrap {
+    background: #FF9F0A;
+    width: 32px;
+    height: 32px;
   }
 
   .tab svg {
-    width: 24px;
-    height: 24px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+    stroke: none;
+  }
+
+  .tab.active svg {
+    fill: #000;
+    width: 20px;
+    height: 20px;
   }
 
   .tab-label {
@@ -337,45 +357,35 @@
 </div>
 
 <nav class="tab-bar">
-  <!-- 世界時計 -->
-  <div class="tab">
-    <svg viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="10"/>
-      <ellipse cx="12" cy="12" rx="4" ry="10"/>
-      <line x1="2" y1="12" x2="22" y2="12"/>
-      <path d="M3.5 7h17M3.5 17h17"/>
-    </svg>
-    <span class="tab-label">世界時計</span>
-  </div>
-  <!-- アラーム -->
-  <div class="tab">
-    <svg viewBox="0 0 24 24">
-      <path d="M12 5a7 7 0 1 1 0 14 7 7 0 0 1 0-14z"/>
-      <path d="M12 8v4l2.5 2.5"/>
-      <path d="M5.5 3.5L3 6M18.5 3.5L21 6"/>
-    </svg>
-    <span class="tab-label">アラーム</span>
-  </div>
-  <!-- ストップウォッチ -->
-  <div class="tab active">
-    <svg viewBox="0 0 24 24">
-      <circle cx="12" cy="13" r="8"/>
-      <line x1="12" y1="13" x2="12" y2="8"/>
-      <line x1="12" y1="3" x2="12" y2="5"/>
-      <line x1="10" y1="2" x2="14" y2="2"/>
-      <line x1="19.5" y1="6.5" x2="18" y2="8"/>
-    </svg>
-    <span class="tab-label">ストップウォッチ</span>
-  </div>
-  <!-- タイマー -->
-  <div class="tab">
-    <svg viewBox="0 0 24 24">
-      <path d="M8 3h8v3.5a5 5 0 0 1-1.46 3.54L12 12.5l-2.54-2.46A5 5 0 0 1 8 6.5V3z"/>
-      <path d="M8 21h8v-3.5a5 5 0 0 0-1.46-3.54L12 11.5l-2.54 2.46A5 5 0 0 0 8 17.5V21z"/>
-      <line x1="7" y1="3" x2="17" y2="3"/>
-      <line x1="7" y1="21" x2="17" y2="21"/>
-    </svg>
-    <span class="tab-label">タイマー</span>
+  <div class="tab-bar-inner">
+    <!-- 世界時計 -->
+    <div class="tab">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+      </div>
+      <span class="tab-label">世界時計</span>
+    </div>
+    <!-- アラーム -->
+    <div class="tab">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M12 4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm.5-10H11v5l4.25 2.5.75-1.23-3.5-2.08V8zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72z"/></svg>
+      </div>
+      <span class="tab-label">アラーム</span>
+    </div>
+    <!-- ストップウォッチ -->
+    <div class="tab active">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M12 20c4.42 0 8-3.58 8-8s-3.58-8-8-8-8 3.58-8 8 3.58 8 8 8zM10 2h4v2h-4V2zm8.24 3.18l1.06-1.06 1.42 1.42-1.06 1.06A9.936 9.936 0 0118.24 5.18zM13 7v5.41l3.3 3.3-1.42 1.42L11 13.29V7h2z"/></svg>
+      </div>
+      <span class="tab-label">ストップウォッチ</span>
+    </div>
+    <!-- タイマー -->
+    <div class="tab">
+      <div class="icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M6 2v6h.01L6 8.01 10 12 6 16l.01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2H6z"/></svg>
+      </div>
+      <span class="tab-label">タイマー</span>
+    </div>
   </div>
 </nav>
 
