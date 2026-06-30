@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------
+    // licenses コレクション
+    // ドキュメントID = 発行したID（例: customer001）
+    // フィールド: passcode(string), deviceId(string|null),
+    //            createdAt(number = Date.now()のミリ秒), note(string)
+    // ---------------------------------------------------------
+    match /licenses/{licenseId} {
+
+      // 読み取り: ログイン処理（ID・パスコード照合）に必要なため許可
+      allow read: if true;
+
+      // 新規作成: 同名IDがまだ存在しない場合のみ許可（上書き作成を防止）。
+      // 型チェックで不正なドキュメント構造の作成も防ぐ。
+      allow create: if resource == null
+        && request.resource.data.passcode is string
+        && request.resource.data.deviceId == null
+        && request.resource.data.note is string;
+
+      // 更新: 端末登録・端末ロック解除のため deviceId のみの変更を許可。
+      // passcode / createdAt / note は既存値から変更されていないことを確認する。
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['deviceId']);
+
+      // 削除: admin.html からのライセンス無効化操作のため許可
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------
+    // deviceChangeRequests コレクション
+    // ドキュメントID = 自動採番
+    // フィールド: licenseId(string), requestedAt(number = Date.now()のミリ秒),
+    //            status(string: "pending" | "approved")
+    // ---------------------------------------------------------
+    match /deviceChangeRequests/{requestId} {
+
+      // 読み取り: admin.html の申請一覧表示に必要なため許可
+      allow read: if true;
+
+      // 新規作成: 端末変更リクエスト送信時のみ。
+      // フィールド構成と型、初期ステータスが pending であることを検証する。
+      allow create: if request.resource.data.keys().hasOnly(['licenseId', 'requestedAt', 'status'])
+        && request.resource.data.licenseId is string
+        && request.resource.data.requestedAt is number
+        && request.resource.data.status is string
+        && request.resource.data.status == 'pending';
+
+      // 更新: 申請承認処理のみを許可。
+      // pending -> approved への遷移のみで、status 以外のフィールドは変更不可。
+      allow update: if resource.data.status == 'pending'
+        && request.resource.data.status == 'approved'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+
+      // 削除: 申請履歴を残すため拒否（承認後もstatus更新のみで対応する）
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------
+    // それ以外のすべてのコレクション・ドキュメント
+    // 想定外のアクセスはすべて拒否する
+    // ---------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
