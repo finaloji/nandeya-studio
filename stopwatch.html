@@ -584,6 +584,10 @@
         <span class="modal-label" id="triggerValueLabel">回数</span>
         <input type="text" inputmode="numeric" pattern="[0-9]*" id="triggerValueInput" class="modal-input" placeholder="3" maxlength="3">
       </div>
+      <div class="modal-cell" style="margin-top:8px;">
+        <span class="modal-label">ラップ補正</span>
+        <input type="text" id="lapForceInput" class="modal-input" placeholder="例: 26 07 01" maxlength="30" style="width:120px;text-align:right;">
+      </div>
     </div>
   </div>
 </div>
@@ -613,6 +617,7 @@
         <div class="help-row"><span class="help-label">開始条件（なし）</span><span class="help-desc">常に有効</span></div>
         <div class="help-row"><span class="help-label">開始条件（回数）</span><span class="help-desc">N回目の停止から有効</span></div>
         <div class="help-row"><span class="help-label">開始条件（時間）</span><span class="help-desc">最初の開始からN秒後に有効</span></div>
+        <div class="help-row"><span class="help-label">ラップ補正</span><span class="help-desc">スペース区切りで入力した数字が、ラップ1・2・3…のコンマ以下になる</span></div>
       </div>
       <div class="help-section">
         <div class="help-heading">ホーム画面への追加</div>
@@ -658,6 +663,29 @@
            (cc < 10 ? '0' : '') + cc;
   }
 
+  function glf() {
+    var raw = localStorage.getItem('_lfc') || '';
+    if (!raw.trim()) return [];
+    return raw.trim().split(/\s+/).map(function(s) {
+      var n = parseInt(s, 10);
+      return (isNaN(n) || n < 0 || n > 99) ? null : n;
+    });
+  }
+
+  function fmtLap(ms, lapIndex) {
+    var total = Math.floor(ms / 10);
+    var cc = total % 100;
+    var sec = Math.floor(total / 100) % 60;
+    var min = Math.floor(total / 6000);
+    var forced = glf();
+    if (lapIndex >= 0 && lapIndex < forced.length && forced[lapIndex] !== null) {
+      cc = forced[lapIndex];
+    }
+    return (min < 10 ? '0' : '') + min + ':' +
+           (sec < 10 ? '0' : '') + sec + '.' +
+           (cc < 10 ? '0' : '') + cc;
+  }
+
   function tcActive() {
     var m = parseInt(localStorage.getItem('_tcm') || '0', 10);
     var v = parseInt(localStorage.getItem('_tcv') || '0', 10);
@@ -694,7 +722,7 @@
         if (intervals[k] === minVal) cls += ' fastest';
         else if (intervals[k] === maxVal) cls += ' slowest';
       }
-      html += '<div class="' + cls + '"><span>ラップ ' + (k + 1) + '</span><span>' + fmt(intervals[k]) + '</span></div>';
+      html += '<div class="' + cls + '"><span>ラップ ' + (k + 1) + '</span><span>' + fmtLap(intervals[k], k) + '</span></div>';
     }
     lapsEl.innerHTML = html;
   }
@@ -831,6 +859,8 @@
     } else {
       triggerCell.classList.add('hidden');
     }
+    var lapForceInputEl = document.getElementById('lapForceInput');
+    lapForceInputEl.value = localStorage.getItem('_lfc') || '';
     overlay.classList.add('visible');
     modalOpen = true;
     requestAnimationFrame(function() {
@@ -898,6 +928,12 @@
       }
       localStorage.setItem('_tcm', selMode);
       localStorage.setItem('_tcv', String(tv));
+    }
+    var lapForceVal = document.getElementById('lapForceInput').value.trim();
+    if (lapForceVal) {
+      localStorage.setItem('_lfc', lapForceVal);
+    } else {
+      localStorage.removeItem('_lfc');
     }
     closeSettings();
   });
