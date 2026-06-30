@@ -378,6 +378,9 @@
     margin-bottom: 8px;
     text-align: center;
   }
+  .login-error.info {
+    color: #30D158;
+  }
   .login-btn {
     width: 100%;
     background: #0A84FF;
@@ -405,7 +408,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, addDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBSSGdNDndjiUj40m4V4QA6Kjqr-oRnBc8",
@@ -421,7 +424,7 @@
 
   // --- Sprint A3: 非moduleのbody側scriptからFirestoreインスタンス・関数を使えるようグローバルに公開 ---
   window.__db = db;
-  window.__fsFns = { doc, getDoc, setDoc, updateDoc };
+  window.__fsFns = { doc, getDoc, setDoc, updateDoc, addDoc, collection, query, where, getDocs };
   window.dispatchEvent(new Event('_fsready'));
 </script>
 </head>
@@ -864,6 +867,12 @@
   }
 
   function showError(msg) {
+    loginError.classList.remove('info');
+    loginError.textContent = msg;
+  }
+
+  function showInfo(msg) {
+    loginError.classList.add('info');
     loginError.textContent = msg;
   }
 
@@ -948,9 +957,54 @@
     }
   });
 
-  deviceChangeLink.addEventListener('click', function(e) {
+  var deviceChangeBusy = false;
+
+  deviceChangeLink.addEventListener('click', async function(e) {
     e.preventDefault();
-    // Sprint A4で実装予定
+    if (deviceChangeBusy) return;
+    var id = loginIdInput.value.trim();
+    var pass = loginPassInput.value;
+    showError('');
+    if (!id || !pass) {
+      showError('IDまたはパスコードが正しくありません');
+      return;
+    }
+    deviceChangeBusy = true;
+    var originalText = deviceChangeLink.textContent;
+    deviceChangeLink.textContent = '確認中...';
+    try {
+      var db = window.__db;
+      var fns = window.__fsFns;
+      var ref = fns.doc(db, 'licenses', id);
+      var snap = await fns.getDoc(ref);
+      if (!snap.exists() || snap.data().passcode !== pass) {
+        showError('IDまたはパスコードが正しくありません');
+        return;
+      }
+      // 既存のpending申請があるか確認
+      var reqQuery = fns.query(
+        fns.collection(db, 'deviceChangeRequests'),
+        fns.where('licenseId', '==', id),
+        fns.where('status', '==', 'pending')
+      );
+      var existing = await fns.getDocs(reqQuery);
+      if (!existing.empty) {
+        showError('すでに申請済みです。承認をお待ちください');
+        return;
+      }
+      await fns.addDoc(fns.collection(db, 'deviceChangeRequests'), {
+        licenseId: id,
+        requestedAt: Date.now(),
+        status: 'pending'
+      });
+      showInfo('申請を送信しました。承認をお待ちください');
+    } catch (err) {
+      console.error('[端末変更リクエスト] エラー:', err);
+      showError('通信エラーが発生しました。もう一度お試しください');
+    } finally {
+      deviceChangeBusy = false;
+      deviceChangeLink.textContent = originalText;
+    }
   });
 
   // ページ読み込み時に自動ログイン判定（Firestore初期化完了を待つ）
