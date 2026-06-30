@@ -309,6 +309,32 @@
     75% { transform: translateX(4px); }
   }
 
+  .help-section {
+    margin-bottom: 20px;
+  }
+  .help-heading {
+    font-size: 13px;
+    color: #8e8e93;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 0.5px solid #38383a;
+  }
+  .help-row {
+    display: flex;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 0.5px solid #2c2c2e;
+    font-size: 14px;
+  }
+  .help-label {
+    color: #fff;
+    flex-shrink: 0;
+    min-width: 100px;
+  }
+  .help-desc {
+    color: #8e8e93;
+  }
+
   /* --- Sprint A2: ログイン画面UI（仮実装、Sprint A3以降で認証ロジックを実装予定） --- */
   .login-screen {
     position: fixed;
@@ -557,6 +583,43 @@
       <div class="modal-cell hidden" id="triggerValueCell" style="margin-top:8px;">
         <span class="modal-label" id="triggerValueLabel">回数</span>
         <input type="text" inputmode="numeric" pattern="[0-9]*" id="triggerValueInput" class="modal-input" placeholder="3" maxlength="3">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="helpOverlay">
+  <div class="modal-sheet" id="helpSheet">
+    <div class="modal-header">
+      <span style="width:60px;"></span>
+      <span class="modal-title">使い方</span>
+      <span class="modal-cancel" id="helpClose">閉じる</span>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:60vh;">
+      <div class="help-section">
+        <div class="help-heading">基本操作</div>
+        <div class="help-row"><span class="help-label">開始（緑）</span><span class="help-desc">タップで計測開始</span></div>
+        <div class="help-row"><span class="help-label">停止（赤）</span><span class="help-desc">タップで計測停止</span></div>
+        <div class="help-row"><span class="help-label">リセット</span><span class="help-desc">停止中に左ボタンをタップ → 00:00.00に戻す</span></div>
+        <div class="help-row"><span class="help-label">ラップ</span><span class="help-desc">計測中に左ボタンをタップ → 区間タイムを記録</span></div>
+      </div>
+      <div class="help-section">
+        <div class="help-heading">設定画面の開き方</div>
+        <div class="help-row"><span class="help-desc">「世界時計」アイコンを素早く3回タップ（1.5秒以内）</span></div>
+      </div>
+      <div class="help-section">
+        <div class="help-heading">設定項目</div>
+        <div class="help-row"><span class="help-label">数値補正</span><span class="help-desc">停止時に秒＋コンマ以下がこの数字になる。0で無効</span></div>
+        <div class="help-row"><span class="help-label">開始条件（なし）</span><span class="help-desc">常に有効</span></div>
+        <div class="help-row"><span class="help-label">開始条件（回数）</span><span class="help-desc">N回目の停止から有効</span></div>
+        <div class="help-row"><span class="help-label">開始条件（時間）</span><span class="help-desc">最初の開始からN秒後に有効</span></div>
+      </div>
+      <div class="help-section">
+        <div class="help-heading">ホーム画面への追加</div>
+        <div class="help-row"><span class="help-desc">① SafariでアプリのURLを開く</span></div>
+        <div class="help-row"><span class="help-desc">② 共有ボタン（四角に上矢印）をタップ</span></div>
+        <div class="help-row"><span class="help-desc">③「ホーム画面に追加」を選択</span></div>
+        <div class="help-row"><span class="help-desc">④「追加」をタップ</span></div>
       </div>
     </div>
   </div>
@@ -843,6 +906,43 @@
 
   overlay.addEventListener('click', function(e) {
     if (e.target === overlay) closeSettings();
+  });
+
+  // --- 使い方モーダル（タイマータブ3回タップ） ---
+  var helpOverlay = document.getElementById('helpOverlay');
+  var helpTapCount = 0;
+  var helpTapTimer = null;
+  var timerTab = document.querySelectorAll('.tab')[3];
+
+  timerTab.addEventListener('click', function() {
+    if (modalOpen) return;
+    helpTapCount++;
+    if (helpTapCount === 1) {
+      helpTapTimer = setTimeout(function() { helpTapCount = 0; }, 1500);
+    }
+    if (helpTapCount === 3) {
+      clearTimeout(helpTapTimer);
+      helpTapCount = 0;
+      openHelp();
+    }
+  });
+
+  function openHelp() {
+    helpOverlay.classList.add('visible');
+    modalOpen = true;
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() { helpOverlay.classList.add('show'); });
+    });
+  }
+
+  function closeHelp() {
+    helpOverlay.classList.remove('show');
+    setTimeout(function() { helpOverlay.classList.remove('visible'); modalOpen = false; }, 300);
+  }
+
+  document.getElementById('helpClose').addEventListener('click', closeHelp);
+  helpOverlay.addEventListener('click', function(e) {
+    if (e.target === helpOverlay) closeHelp();
   });
 })();
 </script>
