@@ -288,6 +288,8 @@
     var lastOperator     = null;
     var lastOperand      = null;
     var justCalculated   = false;
+    var expressionStr    = '';   // 入力中の式文字列（"456＋569＋" など）
+    var completedExpr    = '';   // ＝後に preview に表示する式（"456＋569＝"）
 
     // --- OP記号マップ ---
     var opSymbols = { div: '÷', mul: '×', sub: '−', add: '＋' };
@@ -329,28 +331,30 @@
       var previewEl = document.getElementById('display-preview');
       var acBtn     = document.getElementById('btn-ac');
 
-      // 数字表示
-      numEl.textContent = displayValue;
+      // メイン表示文字列を決定
+      var displayStr;
+      if (justCalculated) {
+        displayStr = displayValue;
+        previewEl.textContent = completedExpr;
+      } else if (waitingForSecond) {
+        displayStr = expressionStr;
+        previewEl.textContent = '';
+      } else {
+        displayStr = expressionStr + displayValue;
+        previewEl.textContent = '';
+      }
+      numEl.textContent = displayStr;
 
-      // フォントサイズ
-      var len = displayValue.length;
+      // フォントサイズ（式全体の長さで決定）
+      var len = displayStr.length;
       if (len <= 6)       numEl.style.fontSize = '96px';
       else if (len <= 8)  numEl.style.fontSize = '72px';
       else if (len <= 10) numEl.style.fontSize = '56px';
-      else                numEl.style.fontSize = '44px';
+      else if (len <= 13) numEl.style.fontSize = '40px';
+      else                numEl.style.fontSize = '30px';
 
-      // プレビュー行
-      if (firstOperand === null) {
-        previewEl.textContent = '';
-      } else if (justCalculated) {
-        var sym = lastOperator ? opSymbols[lastOperator] : '';
-        previewEl.textContent = formatResult(firstOperand) + ' ' + sym + ' ' + formatResult(lastOperand) + ' =';
-      } else {
-        previewEl.textContent = formatResult(firstOperand) + ' ' + (operator ? opSymbols[operator] : '');
-      }
-
-      // AC / C ラベル
-      if (displayValue === '0' && firstOperand === null) {
+      // AC / C ラベル（＝後、または完全クリーン状態で AC）
+      if (justCalculated || (expressionStr === '' && displayValue === '0' && firstOperand === null)) {
         acBtn.textContent = 'AC';
       } else {
         acBtn.textContent = 'C';
@@ -380,6 +384,8 @@
         lastOperand      = null;
         waitingForSecond = false;
         justCalculated   = false;
+        expressionStr    = '';
+        completedExpr    = '';
         displayValue     = digit;
         updateDisplay();
         updateOperatorHighlight();
@@ -417,6 +423,20 @@
     // --- 演算子 ---
     function pressOperator(op) {
       if (displayValue === 'Error') return;
+
+      // 式文字列を更新（計算前に displayValue が変わるため先に処理）
+      if (justCalculated) {
+        // ＝後に演算子 → 結果を起点に新しい式を開始
+        expressionStr = displayValue + opSymbols[op];
+        completedExpr = '';
+      } else if (waitingForSecond) {
+        // 演算子の変更（数字を入力せずに別の演算子を押した）
+        expressionStr = expressionStr.slice(0, -1) + opSymbols[op];
+      } else {
+        // 通常：現在の displayValue を式に追加
+        expressionStr += displayValue + opSymbols[op];
+      }
+
       if (firstOperand !== null && !waitingForSecond) {
         // 連続演算：その場で計算
         var result = calculate(firstOperand, operator, parseFloat(displayValue));
@@ -442,12 +462,16 @@
         result       = calculate(parseFloat(displayValue), lastOperator, lastOperand);
         displayValue = result;
         if (result !== 'Error') firstOperand = parseFloat(result);
+        completedExpr = '';
       } else {
+        var inputVal = displayValue;   // ＝前の入力値を保存
         lastOperand  = parseFloat(displayValue);
         lastOperator = operator;
         result       = calculate(firstOperand, operator, lastOperand);
         displayValue = result;
         if (result !== 'Error') firstOperand = parseFloat(result);
+        completedExpr = expressionStr + inputVal + '＝';
+        expressionStr = '';
       }
       operator         = null;
       waitingForSecond = false;
@@ -458,7 +482,7 @@
 
     // --- AC / C ---
     function pressAC() {
-      if (displayValue === '0' && firstOperand === null) {
+      if (justCalculated || (expressionStr === '' && displayValue === '0' && firstOperand === null)) {
         // AC：全リセット
         firstOperand     = null;
         operator         = null;
@@ -466,6 +490,8 @@
         lastOperand      = null;
         waitingForSecond = false;
         justCalculated   = false;
+        expressionStr    = '';
+        completedExpr    = '';
       }
       // C
       displayValue     = '0';
