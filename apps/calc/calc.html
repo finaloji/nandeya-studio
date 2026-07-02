@@ -370,10 +370,10 @@
       if (isNaN(n) || !isFinite(n)) return 'Error';
       n = Math.round(n * 1e10) / 1e10;
       var s = String(n);
-      // 9桁超なら toPrecision(9)
+      // 10桁超なら toPrecision(10)（フォース結果の10桁を保持するため）
       var digits = s.replace(/[^0-9]/g, '');
-      if (digits.length > 9) {
-        s = parseFloat(n.toPrecision(9)).toString();
+      if (digits.length > 10) {
+        s = parseFloat(n.toPrecision(10)).toString();
       }
       return s;
     }
