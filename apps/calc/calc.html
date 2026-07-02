@@ -1122,8 +1122,8 @@
         } else {
           _cshe('IDまたはパスコードが正しくありません');
         }
-      }).catch(function(err) {
-        _cshe((err && err.code) ? err.code : 'エラーが発生しました');
+      }).catch(function() {
+        _cshe('エラーが発生しました。再度お試しください');
       }).finally(function() {
         _cslb(false);
       });
