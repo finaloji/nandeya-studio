@@ -31,6 +31,100 @@
   </script>
 
   <style>
+    .login-screen {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .login-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .login-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #FF9F0A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .login-icon svg {
+      width: 32px;
+      height: 32px;
+      fill: none;
+      stroke: #000;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .login-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 32px;
+    }
+    .login-form {
+      width: 100%;
+      max-width: 320px;
+    }
+    .login-field {
+      background: #1C1C1E;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .login-field input {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+    }
+    .login-field input::placeholder { color: #8e8e93; }
+    .login-error {
+      color: #FF3B30;
+      font-size: 13px;
+      min-height: 18px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .login-error.info { color: #30D158; }
+    .login-btn {
+      width: 100%;
+      background: #0A84FF;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 0;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+    .login-device-change {
+      text-align: center;
+      color: #8e8e93;
+      font-size: 13px;
+    }
+    .login-device-change a {
+      color: #0A84FF;
+      text-decoration: none;
+    }
+
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
@@ -357,53 +451,31 @@
     </div>
   </div>
 
-  <!-- 初期化画面オーバーレイ -->
-  <div id="_cag" style="
-    position:fixed; inset:0; background:#000; z-index:200;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:24px;
-    transition:opacity 0.3s, visibility 0.3s;
-    opacity:1; visibility:visible;
-    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
-  ">
-    <!-- アイコン -->
-    <div style="width:64px;height:64px;border-radius:50%;background:#FF9F0A;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
-      <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="5" y="11" width="14" height="10" rx="2"/>
-        <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+  <!-- ログイン画面 -->
+  <div class="login-screen" id="_cag">
+    <div class="login-icon">
+      <svg viewBox="0 0 24 24">
+        <rect x="4" y="3" width="16" height="18" rx="2"/>
+        <line x1="8" y1="7" x2="16" y2="7"/>
+        <line x1="8" y1="11" x2="10" y2="11"/>
+        <line x1="8" y1="15" x2="10" y2="15"/>
+        <line x1="14" y1="11" x2="16" y2="11"/>
+        <line x1="14" y1="15" x2="16" y2="15"/>
       </svg>
     </div>
-    <!-- タイトル -->
-    <div style="color:#fff;font-size:20px;font-weight:600;margin-bottom:32px;">電卓</div>
-
-    <!-- 入力フォーム -->
-    <div style="width:100%;max-width:320px;">
-      <div style="background:#1C1C1E;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
-        <input id="_cid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none" style="
-          background:transparent;border:none;outline:none;
-          color:#fff;font-size:16px;font-family:inherit;width:100%;
-        ">
+    <div class="login-title">電卓</div>
+    <div class="login-form">
+      <div class="login-field">
+        <input id="_cid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none">
       </div>
-      <div style="background:#1C1C1E;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
-        <input id="_cpc" type="password" placeholder="パスコード" autocomplete="off" style="
-          background:transparent;border:none;outline:none;
-          color:#fff;font-size:16px;font-family:inherit;width:100%;
-        ">
+      <div class="login-field">
+        <input id="_cpc" type="password" placeholder="パスコード" autocomplete="off">
       </div>
-
-      <!-- メッセージエリア -->
-      <div id="_cmsg" style="min-height:20px;margin-bottom:12px;font-size:13px;text-align:center;"></div>
-
-      <!-- 認証ボタン -->
-      <button id="_clb" style="
-        width:100%;padding:14px 0;border-radius:10px;border:none;
-        background:#FF9F0A;color:#fff;font-size:16px;font-weight:600;
-        font-family:inherit;cursor:pointer;
-      ">認証する</button>
-
-      <!-- 端末変更リンク -->
-      <div id="_cdl" style="margin-top:20px;text-align:center;color:#8e8e93;font-size:13px;display:none;">
-        端末が変わった場合は<a id="_cdr" href="#" style="color:#FF9F0A;text-decoration:none;">端末の変更はこちら</a>
+      <div class="login-error" id="_cmsg"></div>
+      <button class="login-btn" id="_clb">ログイン</button>
+      <div class="login-device-change">
+        この端末を新しく登録したい場合<br>
+        <a href="#" id="_cdr">端末変更をリクエスト</a>
       </div>
     </div>
   </div>
@@ -937,31 +1009,28 @@
     // エラー表示
     function _cshe(msg) {
       var el = document.getElementById('_cmsg');
-      el.style.color = '#FF3B30';
+      el.classList.remove('info');
       el.textContent = msg;
     }
 
     // 案内表示
     function _cshi(msg) {
       var el = document.getElementById('_cmsg');
-      el.style.color = '#30D158';
+      el.classList.add('info');
       el.textContent = msg;
     }
 
     // ローディング状態切替
     function _cslb(isLoading) {
       var btn = document.getElementById('_clb');
-      btn.textContent = isLoading ? '確認中...' : '認証する';
+      btn.textContent = isLoading ? '確認中...' : 'ログイン';
       btn.disabled = isLoading;
       btn.style.opacity = isLoading ? '0.6' : '1';
     }
 
     // 認証画面を隠す
     function _chga() {
-      var el = document.getElementById('_cag');
-      el.style.opacity = '0';
-      el.style.visibility = 'hidden';
-      el.style.pointerEvents = 'none';
+      document.getElementById('_cag').classList.add('hidden');
     }
 
     // ログイン処理
@@ -1043,7 +1112,6 @@
       if (!id || !pass) { _cshe('IDとパスコードを入力してください'); return; }
       if (!window.__cdb) { _cshe('接続中です。しばらくお待ちください'); return; }
       document.getElementById('_cmsg').textContent = '';
-      document.getElementById('_cdl').style.display = 'none';
       _cslb(true);
       _catl(id, pass).then(function(res) {
         if (res.ok) {
@@ -1051,7 +1119,6 @@
           _chga();
         } else if (res.reason === 'device') {
           _cshe('別の端末で登録済みです');
-          document.getElementById('_cdl').style.display = 'block';
         } else {
           _cshe('IDまたはパスコードが正しくありません');
         }
