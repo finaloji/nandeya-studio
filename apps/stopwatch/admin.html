@@ -205,6 +205,31 @@
     padding: 24px;
   }
 
+  /* --- タブ --- */
+  .tab-bar {
+    display: flex;
+    border-bottom: 2px solid #111;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    padding: 8px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #999;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .tab-btn.active {
+    color: #111;
+    border-bottom-color: #111;
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
   @media (max-width: 600px) {
     .form-row { flex-direction: column; align-items: stretch; }
     .field input { min-width: 0; width: 100%; }
@@ -243,65 +268,120 @@
 <div id="admin">
   <h1 class="page-title">ライセンス管理画面</h1>
 
-  <section>
-    <h2>ID発行</h2>
-    <div class="form-row">
-      <div class="field">
-        <label for="issueId">ID</label>
-        <input type="text" id="issueId" placeholder="例: nandeya001">
-      </div>
-      <div class="field">
-        <label for="issuePasscode">パスコード</label>
-        <div class="inline-btn-group">
-          <input type="text" id="issuePasscode" placeholder="例: A1B2C3">
-          <button class="btn-sub" id="genPasscodeBtn" type="button">自動生成</button>
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="sw">ストップウォッチ</button>
+    <button class="tab-btn" data-tab="calc">電卓フォース</button>
+  </div>
+
+  <!-- ストップウォッチタブ -->
+  <div id="tab-sw" class="tab-panel active">
+    <section>
+      <h2>ID発行</h2>
+      <div class="form-row">
+        <div class="field">
+          <label for="issueId">ID</label>
+          <input type="text" id="issueId" placeholder="例: nandeya001">
+        </div>
+        <div class="field">
+          <label for="issuePasscode">パスコード</label>
+          <div class="inline-btn-group">
+            <input type="text" id="issuePasscode" placeholder="例: A1B2C3">
+            <button class="btn-sub" id="genPasscodeBtn" type="button">自動生成</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="issueNote">メモ（任意）</label>
+          <input type="text" id="issueNote" placeholder="例: 〇〇さん用">
+        </div>
+        <div class="field">
+          <button class="btn" id="issueBtn" type="button">発行</button>
         </div>
       </div>
-      <div class="field">
-        <label for="issueNote">メモ（任意）</label>
-        <input type="text" id="issueNote" placeholder="例: 〇〇さん用">
-      </div>
-      <div class="field">
-        <button class="btn" id="issueBtn" type="button">発行</button>
-      </div>
-    </div>
-    <div class="msg" id="issueMsg"></div>
-  </section>
+      <div class="msg" id="issueMsg"></div>
+    </section>
 
-  <section>
-    <h2>端末変更リクエスト</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>対象ID</th>
-          <th>申請日時</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="requestTableBody">
-        <tr class="loading-row"><td colspan="3">読み込み中...</td></tr>
-      </tbody>
-    </table>
-  </section>
+    <section>
+      <h2>端末変更リクエスト</h2>
+      <table>
+        <thead>
+          <tr><th>対象ID</th><th>申請日時</th><th>操作</th></tr>
+        </thead>
+        <tbody id="requestTableBody">
+          <tr class="loading-row"><td colspan="3">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
 
-  <section>
-    <h2>ライセンス一覧</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>パスコード</th>
-          <th>端末登録状況</th>
-          <th>メモ</th>
-          <th>発行日</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="licenseTableBody">
-        <tr class="loading-row"><td colspan="6">読み込み中...</td></tr>
-      </tbody>
-    </table>
-  </section>
+    <section>
+      <h2>ライセンス一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>パスコード</th><th>端末登録状況</th>
+            <th>メモ</th><th>発行日</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="licenseTableBody">
+          <tr class="loading-row"><td colspan="6">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- 電卓フォースタブ -->
+  <div id="tab-calc" class="tab-panel">
+    <section>
+      <h2>ID発行</h2>
+      <div class="form-row">
+        <div class="field">
+          <label for="cIssueId">ID</label>
+          <input type="text" id="cIssueId" placeholder="例: calc001">
+        </div>
+        <div class="field">
+          <label for="cIssuePasscode">パスコード</label>
+          <div class="inline-btn-group">
+            <input type="text" id="cIssuePasscode" placeholder="例: A1B2C3">
+            <button class="btn-sub" id="cGenPasscodeBtn" type="button">自動生成</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="cIssueNote">メモ（任意）</label>
+          <input type="text" id="cIssueNote" placeholder="例: 〇〇さん用">
+        </div>
+        <div class="field">
+          <button class="btn" id="cIssueBtn" type="button">発行</button>
+        </div>
+      </div>
+      <div class="msg" id="cIssueMsg"></div>
+    </section>
+
+    <section>
+      <h2>端末変更リクエスト</h2>
+      <table>
+        <thead>
+          <tr><th>対象ID</th><th>申請日時</th><th>操作</th></tr>
+        </thead>
+        <tbody id="cRequestTableBody">
+          <tr class="loading-row"><td colspan="3">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>ライセンス一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>パスコード</th><th>端末登録状況</th>
+            <th>メモ</th><th>発行日</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="cLicenseTableBody">
+          <tr class="loading-row"><td colspan="6">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
 </div>
 
 <script type="module">
@@ -342,6 +422,8 @@
       adminEl.classList.add("visible");
       loadLicenses();
       loadDeviceRequests();
+      loadCalcLicenses();
+      loadCalcDeviceRequests();
     } else {
       gateErrorEl.textContent = "パスワードが正しくありません";
     }
@@ -597,6 +679,211 @@
     try {
       await updateDoc(doc(db, LICENSES_COLLECTION, id), { deviceId: null });
       await loadLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("端末登録のリセットに失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  // =============================================
+  // タブ切り替え
+  // =============================================
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    });
+  });
+
+  // =============================================
+  // 電卓フォース用
+  // =============================================
+  const CALC_LICENSES = "calc_licenses";
+  const CALC_REQUESTS = "calc_deviceRequests";
+
+  const cIssueMsgEl       = document.getElementById("cIssueMsg");
+  const cIssueIdEl        = document.getElementById("cIssueId");
+  const cIssuePasscodeEl  = document.getElementById("cIssuePasscode");
+  const cIssueNoteEl      = document.getElementById("cIssueNote");
+  const cIssueBtnEl       = document.getElementById("cIssueBtn");
+  const cGenPasscodeBtnEl = document.getElementById("cGenPasscodeBtn");
+  const cTableBodyEl      = document.getElementById("cLicenseTableBody");
+  const cRequestBodyEl    = document.getElementById("cRequestTableBody");
+
+  function setCIssueMsg(text, type) {
+    cIssueMsgEl.textContent = text;
+    cIssueMsgEl.className = "msg" + (type ? " " + type : "");
+  }
+
+  function setCFormDisabled(disabled) {
+    cIssueIdEl.disabled = disabled;
+    cIssuePasscodeEl.disabled = disabled;
+    cIssueNoteEl.disabled = disabled;
+    cGenPasscodeBtnEl.disabled = disabled;
+    cIssueBtnEl.disabled = disabled;
+  }
+
+  cGenPasscodeBtnEl.addEventListener("click", () => {
+    cIssuePasscodeEl.value = generatePasscode();
+  });
+
+  cIssueBtnEl.addEventListener("click", async () => {
+    const id       = cIssueIdEl.value.trim();
+    const passcode = cIssuePasscodeEl.value.trim();
+    const note     = cIssueNoteEl.value.trim();
+    if (!id || !passcode) { setCIssueMsg("IDとパスコードを入力してください", "err"); return; }
+
+    setCFormDisabled(true);
+    cIssueBtnEl.textContent = "処理中...";
+    setCIssueMsg("", "");
+
+    try {
+      const ref = doc(db, CALC_LICENSES, id);
+      if ((await getDoc(ref)).exists()) {
+        setCIssueMsg("このIDは既に使われています", "err");
+        return;
+      }
+      await setDoc(ref, { passcode, deviceId: "", createdAt: Date.now(), note: note || "" });
+      setCIssueMsg("発行しました", "ok");
+      cIssueIdEl.value = "";
+      cIssuePasscodeEl.value = "";
+      cIssueNoteEl.value = "";
+      await loadCalcLicenses();
+    } catch (err) {
+      console.error(err);
+      setCIssueMsg("発行に失敗しました: " + (err && err.message ? err.message : err), "err");
+    } finally {
+      setCFormDisabled(false);
+      cIssueBtnEl.textContent = "発行";
+    }
+  });
+
+  async function loadCalcLicenses() {
+    cTableBodyEl.innerHTML = '<tr class="loading-row"><td colspan="6">読み込み中...</td></tr>';
+    try {
+      const snapshot = await getDocs(collection(db, CALC_LICENSES));
+      const items = [];
+      snapshot.forEach(d => items.push({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      if (items.length === 0) {
+        cTableBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">まだライセンスがありません</td></tr>';
+        return;
+      }
+
+      cTableBodyEl.innerHTML = "";
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        const registered = !!item.deviceId;
+        const createdAtText = item.createdAt ? new Date(item.createdAt).toLocaleDateString("ja-JP") : "-";
+        tr.innerHTML = `
+          <td data-label="ID">${escapeHtml(item.id)}</td>
+          <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
+          <td data-label="端末登録状況">
+            <span class="${registered ? "status-registered" : "status-unregistered"}">
+              ${registered ? "登録済み" : "未登録"}
+            </span>
+          </td>
+          <td data-label="メモ">${escapeHtml(item.note || "")}</td>
+          <td data-label="発行日">${escapeHtml(createdAtText)}</td>
+          <td data-label="操作">
+            <div class="action-cell">
+              <button class="btn-sub reset-btn" type="button" ${registered ? "" : "disabled"}>端末登録をリセット</button>
+              <button class="btn-danger delete-btn" type="button">削除</button>
+            </div>
+          </td>`;
+        tr.querySelector(".reset-btn").addEventListener("click", e => handleCalcResetDevice(item.id, e.target));
+        tr.querySelector(".delete-btn").addEventListener("click", e => handleCalcDelete(item.id, e.target));
+        cTableBodyEl.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      cTableBodyEl.innerHTML = `<tr class="empty-row"><td colspan="6">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
+    }
+  }
+
+  async function loadCalcDeviceRequests() {
+    cRequestBodyEl.innerHTML = '<tr class="loading-row"><td colspan="3">読み込み中...</td></tr>';
+    try {
+      const q = query(collection(db, CALC_REQUESTS), where("status", "==", "pending"));
+      const snapshot = await getDocs(q);
+      const items = [];
+      snapshot.forEach(d => items.push({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0));
+
+      if (items.length === 0) {
+        cRequestBodyEl.innerHTML = '<tr class="empty-row"><td colspan="3">保留中の申請はありません</td></tr>';
+        return;
+      }
+
+      cRequestBodyEl.innerHTML = "";
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        const dateText = item.requestedAt ? new Date(item.requestedAt).toLocaleString("ja-JP") : "-";
+        tr.innerHTML = `
+          <td data-label="対象ID">${escapeHtml(item.licenseId || "")}</td>
+          <td data-label="申請日時">${escapeHtml(dateText)}</td>
+          <td data-label="操作"><button class="btn-sub approve-btn" type="button">承認</button></td>`;
+        tr.querySelector(".approve-btn").addEventListener("click", e => handleCalcApproveRequest(item.id, item.licenseId, e.target));
+        cRequestBodyEl.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      cRequestBodyEl.innerHTML = `<tr class="empty-row"><td colspan="3">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
+    }
+  }
+
+  async function handleCalcApproveRequest(requestId, licenseId, buttonEl) {
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      const licenseRef = doc(db, CALC_LICENSES, licenseId);
+      if (!(await getDoc(licenseRef)).exists()) {
+        alert("対象のライセンスが見つかりません");
+        buttonEl.disabled = false;
+        buttonEl.textContent = original;
+        return;
+      }
+      await updateDoc(licenseRef, { deviceId: "" });
+      await updateDoc(doc(db, CALC_REQUESTS, requestId), { status: "approved" });
+      await loadCalcDeviceRequests();
+      await loadCalcLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("承認処理に失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  async function handleCalcDelete(id, buttonEl) {
+    if (!confirm("本当に削除しますか？")) return;
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      await deleteDoc(doc(db, CALC_LICENSES, id));
+      await loadCalcLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("削除に失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  async function handleCalcResetDevice(id, buttonEl) {
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      await updateDoc(doc(db, CALC_LICENSES, id), { deviceId: "" });
+      await loadCalcLicenses();
     } catch (err) {
       console.error(err);
       alert("端末登録のリセットに失敗しました: " + (err && err.message ? err.message : err));
