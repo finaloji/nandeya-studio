@@ -305,6 +305,35 @@
   </style>
 </head>
 <body>
+  <!-- ログイン画面 -->
+  <div class="login-screen" id="_cag">
+    <div class="login-icon">
+      <svg viewBox="0 0 24 24">
+        <rect x="4" y="3" width="16" height="18" rx="2"/>
+        <line x1="8" y1="7" x2="16" y2="7"/>
+        <line x1="8" y1="11" x2="10" y2="11"/>
+        <line x1="8" y1="15" x2="10" y2="15"/>
+        <line x1="14" y1="11" x2="16" y2="11"/>
+        <line x1="14" y1="15" x2="16" y2="15"/>
+      </svg>
+    </div>
+    <div class="login-title">電卓</div>
+    <div class="login-form">
+      <div class="login-field">
+        <input id="_cid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none">
+      </div>
+      <div class="login-field">
+        <input id="_cpc" type="password" placeholder="パスコード" autocomplete="off">
+      </div>
+      <div class="login-error" id="_cmsg"></div>
+      <button class="login-btn" id="_clb">ログイン</button>
+      <div class="login-device-change">
+        この端末を新しく登録したい場合<br>
+        <a href="#" id="_cdr">端末変更をリクエスト</a>
+      </div>
+    </div>
+  </div>
+
   <div id="app">
     <div id="display">
       <div id="display-icons">
@@ -447,35 +476,6 @@
       </div>
       <div class="cell">
         <button class="btn btn-op" data-op="eq">＝</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ログイン画面 -->
-  <div class="login-screen" id="_cag">
-    <div class="login-icon">
-      <svg viewBox="0 0 24 24">
-        <rect x="4" y="3" width="16" height="18" rx="2"/>
-        <line x1="8" y1="7" x2="16" y2="7"/>
-        <line x1="8" y1="11" x2="10" y2="11"/>
-        <line x1="8" y1="15" x2="10" y2="15"/>
-        <line x1="14" y1="11" x2="16" y2="11"/>
-        <line x1="14" y1="15" x2="16" y2="15"/>
-      </svg>
-    </div>
-    <div class="login-title">電卓</div>
-    <div class="login-form">
-      <div class="login-field">
-        <input id="_cid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none">
-      </div>
-      <div class="login-field">
-        <input id="_cpc" type="password" placeholder="パスコード" autocomplete="off">
-      </div>
-      <div class="login-error" id="_cmsg"></div>
-      <button class="login-btn" id="_clb">ログイン</button>
-      <div class="login-device-change">
-        この端末を新しく登録したい場合<br>
-        <a href="#" id="_cdr">端末変更をリクエスト</a>
       </div>
     </div>
   </div>
