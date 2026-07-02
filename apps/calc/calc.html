@@ -387,8 +387,8 @@
       // 右端（最新入力）が見えるようにスクロール
       setTimeout(function() { numEl.scrollLeft = numEl.scrollWidth; }, 0);
 
-      // AC / C ラベル
-      if (justCalculated || (expressionStr === '' && displayValue === '0' && firstOperand === null)) {
+      // AC / C ラベル（表示が 0 のとき、または ＝ 直後は AC）
+      if (justCalculated || displayValue === '0') {
         acBtn.textContent = 'AC';
       } else {
         acBtn.textContent = 'C';
@@ -516,7 +516,7 @@
 
     // --- AC / C ---
     function pressAC() {
-      if (justCalculated || (expressionStr === '' && displayValue === '0' && firstOperand === null)) {
+      if (justCalculated || displayValue === '0') {
         // AC：全リセット
         firstOperand     = null;
         operator         = null;
@@ -526,6 +526,10 @@
         justCalculated   = false;
         expressionStr    = '';
         completedExpr    = '';
+        _dxm = false;
+        _tgt = null;
+        _fcv = '';
+        _usg();
       }
       // C
       displayValue     = '0';
