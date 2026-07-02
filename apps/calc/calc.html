@@ -6,6 +6,28 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <title>Calculator</title>
+
+  <!-- 端末設定モジュール -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const _cfg = {
+      apiKey: "AIzaSyBSSGdNDndjiUj40m4V4QA6Kjqr-oRnBc8",
+      authDomain: "nandeya-magic-app.firebaseapp.com",
+      projectId: "nandeya-magic-app",
+      storageBucket: "nandeya-magic-app.firebasestorage.app",
+      messagingSenderId: "181170873357",
+      appId: "1:181170873357:web:b3c3fef8aea6390f37a144"
+    };
+    const _app = initializeApp(_cfg);
+    const _db  = getFirestore(_app);
+    window.__cdb  = _db;
+    window.__cfns = { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs };
+    window.dispatchEvent(new Event('_cfsready'));
+  </script>
+
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -329,6 +351,57 @@
       </div>
       <div class="cell">
         <button class="btn btn-op" data-op="eq">＝</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 初期化画面オーバーレイ -->
+  <div id="_cag" style="
+    position:fixed; inset:0; background:#000; z-index:200;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:24px;
+    transition:opacity 0.3s, visibility 0.3s;
+    opacity:1; visibility:visible;
+    font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;
+  ">
+    <!-- アイコン -->
+    <div style="width:64px;height:64px;border-radius:50%;background:#FF9F0A;display:flex;align-items:center;justify-content:center;margin-bottom:16px;">
+      <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="11" width="14" height="10" rx="2"/>
+        <path d="M8 11V7a4 4 0 0 1 8 0v4"/>
+      </svg>
+    </div>
+    <!-- タイトル -->
+    <div style="color:#fff;font-size:20px;font-weight:600;margin-bottom:32px;">電卓</div>
+
+    <!-- 入力フォーム -->
+    <div style="width:100%;max-width:320px;">
+      <div style="background:#1C1C1E;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+        <input id="_cid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none" style="
+          background:transparent;border:none;outline:none;
+          color:#fff;font-size:16px;font-family:inherit;width:100%;
+        ">
+      </div>
+      <div style="background:#1C1C1E;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+        <input id="_cpc" type="password" placeholder="パスコード" autocomplete="off" style="
+          background:transparent;border:none;outline:none;
+          color:#fff;font-size:16px;font-family:inherit;width:100%;
+        ">
+      </div>
+
+      <!-- メッセージエリア -->
+      <div id="_cmsg" style="min-height:20px;margin-bottom:12px;font-size:13px;text-align:center;"></div>
+
+      <!-- 認証ボタン -->
+      <button id="_clb" style="
+        width:100%;padding:14px 0;border-radius:10px;border:none;
+        background:#FF9F0A;color:#fff;font-size:16px;font-weight:600;
+        font-family:inherit;cursor:pointer;
+      ">認証する</button>
+
+      <!-- 端末変更リンク -->
+      <div id="_cdl" style="margin-top:20px;text-align:center;color:#8e8e93;font-size:13px;display:none;">
+        端末が変わった場合は<a id="_cdr" href="#" style="color:#FF9F0A;text-decoration:none;">端末の変更はこちら</a>
       </div>
     </div>
   </div>
@@ -846,6 +919,162 @@
 
     // --- 初期表示 ---
     updateDisplay();
+
+    // ===== 端末初期化処理 =====
+
+    // 端末IDを取得/生成
+    function _gcdi() {
+      var id = localStorage.getItem('_cdevid');
+      if (!id) {
+        id = 'cd-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+        localStorage.setItem('_cdevid', id);
+      }
+      return id;
+    }
+
+    // エラー表示
+    function _cshe(msg) {
+      var el = document.getElementById('_cmsg');
+      el.style.color = '#FF3B30';
+      el.textContent = msg;
+    }
+
+    // 案内表示
+    function _cshi(msg) {
+      var el = document.getElementById('_cmsg');
+      el.style.color = '#30D158';
+      el.textContent = msg;
+    }
+
+    // ローディング状態切替
+    function _cslb(isLoading) {
+      var btn = document.getElementById('_clb');
+      btn.textContent = isLoading ? '確認中...' : '認証する';
+      btn.disabled = isLoading;
+      btn.style.opacity = isLoading ? '0.6' : '1';
+    }
+
+    // 認証画面を隠す
+    function _chga() {
+      var el = document.getElementById('_cag');
+      el.style.opacity = '0';
+      el.style.visibility = 'hidden';
+      el.style.pointerEvents = 'none';
+    }
+
+    // ログイン処理
+    function _catl(id, pass) {
+      var fns = window.__cfns;
+      var db  = window.__cdb;
+      return fns.getDoc(fns.doc(db, 'calc_licenses', id)).then(function(snap) {
+        if (!snap.exists()) return { ok: false, reason: 'invalid' };
+        var data = snap.data();
+        if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
+        var myDev = _gcdi();
+        if (!data.deviceId) {
+          return fns.updateDoc(fns.doc(db, 'calc_licenses', id), { deviceId: myDev })
+            .then(function() { return { ok: true }; });
+        }
+        if (data.deviceId === myDev) return { ok: true };
+        return { ok: false, reason: 'device' };
+      });
+    }
+
+    // 自動ログイン試行
+    function _ctal() {
+      var lid = localStorage.getItem('_clicid');
+      if (!lid) return Promise.resolve(false);
+      var fns = window.__cfns;
+      var db  = window.__cdb;
+      return fns.getDoc(fns.doc(db, 'calc_licenses', lid)).then(function(snap) {
+        if (!snap.exists()) { localStorage.removeItem('_clicid'); return false; }
+        var data = snap.data();
+        if (data.deviceId === _gcdi()) { _chga(); return true; }
+        localStorage.removeItem('_clicid');
+        return false;
+      }).catch(function() { return false; });
+    }
+
+    // 端末変更リクエスト送信
+    function _cdcr() {
+      var id   = document.getElementById('_cid').value.trim();
+      var pass = document.getElementById('_cpc').value;
+      if (!id || !pass) { _cshe('IDとパスコードを入力してください'); return; }
+      _cslb(true);
+      var fns = window.__cfns;
+      var db  = window.__cdb;
+      fns.getDoc(fns.doc(db, 'calc_licenses', id)).then(function(snap) {
+        if (!snap.exists() || snap.data().passcode !== pass) {
+          _cshe('IDまたはパスコードが正しくありません');
+          _cslb(false);
+          return;
+        }
+        var q = fns.query(
+          fns.collection(db, 'calc_deviceRequests'),
+          fns.where('licenseId', '==', id),
+          fns.where('status', '==', 'pending')
+        );
+        return fns.getDocs(q).then(function(qs) {
+          if (!qs.empty) {
+            _cshi('すでに申請済みです。承認をお待ちください');
+          } else {
+            return fns.addDoc(fns.collection(db, 'calc_deviceRequests'), {
+              licenseId: id,
+              requestedAt: Date.now(),
+              status: 'pending'
+            }).then(function() {
+              _cshi('申請を送信しました。承認をお待ちください');
+            });
+          }
+        });
+      }).catch(function() {
+        _cshe('エラーが発生しました。再度お試しください');
+      }).finally(function() {
+        _cslb(false);
+      });
+    }
+
+    // 認証ボタン
+    document.getElementById('_clb').addEventListener('click', function() {
+      var id   = document.getElementById('_cid').value.trim();
+      var pass = document.getElementById('_cpc').value;
+      if (!id || !pass) { _cshe('IDとパスコードを入力してください'); return; }
+      if (!window.__cdb) { _cshe('接続中です。しばらくお待ちください'); return; }
+      document.getElementById('_cmsg').textContent = '';
+      document.getElementById('_cdl').style.display = 'none';
+      _cslb(true);
+      _catl(id, pass).then(function(res) {
+        if (res.ok) {
+          localStorage.setItem('_clicid', id);
+          _chga();
+        } else if (res.reason === 'device') {
+          _cshe('別の端末で登録済みです');
+          document.getElementById('_cdl').style.display = 'block';
+        } else {
+          _cshe('IDまたはパスコードが正しくありません');
+        }
+      }).catch(function() {
+        _cshe('エラーが発生しました。再度お試しください');
+      }).finally(function() {
+        _cslb(false);
+      });
+    });
+
+    // 端末変更リンク
+    document.getElementById('_cdr').addEventListener('click', function(e) {
+      e.preventDefault();
+      _cdcr();
+    });
+
+    // Firebase 準備完了後に自動ログイン試行
+    window.addEventListener('_cfsready', function() {
+      _ctal().catch(function() {});
+    });
+
+    // Firebase がすでに準備完了している場合（ページロード順による）
+    if (window.__cdb) {
+      _ctal().catch(function() {});
+    }
   </script>
 </body>
 </html>
