@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="時計">
+<title>時計</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    /* iOS標準の水色グラデーション壁紙（近似） */
+    background: linear-gradient(180deg,
+      #9fddf3 0%,
+      #86cfef 35%,
+      #67bdea 70%,
+      #55b4e6 100%);
+    background-attachment: fixed;
+    font-family: -apple-system, "SF Pro Display", "Hiragino Sans", system-ui, sans-serif;
+    color: #ffffff;
+    position: relative;
+    height: 100vh;
+    height: 100dvh;
+    touch-action: manipulation;
+  }
+
+  /* ステータスバー（自前で描画） */
+  .sb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top, 54px);
+    min-height: 54px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 30px 6px;
+    padding-top: env(safe-area-inset-top, 14px);
+  }
+  .sb-carrier {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .sb-icons {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .sb-icons svg { display: block; }
+
+  /* 日付＋時計のかたまり */
+  .head {
+    position: absolute;
+    top: 16%;
+    left: 0;
+    right: 0;
+    text-align: center;
+  }
+  .date {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 2px;
+  }
+  .clock {
+    font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+    font-size: 25vw;
+    line-height: 1.0;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.82);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* 下部のライト・カメラボタン（ロック画面の飾り） */
+  .foot {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(env(safe-area-inset-bottom, 20px) + 22px);
+    display: flex;
+    justify-content: space-between;
+    padding: 0 46px;
+  }
+  .fbtn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .fbtn svg { display: block; }
+
+  /* ホームインジケータ */
+  .home-ind {
+    position: absolute;
+    bottom: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 135px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.85);
+  }
+</style>
+</head>
+<body>
+
+  <!-- ステータスバー -->
+  <div class="sb">
+    <div class="sb-carrier">LINEMO</div>
+    <div class="sb-icons">
+      <!-- 電波 -->
+      <svg width="19" height="13" viewBox="0 0 19 13" fill="#fff">
+        <rect x="0"  y="8.5" width="3.2" height="4.5" rx="1"/>
+        <rect x="5"  y="6"   width="3.2" height="7"   rx="1"/>
+        <rect x="10" y="3.5" width="3.2" height="9.5" rx="1"/>
+        <rect x="15" y="1"   width="3.2" height="12"  rx="1"/>
+      </svg>
+      <!-- Wi-Fi -->
+      <svg width="18" height="13" viewBox="0 0 18 13" fill="#fff">
+        <path d="M9 2.2c3 0 5.7 1.15 7.7 3.02a.9.9 0 0 0 1.24-.02.86.86 0 0 0-.02-1.25C15.66 1.8 12.5.5 9 .5S2.34 1.8.08 3.97a.86.86 0 0 0-.02 1.25.9.9 0 0 0 1.24.02C3.3 3.35 6 2.2 9 2.2z"/>
+        <path d="M9 5.6c1.9 0 3.63.74 4.9 1.95a.9.9 0 0 0 1.24-.03.86.86 0 0 0-.03-1.24A9.03 9.03 0 0 0 9 3.8a9.03 9.03 0 0 0-6.1 2.48.86.86 0 0 0-.04 1.24.9.9 0 0 0 1.24.03A7.1 7.1 0 0 1 9 5.6z"/>
+        <path d="M9 8.9c.96 0 1.83.38 2.47 1a.9.9 0 0 0 1.26-.02.86.86 0 0 0-.02-1.24A5.44 5.44 0 0 0 9 7.1a5.44 5.44 0 0 0-3.71 1.54.86.86 0 0 0-.02 1.24.9.9 0 0 0 1.26.02A3.55 3.55 0 0 1 9 8.9z"/>
+        <circle cx="9" cy="11.5" r="1.3"/>
+      </svg>
+      <!-- バッテリー -->
+      <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+        <rect x="0.5" y="0.5" width="22" height="12" rx="3.5" stroke="#fff" stroke-opacity="0.5"/>
+        <rect x="2" y="2" width="19" height="9" rx="2" fill="#fff"/>
+        <path d="M24.5 4.2v4.6c1-.35 1-4.25 0-4.6z" fill="#fff" fill-opacity="0.6"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 日付＋時計 -->
+  <div class="head">
+    <div class="date" id="_d">--</div>
+    <div class="clock" id="_c">--:--</div>
+  </div>
+
+  <!-- 下部ボタン -->
+  <div class="foot">
+    <div class="fbtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff">
+        <path d="M8 2h8l-1 4H9L8 2zm.6 5h6.8l-.5 2.2c-.2.9-.9 1.6-1.8 1.6h-.6V22a1.1 1.1 0 0 1-2.2 0V10.8h-.6c-.9 0-1.6-.7-1.8-1.6L8.6 7z"/>
+      </svg>
+    </div>
+    <div class="fbtn">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="#fff">
+        <path d="M9.2 3.5l-1.1 1.6H4.5A2.5 2.5 0 0 0 2 7.6v10A2.5 2.5 0 0 0 4.5 20h15a2.5 2.5 0 0 0 2.5-2.5v-10a2.5 2.5 0 0 0-2.5-2.5h-3.6l-1.1-1.6a1 1 0 0 0-.83-.44H10.03a1 1 0 0 0-.83.44zM12 8.2a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 0 1 0-8.6zm0 1.9a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="home-ind"></div>
+
+<script>
+  (function () {
+    'use strict';
+
+    var _c = document.getElementById('_c');
+    var _d = document.getElementById('_d');
+    var _wd = ['日', '月', '火', '水', '木', '金', '土'];
+
+    // 表示する時刻の基準を返す（試作1-1では実時刻をそのまま返す）
+    // 後続スプリントで、この関数がプリセット表示・巻き戻し中の時刻を返すようになる
+    function _base() {
+      return new Date();
+    }
+
+    function _z(n) {
+      return (n < 10 ? '0' : '') + n;
+    }
+
+    function _tick() {
+      var t = _base();
+      _c.textContent = _z(t.getHours()) + ':' + _z(t.getMinutes());
+      _d.textContent = (t.getMonth() + 1) + '月' + t.getDate() + '日 (' + _wd[t.getDay()] + ')';
+    }
+
+    _tick();
+    setInterval(_tick, 250);
+  })();
+</script>
+</body>
+</html>
