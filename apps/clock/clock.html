@@ -133,6 +133,46 @@
     font-family: ui-monospace, monospace;
     pointer-events: none;
   }
+
+  /* 表示設定パネル（隠し：カメラ3回タップで開く） */
+  .sp {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0, 0, 0, 0.5);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, "Hiragino Sans", system-ui, sans-serif;
+  }
+  .sp.on { display: flex; }
+  .sp-panel {
+    width: 86%;
+    max-width: 420px;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: #1c1c1e;
+    color: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  .sp-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .sp-title { font-size: 18px; font-weight: 600; }
+  .sp-close {
+    font-size: 20px;
+    color: #8e8e93;
+    padding: 2px 10px;
+    cursor: pointer;
+  }
+  .sp-body { font-size: 14px; color: #aeaeb2; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -167,6 +207,19 @@
 
   <!-- 開発用センサー表示（一時的） -->
   <div class="dbg" id="_g"></div>
+
+  <!-- 表示設定パネル（カメラ3回タップで開く） -->
+  <div class="sp" id="_sp">
+    <div class="sp-panel">
+      <div class="sp-head">
+        <div class="sp-title">表示設定</div>
+        <div class="sp-close" id="_sx">✕</div>
+      </div>
+      <div class="sp-body" id="_sbody">
+        設定項目は順次追加されます。
+      </div>
+    </div>
+  </div>
 
 <script>
   (function () {
@@ -239,8 +292,10 @@
     var _g = document.getElementById('_g');    // 開発用表示
     var _lb = document.getElementById('_lb');  // ライト(左下)
     var _cb = document.getElementById('_cb');  // カメラ(右下)
+    var _sp = document.getElementById('_sp');  // 設定パネル
+    var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v6';                           // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v7';                           // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -378,6 +433,34 @@
       _flT = '★リセット';
       _flU = Date.now() + 1500;
     });
+
+    // ------------------------------------------------------------
+    // 表示設定（localStorage・難読化キー）
+    // ------------------------------------------------------------
+    var _ck = '_ncs1';        // 保存キー
+    var _cfg = {};            // 設定値
+
+    function _load() {
+      try { _cfg = JSON.parse(localStorage.getItem(_ck)) || {}; } catch (e) { _cfg = {}; }
+    }
+    function _save() {
+      try { localStorage.setItem(_ck, JSON.stringify(_cfg)); } catch (e) {}
+    }
+
+    // 保存済みの設定を実行時の値へ反映（UIは後続スプリントで追加）
+    function _apply() {
+      if (_cfg.dmap) _dmap = _cfg.dmap;
+      if (_cfg.wait != null) _RW_WAIT = _cfg.wait;
+      if (_cfg.step != null) _RW_STEP = _cfg.step;
+    }
+
+    _load();
+    _apply();
+
+    // カメラ(右下)を3回タップ → 設定パネルを開く
+    _tap3(_cb, function () { _sp.classList.add('on'); });
+    _sx.addEventListener('click', function (e) { e.stopPropagation(); _sp.classList.remove('on'); });
+    _sp.addEventListener('click', function (e) { if (e.target === _sp) _sp.classList.remove('on'); });
   })();
 </script>
 </body>
