@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="時計">
@@ -198,6 +201,8 @@
     var _h = document.getElementById('_h');   // タップ案内
     var _g = document.getElementById('_g');    // 開発用表示
     var _on = false;                           // 購読済みフラグ
+    var _VER = 'v1';                           // ビルド確認用（更新のたびに上げる）
+    _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
       return (v == null) ? '-' : v.toFixed(1);
@@ -277,7 +282,7 @@
 
       // --- 開発用表示 ---
       var head = (now < _flU) ? _flT : _lab();
-      _g.textContent = head +
+      _g.textContent = _VER + ' ' + head +
         '  z:' + _fx(z) +
         '  β:' + _fx(rb) +
         '  γ:' + _fx(rg);
