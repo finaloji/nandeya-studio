@@ -115,5 +115,5 @@ const firebaseConfig = {
 | L1 | Firestoreルール追加（`clock_licenses`/`clock_deviceRequests`） | コード完了・**コンソール反映待ち** |
 | L2 | clock.htmlにログインゲートUI＋Firebase初期化 | 完了 |
 | L3 | ログイン処理・1ID1端末ロック・端末変更申請 | 完了 |
-| L4 | admin.htmlにRe:Timeセクション追加 | 未着手 |
+| L4 | admin.htmlにRe:Timeセクション追加 | 完了 |
 | L5 | 通し動作確認（発行→ログイン→端末ロック→変更承認） | 未着手 |

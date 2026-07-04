@@ -276,6 +276,7 @@
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="sw">ストップウォッチ</button>
     <button class="tab-btn" data-tab="calc">電卓フォース</button>
+    <button class="tab-btn" data-tab="clock">Re:Time</button>
   </div>
 
   <!-- ストップウォッチタブ -->
@@ -387,6 +388,61 @@
       </table>
     </section>
   </div>
+
+  <!-- Re:Time タブ -->
+  <div id="tab-clock" class="tab-panel">
+    <section>
+      <h2>ID発行</h2>
+      <div class="form-row">
+        <div class="field">
+          <label for="rtIssueId">ID</label>
+          <input type="text" id="rtIssueId" placeholder="例: rt001">
+        </div>
+        <div class="field">
+          <label for="rtIssuePasscode">パスコード</label>
+          <div class="inline-btn-group">
+            <input type="text" id="rtIssuePasscode" placeholder="例: A1B2C3">
+            <button class="btn-sub" id="rtGenPasscodeBtn" type="button">自動生成</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="rtIssueNote">メモ（任意）</label>
+          <input type="text" id="rtIssueNote" placeholder="例: 〇〇さん用">
+        </div>
+        <div class="field">
+          <button class="btn" id="rtIssueBtn" type="button">発行</button>
+        </div>
+      </div>
+      <div class="msg" id="rtIssueMsg"></div>
+    </section>
+
+    <section>
+      <h2>端末変更リクエスト</h2>
+      <table>
+        <thead>
+          <tr><th>対象ID</th><th>申請日時</th><th>操作</th></tr>
+        </thead>
+        <tbody id="rtRequestTableBody">
+          <tr class="loading-row"><td colspan="3">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>ライセンス一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>パスコード</th><th>端末登録状況</th>
+            <th>メモ</th><th>発行日</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="rtLicenseTableBody">
+          <tr class="loading-row"><td colspan="6">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
 </div>
 
 <script type="module">
@@ -429,6 +485,8 @@
       loadDeviceRequests();
       loadCalcLicenses();
       loadCalcDeviceRequests();
+      loadRtLicenses();
+      loadRtDeviceRequests();
     } else {
       gateErrorEl.textContent = "パスワードが正しくありません";
     }
@@ -889,6 +947,200 @@
     try {
       await updateDoc(doc(db, CALC_LICENSES, id), { deviceId: "" });
       await loadCalcLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("端末登録のリセットに失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  // =============================================
+  // Re:Time（時間巻き戻し）用
+  // ※Firestoreルール上、作成/リセットの deviceId は null を使う
+  // =============================================
+  const RT_LICENSES = "clock_licenses";
+  const RT_REQUESTS = "clock_deviceRequests";
+
+  const rtIssueMsgEl       = document.getElementById("rtIssueMsg");
+  const rtIssueIdEl        = document.getElementById("rtIssueId");
+  const rtIssuePasscodeEl  = document.getElementById("rtIssuePasscode");
+  const rtIssueNoteEl      = document.getElementById("rtIssueNote");
+  const rtIssueBtnEl       = document.getElementById("rtIssueBtn");
+  const rtGenPasscodeBtnEl = document.getElementById("rtGenPasscodeBtn");
+  const rtTableBodyEl      = document.getElementById("rtLicenseTableBody");
+  const rtRequestBodyEl    = document.getElementById("rtRequestTableBody");
+
+  function setRtIssueMsg(text, type) {
+    rtIssueMsgEl.textContent = text;
+    rtIssueMsgEl.className = "msg" + (type ? " " + type : "");
+  }
+
+  function setRtFormDisabled(disabled) {
+    rtIssueIdEl.disabled = disabled;
+    rtIssuePasscodeEl.disabled = disabled;
+    rtIssueNoteEl.disabled = disabled;
+    rtGenPasscodeBtnEl.disabled = disabled;
+    rtIssueBtnEl.disabled = disabled;
+  }
+
+  rtGenPasscodeBtnEl.addEventListener("click", () => {
+    rtIssuePasscodeEl.value = generatePasscode();
+  });
+
+  rtIssueBtnEl.addEventListener("click", async () => {
+    const id       = rtIssueIdEl.value.trim();
+    const passcode = rtIssuePasscodeEl.value.trim();
+    const note     = rtIssueNoteEl.value.trim();
+    if (!id || !passcode) { setRtIssueMsg("IDとパスコードを入力してください", "err"); return; }
+
+    setRtFormDisabled(true);
+    rtIssueBtnEl.textContent = "処理中...";
+    setRtIssueMsg("", "");
+
+    try {
+      const ref = doc(db, RT_LICENSES, id);
+      if ((await getDoc(ref)).exists()) {
+        setRtIssueMsg("このIDは既に使われています", "err");
+        return;
+      }
+      await setDoc(ref, { passcode, deviceId: null, createdAt: Date.now(), note: note || "" });
+      setRtIssueMsg("発行しました", "ok");
+      rtIssueIdEl.value = "";
+      rtIssuePasscodeEl.value = "";
+      rtIssueNoteEl.value = "";
+      await loadRtLicenses();
+    } catch (err) {
+      console.error(err);
+      setRtIssueMsg("発行に失敗しました: " + (err && err.message ? err.message : err), "err");
+    } finally {
+      setRtFormDisabled(false);
+      rtIssueBtnEl.textContent = "発行";
+    }
+  });
+
+  async function loadRtLicenses() {
+    rtTableBodyEl.innerHTML = '<tr class="loading-row"><td colspan="6">読み込み中...</td></tr>';
+    try {
+      const snapshot = await getDocs(collection(db, RT_LICENSES));
+      const items = [];
+      snapshot.forEach(d => items.push({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      if (items.length === 0) {
+        rtTableBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">まだライセンスがありません</td></tr>';
+        return;
+      }
+
+      rtTableBodyEl.innerHTML = "";
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        const registered = !!item.deviceId;
+        const createdAtText = item.createdAt ? new Date(item.createdAt).toLocaleDateString("ja-JP") : "-";
+        tr.innerHTML = `
+          <td data-label="ID">${escapeHtml(item.id)}</td>
+          <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
+          <td data-label="端末登録状況">
+            <span class="${registered ? "status-registered" : "status-unregistered"}">
+              ${registered ? "登録済み" : "未登録"}
+            </span>
+          </td>
+          <td data-label="メモ">${escapeHtml(item.note || "")}</td>
+          <td data-label="発行日">${escapeHtml(createdAtText)}</td>
+          <td data-label="操作">
+            <div class="action-cell">
+              <button class="btn-sub reset-btn" type="button" ${registered ? "" : "disabled"}>端末登録をリセット</button>
+              <button class="btn-danger delete-btn" type="button">削除</button>
+            </div>
+          </td>`;
+        tr.querySelector(".reset-btn").addEventListener("click", e => handleRtResetDevice(item.id, e.target));
+        tr.querySelector(".delete-btn").addEventListener("click", e => handleRtDelete(item.id, e.target));
+        rtTableBodyEl.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      rtTableBodyEl.innerHTML = `<tr class="empty-row"><td colspan="6">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
+    }
+  }
+
+  async function loadRtDeviceRequests() {
+    rtRequestBodyEl.innerHTML = '<tr class="loading-row"><td colspan="3">読み込み中...</td></tr>';
+    try {
+      const q = query(collection(db, RT_REQUESTS), where("status", "==", "pending"));
+      const snapshot = await getDocs(q);
+      const items = [];
+      snapshot.forEach(d => items.push({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0));
+
+      if (items.length === 0) {
+        rtRequestBodyEl.innerHTML = '<tr class="empty-row"><td colspan="3">保留中の申請はありません</td></tr>';
+        return;
+      }
+
+      rtRequestBodyEl.innerHTML = "";
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        const dateText = item.requestedAt ? new Date(item.requestedAt).toLocaleString("ja-JP") : "-";
+        tr.innerHTML = `
+          <td data-label="対象ID">${escapeHtml(item.licenseId || "")}</td>
+          <td data-label="申請日時">${escapeHtml(dateText)}</td>
+          <td data-label="操作"><button class="btn-sub approve-btn" type="button">承認</button></td>`;
+        tr.querySelector(".approve-btn").addEventListener("click", e => handleRtApproveRequest(item.id, item.licenseId, e.target));
+        rtRequestBodyEl.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      rtRequestBodyEl.innerHTML = `<tr class="empty-row"><td colspan="3">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
+    }
+  }
+
+  async function handleRtApproveRequest(requestId, licenseId, buttonEl) {
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      const licenseRef = doc(db, RT_LICENSES, licenseId);
+      if (!(await getDoc(licenseRef)).exists()) {
+        alert("対象のライセンスが見つかりません");
+        buttonEl.disabled = false;
+        buttonEl.textContent = original;
+        return;
+      }
+      await updateDoc(licenseRef, { deviceId: null });
+      await updateDoc(doc(db, RT_REQUESTS, requestId), { status: "approved" });
+      await loadRtDeviceRequests();
+      await loadRtLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("承認処理に失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  async function handleRtDelete(id, buttonEl) {
+    if (!confirm("本当に削除しますか？")) return;
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      await deleteDoc(doc(db, RT_LICENSES, id));
+      await loadRtLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("削除に失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  async function handleRtResetDevice(id, buttonEl) {
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      await updateDoc(doc(db, RT_LICENSES, id), { deviceId: null });
+      await loadRtLicenses();
     } catch (err) {
       console.error(err);
       alert("端末登録のリセットに失敗しました: " + (err && err.message ? err.message : err));
