@@ -182,6 +182,38 @@
     // 表示時刻の上書き値。null なら実時刻、Date が入ればその時刻で固定表示
     var _ov = null;
 
+    // 補正表示のタイミング設定
+    var _RW_WAIT = 2000;  // 固定表示から巻き戻し開始までの待ち(ms)
+    var _RW_STEP = 500;   // 巻き戻し1ステップの間隔(ms)
+    var _rwT = null;      // 開始待ちタイマー
+    var _rwI = null;      // ステップ用インターバル
+
+    // 補正表示を中止して実時刻に戻す
+    function _rwStop() {
+      if (_rwT) { clearTimeout(_rwT); _rwT = null; }
+      if (_rwI) { clearInterval(_rwI); _rwI = null; }
+      _ov = null;
+      _tick();
+    }
+
+    // 現在時刻＋min分で固定表示し、2秒後から1分ずつ実時刻まで巻き戻す
+    function _rwGo(min) {
+      _rwStop();
+      _ov = new Date(Date.now() + min * 60000);
+      _tick();
+      _rwT = setTimeout(function () {
+        _rwT = null;
+        _rwI = setInterval(function () {
+          _ov = new Date(_ov.getTime() - 60000);
+          if (_ov.getTime() <= Date.now()) {   // 実時刻に到達したら通常へ
+            _rwStop();
+            return;
+          }
+          _tick();
+        }, _RW_STEP);
+      }, _RW_WAIT);
+    }
+
     // 表示する時刻の基準を返す
     function _base() {
       return _ov ? _ov : new Date();
@@ -206,7 +238,7 @@
     var _h = document.getElementById('_h');   // タップ案内
     var _g = document.getElementById('_g');    // 開発用表示
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v3';                           // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v4';                           // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -278,10 +310,9 @@
         if (o === 'U') {                 // 表向きに到達＝返し完了、方向を確定
           var dir = _dir(_ia, _ib);
           var min = _dmap[dir] || 0;
-          // 現在時刻＋補正分数で固定表示（プリセット）
+          // 現在時刻＋補正分数で固定表示→2秒後に1分ずつ実時刻まで巻き戻し
           if (min > 0) {
-            _ov = new Date(Date.now() + min * 60000);
-            _tick();
+            _rwGo(min);
           }
           _flT = '★' + dir + '(+' + min + ')  α=' + _ia.toFixed(0) + ' β=' + _ib.toFixed(0);
           _flU = now + 3000;
