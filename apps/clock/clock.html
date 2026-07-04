@@ -208,13 +208,27 @@
     var _FU = -6;     // これより小さければ表向き
     var _HOLD = 800;  // 伏せをこの時間キープで待機モードへ(ms)
 
-    var _st = 'up';           // up=通常(表向き) / wait=待機モード
+    var _st = 'up';           // up=通常(表向き) / wait=待機 / flip=返し中
     var _dwn = 0;             // 伏せを検出し始めた時刻
+    var _lt = 0;              // 前回イベント時刻(積分用)
+    var _ib = 0;              // 返し中のβ回転の積算(度)
+    var _ig = 0;              // 返し中のγ回転の積算(度)
     var _flU = 0;             // 開発用フラッシュ表示の終了時刻
     var _flT = '';            // 開発用フラッシュ表示の文言
 
     function _lab() {
-      return (_st === 'wait') ? '待機' : '表';
+      if (_st === 'wait') return '待機';
+      if (_st === 'flip') return '返し中';
+      return '表';
+    }
+
+    // 積算した回転から返した方向を判定する
+    // β(左右軸まわり)=手前/奥, γ(上下軸まわり)=右/左。符号は実測で確定させる
+    function _dir(ib, ig) {
+      if (Math.abs(ib) >= Math.abs(ig)) {
+        return ib > 0 ? '手前' : '奥';
+      }
+      return ig > 0 ? '右' : '左';
     }
 
     // センサー1回分の受信
@@ -222,27 +236,38 @@
       var a = e.accelerationIncludingGravity || {};
       var r = e.rotationRate || {};
       var z = (a.z == null) ? 0 : a.z;
+      var rb = (r.beta == null) ? 0 : r.beta;
+      var rg = (r.gamma == null) ? 0 : r.gamma;
       var now = Date.now();
+      var dt = _lt ? (now - _lt) / 1000 : 0;
+      _lt = now;
 
-      // --- 伏せ/表向きの状態遷移 ---
+      // 端末の向き: D=伏せ / U=表向き / M=その中間(返している最中)
       var o = (z > _FD) ? 'D' : (z < _FU ? 'U' : 'M');
+
       if (_st === 'up') {
         if (o === 'D') {
-          if (_dwn === 0) {
-            _dwn = now;
-          } else if (now - _dwn >= _HOLD) {
-            _st = 'wait';
-            _dwn = 0;
-            if (navigator.vibrate) navigator.vibrate(60); // 待機入りの合図(開発用)
-          }
+          if (_dwn === 0) _dwn = now;
+          else if (now - _dwn >= _HOLD) { _st = 'wait'; _dwn = 0; }
         } else {
           _dwn = 0;
         }
       } else if (_st === 'wait') {
-        if (o === 'U') {
+        if (o !== 'D') {                 // 伏せから動き出した＝返し開始
+          _st = 'flip';
+          _ib = rb * dt;
+          _ig = rg * dt;
+        }
+      } else if (_st === 'flip') {
+        _ib += rb * dt;                  // 返し中は回転を積算し続ける
+        _ig += rg * dt;
+        if (o === 'U') {                 // 表向きに到達＝返し完了、方向を確定
+          var dir = _dir(_ib, _ig);
+          _flT = '★' + dir + '  β=' + _ib.toFixed(0) + ' γ=' + _ig.toFixed(0);
+          _flU = now + 3000;
           _st = 'up';
-          _flT = '★表向き検出';
-          _flU = now + 1500;
+        } else if (o === 'D') {          // 伏せに戻った＝やり直し
+          _st = 'wait';
         }
       }
 
@@ -250,8 +275,8 @@
       var head = (now < _flU) ? _flT : _lab();
       _g.textContent = head +
         '  z:' + _fx(z) +
-        '  β:' + _fx(r.beta) +
-        '  γ:' + _fx(r.gamma);
+        '  β:' + _fx(rb) +
+        '  γ:' + _fx(rg);
     }
 
     // 購読開始（案内を消す）
