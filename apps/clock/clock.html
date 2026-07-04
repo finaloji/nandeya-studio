@@ -176,10 +176,15 @@
     var _d = document.getElementById('_d');
     var _wd = ['日', '月', '火', '水', '木', '金', '土'];
 
-    // 表示する時刻の基準を返す（試作1-1では実時刻をそのまま返す）
-    // 後続スプリントで、この関数がプリセット表示・巻き戻し中の時刻を返すようになる
+    // 方向 → 補正する分数（初期値。後で設定画面から変更可にする）
+    var _dmap = { '手前': 3, '右': 6, '奥': 9, '左': 12 };
+
+    // 表示時刻の上書き値。null なら実時刻、Date が入ればその時刻で固定表示
+    var _ov = null;
+
+    // 表示する時刻の基準を返す
     function _base() {
-      return new Date();
+      return _ov ? _ov : new Date();
     }
 
     function _z(n) {
@@ -201,7 +206,7 @@
     var _h = document.getElementById('_h');   // タップ案内
     var _g = document.getElementById('_g');    // 開発用表示
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v1';                           // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v2';                           // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -272,7 +277,13 @@
         _ia += ra * dt;
         if (o === 'U') {                 // 表向きに到達＝返し完了、方向を確定
           var dir = _dir(_ia, _ib);
-          _flT = '★' + dir + '  α=' + _ia.toFixed(0) + ' β=' + _ib.toFixed(0) + ' γ=' + _ig.toFixed(0);
+          var min = _dmap[dir] || 0;
+          // 現在時刻＋補正分数で固定表示（プリセット）
+          if (min > 0) {
+            _ov = new Date(Date.now() + min * 60000);
+            _tick();
+          }
+          _flT = '★' + dir + '(+' + min + ')  α=' + _ia.toFixed(0) + ' β=' + _ib.toFixed(0);
           _flU = now + 3000;
           _st = 'up';
         } else if (o === 'D') {          // 伏せに戻った＝やり直し
