@@ -47,7 +47,7 @@
     position: fixed;
     inset: 0;
     z-index: -1;
-    background-color: #55b4e6;
+    background-color: transparent;
     background-position: center;
     background-size: cover;
     background-repeat: no-repeat;
@@ -280,10 +280,10 @@
 
         <div class="sp-sec">背景</div>
         <div class="sp-sw">
-          <div class="sw" id="_sw0" data-bg="" style="background:linear-gradient(180deg,#9fddf3,#55b4e6)"></div>
-          <div class="sw" id="_sw1" data-bg="linear-gradient(180deg,#3a3a3c,#1c1c1e)" style="background:linear-gradient(180deg,#3a3a3c,#1c1c1e)"></div>
-          <div class="sw" id="_sw2" data-bg="linear-gradient(160deg,#ff9a56,#ff6a88)" style="background:linear-gradient(160deg,#ff9a56,#ff6a88)"></div>
-          <div class="sw" id="_sw3" data-bg="linear-gradient(160deg,#5b6cff,#8f5bff)" style="background:linear-gradient(160deg,#5b6cff,#8f5bff)"></div>
+          <div class="sw" id="_sw0" data-bg="" data-bc="#55b4e6" style="background:linear-gradient(180deg,#9fddf3,#55b4e6)"></div>
+          <div class="sw" id="_sw1" data-bg="linear-gradient(180deg,#3a3a3c,#1c1c1e)" data-bc="#1c1c1e" style="background:linear-gradient(180deg,#3a3a3c,#1c1c1e)"></div>
+          <div class="sw" id="_sw2" data-bg="linear-gradient(160deg,#ff9a56,#ff6a88)" data-bc="#ff6a88" style="background:linear-gradient(160deg,#ff9a56,#ff6a88)"></div>
+          <div class="sw" id="_sw3" data-bg="linear-gradient(160deg,#5b6cff,#8f5bff)" data-bc="#8f5bff" style="background:linear-gradient(160deg,#5b6cff,#8f5bff)"></div>
         </div>
         <div class="sp-btnrow">
           <label class="sp-btn" for="_bgf">画像を選ぶ</label>
@@ -367,7 +367,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v12';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v13';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -535,19 +535,9 @@
       });
     }
     function _applyBg() {
-      var v = _cfg.bg || '';
-      _bg.style.backgroundImage = v;
-      // ルート要素(html)にも反映して、画面外(オーバースクロール領域)まで隙間なく覆う。
-      // 標準グラデ(v='')のときは html は下端色のまま＝馴染むので背景画像は付けない
-      var de = document.documentElement;
-      if (v) {
-        de.style.backgroundImage = v;
-        de.style.backgroundSize = 'cover';
-        de.style.backgroundPosition = 'center';
-        de.style.backgroundRepeat = 'no-repeat';
-      } else {
-        de.style.backgroundImage = '';
-      }
+      _bg.style.backgroundImage = _cfg.bg || '';
+      // 画面外(オーバースクロール領域)の塗り色を、背景の下端色に合わせて境目を消す
+      document.documentElement.style.backgroundColor = _cfg.bc || '#55b4e6';
       _markSw();
     }
 
@@ -566,6 +556,7 @@
     _sws.forEach(function (el) {
       el.addEventListener('click', function () {
         _cfg.bg = el.getAttribute('data-bg') || '';
+        _cfg.bc = el.getAttribute('data-bc') || '';
         _save();
         _applyBg();
       });
@@ -585,7 +576,16 @@
           var cv = document.createElement('canvas');
           cv.width = cw;
           cv.height = ch;
-          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          var ctx = cv.getContext('2d');
+          ctx.drawImage(img, 0, 0, cw, ch);
+          // 下端1行の平均色を採取して画面外の塗り色に使う
+          try {
+            var px = ctx.getImageData(0, ch - 1, cw, 1).data;
+            var r = 0, g = 0, b = 0;
+            for (var p = 0; p < px.length; p += 4) { r += px[p]; g += px[p + 1]; b += px[p + 2]; }
+            var n = px.length / 4;
+            _cfg.bc = 'rgb(' + Math.round(r / n) + ',' + Math.round(g / n) + ',' + Math.round(b / n) + ')';
+          } catch (e) { _cfg.bc = '#000000'; }
           _cfg.bg = 'url("' + cv.toDataURL('image/jpeg', 0.82) + '")';
           _save();
           _applyBg();
