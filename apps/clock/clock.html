@@ -461,7 +461,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v15';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v16';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -658,9 +658,7 @@
     // 5-5aでは枠の仕組みのみ。実際の見た目は5-5bで t ごとに描画する。
     var _wg = document.getElementById('_wg');
     var _WGDEF = [
-      { s: 'md', t: '' },
-      { s: 'sm', t: '' },
-      { s: 'sm', t: '' }
+      { s: 'md', t: '' }
     ];
     function _renderWg() {
       var list = (_cfg.wg && _cfg.wg.length) ? _cfg.wg : _WGDEF;
