@@ -67,19 +67,20 @@
     text-align: center;
   }
   .date {
+    font-family: var(--fcf, ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif);
     font-size: 22px;
     font-weight: 600;
     letter-spacing: 0.5px;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, var(--fco, 0.6));
     margin-bottom: 2px;
   }
   .clock {
-    font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+    font-family: var(--fcf, ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif);
     font-size: 25vw;
     line-height: 1.0;
     font-weight: 600;
     letter-spacing: -3px;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, var(--fco, 0.6));
   }
 
   /* 下部のライト・カメラボタン（ロック画面の飾り） */
@@ -223,6 +224,19 @@
     border-radius: 10px;
     cursor: pointer;
   }
+  .sp-row select {
+    background: #2c2c2e;
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .sp-row input[type="range"] {
+    width: 120px;
+  }
 </style>
 </head>
 <body>
@@ -289,6 +303,17 @@
           <label class="sp-btn" for="_bgf">画像を選ぶ</label>
           <input type="file" id="_bgf" accept="image/*" style="display:none">
         </div>
+
+        <div class="sp-sec">文字</div>
+        <div class="sp-row"><span>書体</span>
+          <select id="_ff">
+            <option value="">丸み（標準）</option>
+            <option value="std">標準</option>
+            <option value="light">細字</option>
+            <option value="serif">明朝</option>
+          </select>
+        </div>
+        <div class="sp-row"><span>濃さ</span><input type="range" id="_fo" min="0.2" max="1" step="0.05"></div>
       </div>
     </div>
   </div>
@@ -367,7 +392,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v13';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v14';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -541,12 +566,31 @@
       _markSw();
     }
 
+    // 書体（キー→font-family）
+    var _fmap = {
+      '':      'ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif',
+      'std':   '-apple-system, "SF Pro Display", system-ui, sans-serif',
+      'light': '-apple-system, "SF Pro Display", system-ui, sans-serif',
+      'serif': 'ui-serif, "Hiragino Mincho ProN", serif'
+    };
+    var _fwmap = { '': 600, 'std': 600, 'light': 300, 'serif': 600 };
+
+    function _applyFont() {
+      var ff = _cfg.ff || '';
+      var root = document.documentElement.style;
+      root.setProperty('--fcf', _fmap[ff] || _fmap['']);
+      root.setProperty('--fco', (_cfg.fo != null) ? _cfg.fo : 0.6);
+      _c.style.fontWeight = _fwmap[ff] || 600;
+      _d.style.fontWeight = _fwmap[ff] || 600;
+    }
+
     // 保存済みの設定を実行時の値へ反映
     function _apply() {
       if (_cfg.dmap) _dmap = _cfg.dmap;
       if (_cfg.wait != null) _RW_WAIT = _cfg.wait;
       if (_cfg.step != null) _RW_STEP = _cfg.step;
       _applyBg();
+      _applyFont();
     }
 
     _load();
@@ -605,12 +649,16 @@
     ];
     var _ws = document.getElementById('_ws'); // 巻き戻し速度(秒/コマ)
     var _ww = document.getElementById('_ww'); // 開始待ち(秒)
+    var _ff = document.getElementById('_ff'); // 書体
+    var _fo = document.getElementById('_fo'); // 濃さ
 
     // 現在値を入力欄に反映（開くとき）
     function _fillSettings() {
       for (var i = 0; i < 4; i++) _mi[i].value = _dmap[_keys[i]];
       _ws.value = (_RW_STEP / 1000);
       _ww.value = (_RW_WAIT / 1000);
+      _ff.value = _cfg.ff || '';
+      _fo.value = (_cfg.fo != null) ? _cfg.fo : 0.6;
     }
 
     // 入力欄から値を読み取り、実行時の値へ反映して保存
@@ -628,13 +676,19 @@
       _cfg.dmap = _dmap;
       _cfg.step = _RW_STEP;
       _cfg.wait = _RW_WAIT;
+      _cfg.ff = _ff.value;
+      var fo = parseFloat(_fo.value);
+      _cfg.fo = isNaN(fo) ? 0.6 : fo;
       _save();
+      _applyFont();
     }
 
     // 各入力欄が変わるたびに保存（iOSはblurでchangeが発火）
-    _mi.concat([_ws, _ww]).forEach(function (el) {
+    _mi.concat([_ws, _ww, _ff]).forEach(function (el) {
       el.addEventListener('change', _readSettings);
     });
+    // 濃さのスライダーはドラッグ中も即反映したいので input でも拾う
+    _fo.addEventListener('input', _readSettings);
 
     // カメラ(右下)を3回タップ → 設定パネルを開く
     _tap3(_cb, function () { _fillSettings(); _sp.classList.add('on'); });
