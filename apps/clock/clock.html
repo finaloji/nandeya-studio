@@ -279,7 +279,7 @@
           <div class="sw" id="_sw3" data-bg="linear-gradient(160deg,#5b6cff,#8f5bff)" data-bc="#8f5bff" style="background:linear-gradient(160deg,#5b6cff,#8f5bff)"></div>
           <div class="sw" id="_sw4" data-bg='url("paper01.png")' style="background:url('paper01.png') center/cover"></div>
           <div class="sw" id="_sw5" data-bg='url("paper02.png")' style="background:url('paper02.png') center/cover"></div>
-          <div class="sw" id="_sw6" data-bg='url("paper03.png")' style="background:url('paper03.png') center/cover"></div>
+          <div class="sw" id="_sw6" data-bg='url("paper04.png")' style="background:url('paper04.png') center/cover"></div>
         </div>
         <div class="sp-btnrow">
           <label class="sp-btn" for="_bgf">画像を選ぶ</label>
@@ -373,7 +373,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v25';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v26';                          // ビルド確認用（更新のたびに上げる）
 
     // 伏せ/表向きのしきい値（実測: 表向き z≈-9.9 / 伏せ z≈+9.7）
     var _FD = 6;      // これより大きければ伏せ
@@ -579,10 +579,10 @@
       if (_cfg.dmap) _dmap = _cfg.dmap;
       if (_cfg.wait != null) _RW_WAIT = _cfg.wait;
       if (_cfg.step != null) _RW_STEP = _cfg.step;
-      // 未設定なら初期背景を paper03 にする（下端色は画像から算出）
-      if (_cfg.bg == null) {
-        _cfg.bg = 'url("paper03.png")';
-        _bcFromUrl('paper03.png', function (bc) { _cfg.bc = bc; _save(); _applyBg(); });
+      // 初期背景は paper04（未設定・旧paper03選択のどちらもpaper04へ。下端色は画像から算出）
+      if (_cfg.bg == null || /paper03\.png/.test(_cfg.bg)) {
+        _cfg.bg = 'url("paper04.png")';
+        _bcFromUrl('paper04.png', function (bc) { _cfg.bc = bc; _save(); _applyBg(); });
       }
       _applyBg();
       _applyFont();
