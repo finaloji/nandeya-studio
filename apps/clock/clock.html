@@ -179,6 +179,7 @@
   }
   .sp-sw {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
     padding: 10px 0;
   }
@@ -276,6 +277,9 @@
           <div class="sw" id="_sw1" data-bg="linear-gradient(180deg,#3a3a3c,#1c1c1e)" data-bc="#1c1c1e" style="background:linear-gradient(180deg,#3a3a3c,#1c1c1e)"></div>
           <div class="sw" id="_sw2" data-bg="linear-gradient(160deg,#ff9a56,#ff6a88)" data-bc="#ff6a88" style="background:linear-gradient(160deg,#ff9a56,#ff6a88)"></div>
           <div class="sw" id="_sw3" data-bg="linear-gradient(160deg,#5b6cff,#8f5bff)" data-bc="#8f5bff" style="background:linear-gradient(160deg,#5b6cff,#8f5bff)"></div>
+          <div class="sw" id="_sw4" data-bg='url("paper01.png")' style="background:url('paper01.png') center/cover"></div>
+          <div class="sw" id="_sw5" data-bg='url("paper02.png")' style="background:url('paper02.png') center/cover"></div>
+          <div class="sw" id="_sw6" data-bg='url("paper03.png")' style="background:url('paper03.png') center/cover"></div>
         </div>
         <div class="sp-btnrow">
           <label class="sp-btn" for="_bgf">画像を選ぶ</label>
@@ -369,7 +373,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v24';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v25';                          // ビルド確認用（更新のたびに上げる）
 
     // 伏せ/表向きのしきい値（実測: 表向き z≈-9.9 / 伏せ z≈+9.7）
     var _FD = 6;      // これより大きければ伏せ
@@ -499,13 +503,40 @@
       document.getElementById('_sw0'),
       document.getElementById('_sw1'),
       document.getElementById('_sw2'),
-      document.getElementById('_sw3')
+      document.getElementById('_sw3'),
+      document.getElementById('_sw4'),
+      document.getElementById('_sw5'),
+      document.getElementById('_sw6')
     ];
     function _markSw() {
       var cur = _cfg.bg || '';
       _sws.forEach(function (el) {
         el.classList.toggle('on', (el.getAttribute('data-bg') || '') === cur);
       });
+    }
+    // 'url("paper03.png")' → 'paper03.png'
+    function _urlOf(s) {
+      var m = /url\(["']?(.*?)["']?\)/.exec(s || '');
+      return m ? m[1] : (s || '');
+    }
+    // 画像の下端1行の平均色を求めてコールバックで返す（境目消し用）
+    function _bcFromUrl(src, cb) {
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var cv = document.createElement('canvas');
+          cv.width = img.width; cv.height = img.height;
+          var ctx = cv.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          var px = ctx.getImageData(0, img.height - 1, img.width, 1).data;
+          var r = 0, g = 0, b = 0;
+          for (var p = 0; p < px.length; p += 4) { r += px[p]; g += px[p + 1]; b += px[p + 2]; }
+          var n = px.length / 4;
+          cb('rgb(' + Math.round(r / n) + ',' + Math.round(g / n) + ',' + Math.round(b / n) + ')');
+        } catch (e) { cb('#000000'); }
+      };
+      img.onerror = function () { cb('#000000'); };
+      img.src = src;
     }
     function _applyBg() {
       _bg.style.backgroundImage = _cfg.bg || '';
@@ -548,6 +579,11 @@
       if (_cfg.dmap) _dmap = _cfg.dmap;
       if (_cfg.wait != null) _RW_WAIT = _cfg.wait;
       if (_cfg.step != null) _RW_STEP = _cfg.step;
+      // 未設定なら初期背景を paper03 にする（下端色は画像から算出）
+      if (_cfg.bg == null) {
+        _cfg.bg = 'url("paper03.png")';
+        _bcFromUrl('paper03.png', function (bc) { _cfg.bc = bc; _save(); _applyBg(); });
+      }
       _applyBg();
       _applyFont();
     }
@@ -558,8 +594,14 @@
     // プリセット選択（標準に戻す＝先頭スウォッチ）
     _sws.forEach(function (el) {
       el.addEventListener('click', function () {
-        _cfg.bg = el.getAttribute('data-bg') || '';
-        _cfg.bc = el.getAttribute('data-bc') || '';
+        var bg = el.getAttribute('data-bg') || '';
+        _cfg.bg = bg;
+        if (/^url\(/.test(bg)) {
+          // 画像プリセットは下端色を画像から算出して境目を消す
+          _bcFromUrl(_urlOf(bg), function (bc) { _cfg.bc = bc; _save(); _applyBg(); });
+        } else {
+          _cfg.bc = el.getAttribute('data-bc') || '';
+        }
         _save();
         _applyBg();
       });
