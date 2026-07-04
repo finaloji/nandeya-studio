@@ -41,14 +41,17 @@
     touch-action: manipulation;
   }
 
-  /* iOS標準の水色グラデーション壁紙（近似）。
-     画面全体を固定で覆い、Safariのバー開閉でも空白ができないようにする */
-  body::before {
-    content: '';
+  /* 壁紙レイヤー。画面全体を固定で覆い、差し替え可能にする。
+     既定はiOS標準の水色グラデーション（近似）。設定で画像やプリセットに変更できる */
+  .bg {
     position: fixed;
     inset: 0;
     z-index: -1;
-    background: linear-gradient(180deg,
+    background-color: #55b4e6;
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-image: linear-gradient(180deg,
       #9fddf3 0%,
       #86cfef 35%,
       #67bdea 70%,
@@ -198,9 +201,34 @@
     -webkit-appearance: none;
     appearance: none;
   }
+  .sp-sw {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+  }
+  .sw {
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+  }
+  .sw.on { border-color: #0a84ff; }
+  .sp-btnrow { padding: 6px 0 2px; }
+  .sp-btn {
+    display: inline-block;
+    background: #2c2c2e;
+    color: #0a84ff;
+    font-size: 15px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
+
+  <!-- 壁紙レイヤー（差し替え可能） -->
+  <div class="bg" id="_bg"></div>
 
   <!-- 日付＋時計 -->
   <div class="head">
@@ -249,6 +277,18 @@
         <div class="sp-sec">タイミング</div>
         <div class="sp-row"><span>巻き戻し速度（秒／コマ）</span><input type="number" inputmode="decimal" step="0.1" id="_ws"></div>
         <div class="sp-row"><span>開始待ち（秒）</span><input type="number" inputmode="decimal" step="0.1" id="_ww"></div>
+
+        <div class="sp-sec">背景</div>
+        <div class="sp-sw">
+          <div class="sw" id="_sw0" data-bg="" style="background:linear-gradient(180deg,#9fddf3,#55b4e6)"></div>
+          <div class="sw" id="_sw1" data-bg="linear-gradient(180deg,#3a3a3c,#1c1c1e)" style="background:linear-gradient(180deg,#3a3a3c,#1c1c1e)"></div>
+          <div class="sw" id="_sw2" data-bg="linear-gradient(160deg,#ff9a56,#ff6a88)" style="background:linear-gradient(160deg,#ff9a56,#ff6a88)"></div>
+          <div class="sw" id="_sw3" data-bg="linear-gradient(160deg,#5b6cff,#8f5bff)" style="background:linear-gradient(160deg,#5b6cff,#8f5bff)"></div>
+        </div>
+        <div class="sp-btnrow">
+          <label class="sp-btn" for="_bgf">画像を選ぶ</label>
+          <input type="file" id="_bgf" accept="image/*" style="display:none">
+        </div>
       </div>
     </div>
   </div>
@@ -327,7 +367,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v9';                           // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v10';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -479,15 +519,69 @@
       try { localStorage.setItem(_ck, JSON.stringify(_cfg)); } catch (e) {}
     }
 
-    // 保存済みの設定を実行時の値へ反映（UIは後続スプリントで追加）
+    // 背景（壁紙）関連
+    var _bg = document.getElementById('_bg');
+    var _bgf = document.getElementById('_bgf');
+    var _sws = [
+      document.getElementById('_sw0'),
+      document.getElementById('_sw1'),
+      document.getElementById('_sw2'),
+      document.getElementById('_sw3')
+    ];
+    function _markSw() {
+      var cur = _cfg.bg || '';
+      _sws.forEach(function (el) {
+        el.classList.toggle('on', (el.getAttribute('data-bg') || '') === cur);
+      });
+    }
+    function _applyBg() {
+      _bg.style.backgroundImage = _cfg.bg || '';
+      _markSw();
+    }
+
+    // 保存済みの設定を実行時の値へ反映
     function _apply() {
       if (_cfg.dmap) _dmap = _cfg.dmap;
       if (_cfg.wait != null) _RW_WAIT = _cfg.wait;
       if (_cfg.step != null) _RW_STEP = _cfg.step;
+      _applyBg();
     }
 
     _load();
     _apply();
+
+    // プリセット選択（標準に戻す＝先頭スウォッチ）
+    _sws.forEach(function (el) {
+      el.addEventListener('click', function () {
+        _cfg.bg = el.getAttribute('data-bg') || '';
+        _save();
+        _applyBg();
+      });
+    });
+
+    // 画像アップロード（縮小してlocalStorageに保存）
+    _bgf.addEventListener('change', function () {
+      var f = _bgf.files && _bgf.files[0];
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var mx = 1400;
+          var sc = Math.min(1, mx / Math.max(img.width, img.height));
+          var cw = Math.round(img.width * sc), ch = Math.round(img.height * sc);
+          var cv = document.createElement('canvas');
+          cv.width = cw;
+          cv.height = ch;
+          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          _cfg.bg = 'url("' + cv.toDataURL('image/jpeg', 0.82) + '")';
+          _save();
+          _applyBg();
+        };
+        img.src = rd.result;
+      };
+      rd.readAsDataURL(f);
+    });
 
     // 設定項目の入力欄
     var _keys = ['手前', '右', '奥', '左'];
