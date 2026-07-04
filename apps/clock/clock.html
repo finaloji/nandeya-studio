@@ -83,6 +83,41 @@
     color: rgba(255, 255, 255, var(--fco, 0.6));
   }
 
+  /* 時計下のウィジェット枠（ロック画面のウィジェット行を再現）。
+     枠(スロット)の仕組みだけを用意し、中身は設定で差し替えられるようにする */
+  .wg {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 0 22px;
+  }
+  .wg.off { display: none; }
+  .wtile {
+    height: 74px;
+    border-radius: 18px;
+    background: rgba(120, 120, 128, 0.28);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .wtile.sm { width: 74px; }
+  .wtile.md { width: 158px; }
+  /* 中身が未設定のスロットの仮表示 */
+  .wtile .ph {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: -apple-system, "Hiragino Sans", system-ui, sans-serif;
+    text-align: center;
+    line-height: 1.3;
+  }
+
   /* 下部のライト・カメラボタン（ロック画面の飾り） */
   .foot {
     position: absolute;
@@ -237,6 +272,35 @@
   .sp-row input[type="range"] {
     width: 120px;
   }
+  /* iOS風トグルスイッチ */
+  .sp-row input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 50px;
+    height: 30px;
+    background: #39393d;
+    border-radius: 15px;
+    position: relative;
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+  .sp-row input[type="checkbox"]::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 26px;
+    height: 26px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .sp-row input[type="checkbox"]:checked {
+    background: #34c759;
+  }
+  .sp-row input[type="checkbox"]:checked::after {
+    transform: translateX(20px);
+  }
 </style>
 </head>
 <body>
@@ -248,6 +312,8 @@
   <div class="head">
     <div class="date" id="_d">--</div>
     <div class="clock" id="_c">--:--</div>
+    <!-- ウィジェット枠（スロットはJSで生成・設定で差し替え） -->
+    <div class="wg off" id="_wg"></div>
   </div>
 
   <!-- 下部ボタン -->
@@ -314,6 +380,9 @@
           </select>
         </div>
         <div class="sp-row"><span>濃さ</span><input type="range" id="_fo" min="0.2" max="1" step="0.05"></div>
+
+        <div class="sp-sec">ウィジェット</div>
+        <div class="sp-row"><span>表示する</span><input type="checkbox" id="_wgon"></div>
       </div>
     </div>
   </div>
@@ -392,7 +461,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v14';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v15';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -584,6 +653,34 @@
       _d.style.fontWeight = _fwmap[ff] || 600;
     }
 
+    // ウィジェット枠（スロット機構）
+    // スロット定義: { s:'sm'|'md', t:種別 } の配列。t未設定は仮表示。
+    // 5-5aでは枠の仕組みのみ。実際の見た目は5-5bで t ごとに描画する。
+    var _wg = document.getElementById('_wg');
+    var _WGDEF = [
+      { s: 'md', t: '' },
+      { s: 'sm', t: '' },
+      { s: 'sm', t: '' }
+    ];
+    function _renderWg() {
+      var list = (_cfg.wg && _cfg.wg.length) ? _cfg.wg : _WGDEF;
+      _wg.innerHTML = '';
+      list.forEach(function (w) {
+        var tile = document.createElement('div');
+        tile.className = 'wtile ' + (w.s === 'md' ? 'md' : 'sm');
+        // 種別ごとの見た目は5-5bで実装。今は枠の確認用に仮表示。
+        var ph = document.createElement('div');
+        ph.className = 'ph';
+        ph.textContent = (w.s === 'md' ? '枠(横長)' : '枠');
+        tile.appendChild(ph);
+        _wg.appendChild(tile);
+      });
+    }
+    function _applyWg() {
+      _renderWg();
+      _wg.classList.toggle('off', !_cfg.wgOn);
+    }
+
     // 保存済みの設定を実行時の値へ反映
     function _apply() {
       if (_cfg.dmap) _dmap = _cfg.dmap;
@@ -591,6 +688,7 @@
       if (_cfg.step != null) _RW_STEP = _cfg.step;
       _applyBg();
       _applyFont();
+      _applyWg();
     }
 
     _load();
@@ -651,6 +749,7 @@
     var _ww = document.getElementById('_ww'); // 開始待ち(秒)
     var _ff = document.getElementById('_ff'); // 書体
     var _fo = document.getElementById('_fo'); // 濃さ
+    var _wgon = document.getElementById('_wgon'); // ウィジェット表示
 
     // 現在値を入力欄に反映（開くとき）
     function _fillSettings() {
@@ -659,6 +758,7 @@
       _ww.value = (_RW_WAIT / 1000);
       _ff.value = _cfg.ff || '';
       _fo.value = (_cfg.fo != null) ? _cfg.fo : 0.6;
+      _wgon.checked = !!_cfg.wgOn;
     }
 
     // 入力欄から値を読み取り、実行時の値へ反映して保存
@@ -679,12 +779,14 @@
       _cfg.ff = _ff.value;
       var fo = parseFloat(_fo.value);
       _cfg.fo = isNaN(fo) ? 0.6 : fo;
+      _cfg.wgOn = _wgon.checked;
       _save();
       _applyFont();
+      _applyWg();
     }
 
     // 各入力欄が変わるたびに保存（iOSはblurでchangeが発火）
-    _mi.concat([_ws, _ww, _ff]).forEach(function (el) {
+    _mi.concat([_ws, _ww, _ff, _wgon]).forEach(function (el) {
       el.addEventListener('change', _readSettings);
     });
     // 濃さのスライダーはドラッグ中も即反映したいので input でも拾う
