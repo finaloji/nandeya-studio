@@ -61,7 +61,7 @@
   /* 日付＋時計のかたまり */
   .head {
     position: absolute;
-    top: 16%;
+    top: 12%;
     left: 0;
     right: 0;
     text-align: center;
@@ -71,7 +71,7 @@
     font-size: 22px;
     font-weight: 600;
     letter-spacing: 0.5px;
-    color: rgba(255, 255, 255, var(--fco, 0.6));
+    color: var(--fccol, rgba(255, 255, 255, 0.6));
     margin-bottom: 2px;
   }
   .clock {
@@ -80,7 +80,7 @@
     line-height: 1.0;
     font-weight: 600;
     letter-spacing: -3px;
-    color: rgba(255, 255, 255, var(--fco, 0.6));
+    color: var(--fccol, rgba(255, 255, 255, 0.6));
   }
 
   /* 下部のライト・カメラボタン（ロック画面の飾り） */
@@ -237,6 +237,15 @@
   .sp-row input[type="range"] {
     width: 120px;
   }
+  .sp-row input[type="color"] {
+    width: 44px;
+    height: 30px;
+    padding: 2px;
+    background: #2c2c2e;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -313,6 +322,7 @@
             <option value="serif">明朝</option>
           </select>
         </div>
+        <div class="sp-row"><span>色</span><input type="color" id="_fc" value="#ffffff"></div>
         <div class="sp-row"><span>濃さ</span><input type="range" id="_fo" min="0.2" max="1" step="0.05"></div>
       </div>
     </div>
@@ -392,7 +402,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v19';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v20';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -575,11 +585,22 @@
     };
     var _fwmap = { '': 600, 'std': 600, 'light': 300, 'serif': 600 };
 
+    // #rrggbb → "r,g,b"
+    function _hex2rgb(hex) {
+      var h = (hex || '#ffffff').replace('#', '');
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      var n = parseInt(h, 16);
+      return ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255);
+    }
+
     function _applyFont() {
       var ff = _cfg.ff || '';
       var root = document.documentElement.style;
       root.setProperty('--fcf', _fmap[ff] || _fmap['']);
-      root.setProperty('--fco', (_cfg.fo != null) ? _cfg.fo : 0.6);
+      // 文字色（色＋濃さ）をまとめて rgba にして反映
+      var fo = (_cfg.fo != null) ? _cfg.fo : 0.6;
+      var rgb = _hex2rgb(_cfg.fc || '#ffffff');
+      root.setProperty('--fccol', 'rgba(' + rgb + ',' + fo + ')');
       _c.style.fontWeight = _fwmap[ff] || 600;
       _d.style.fontWeight = _fwmap[ff] || 600;
     }
@@ -650,6 +671,7 @@
     var _ws = document.getElementById('_ws'); // 巻き戻し速度(秒/コマ)
     var _ww = document.getElementById('_ww'); // 開始待ち(秒)
     var _ff = document.getElementById('_ff'); // 書体
+    var _fc = document.getElementById('_fc'); // 色
     var _fo = document.getElementById('_fo'); // 濃さ
 
     // 現在値を入力欄に反映（開くとき）
@@ -658,6 +680,7 @@
       _ws.value = (_RW_STEP / 1000);
       _ww.value = (_RW_WAIT / 1000);
       _ff.value = _cfg.ff || '';
+      _fc.value = _cfg.fc || '#ffffff';
       _fo.value = (_cfg.fo != null) ? _cfg.fo : 0.6;
     }
 
@@ -677,6 +700,7 @@
       _cfg.step = _RW_STEP;
       _cfg.wait = _RW_WAIT;
       _cfg.ff = _ff.value;
+      _cfg.fc = _fc.value;
       var fo = parseFloat(_fo.value);
       _cfg.fo = isNaN(fo) ? 0.6 : fo;
       _save();
@@ -687,8 +711,9 @@
     _mi.concat([_ws, _ww, _ff]).forEach(function (el) {
       el.addEventListener('change', _readSettings);
     });
-    // 濃さのスライダーはドラッグ中も即反映したいので input でも拾う
+    // 濃さのスライダー・色ピッカーはドラッグ中も即反映したいので input でも拾う
     _fo.addEventListener('input', _readSettings);
+    _fc.addEventListener('input', _readSettings);
 
     // カメラ(右下)を3回タップ → 設定パネルを開く
     _tap3(_cb, function () { _fillSettings(); _sp.classList.add('on'); });
