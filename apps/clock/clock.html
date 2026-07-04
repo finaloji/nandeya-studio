@@ -13,6 +13,28 @@
 <link rel="icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
 <title>Re:Time</title>
+
+<!-- ライセンス確認モジュール（Firestore初期化） -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const _cfg = {
+    apiKey: "AIzaSyBSSGdNDndjiUj40m4V4QA6Kjqr-oRnBc8",
+    authDomain: "nandeya-magic-app.firebaseapp.com",
+    projectId: "nandeya-magic-app",
+    storageBucket: "nandeya-magic-app.firebasestorage.app",
+    messagingSenderId: "181170873357",
+    appId: "1:181170873357:web:b3c3fef8aea6390f37a144"
+  };
+  const _app = initializeApp(_cfg);
+  const _db  = getFirestore(_app);
+  window.__rdb  = _db;
+  window.__rfns = { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs };
+  window.dispatchEvent(new Event('_rfsready'));
+</script>
+
 <style>
   * {
     margin: 0;
@@ -222,9 +244,110 @@
     border-radius: 8px;
     cursor: pointer;
   }
+
+  /* ライセンス確認画面（初回セットアップ時のみ・以降は端末に記憶） */
+  .lgate {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: -apple-system, "SF Pro Display", "Hiragino Sans", system-ui, sans-serif;
+    transition: opacity 0.3s, visibility 0.3s;
+  }
+  .lgate.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .lg-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+  .lg-icon img { width: 100%; height: 100%; display: block; }
+  .lg-title {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 30px;
+  }
+  .lg-form { width: 100%; max-width: 320px; }
+  .lg-field {
+    background: #1c1c1e;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .lg-field input {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    font-family: inherit;
+    width: 100%;
+    outline: none;
+  }
+  .lg-field input::placeholder { color: #8e8e93; }
+  .lg-msg {
+    color: #ff3b30;
+    font-size: 13px;
+    min-height: 18px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .lg-msg.info { color: #30d158; }
+  .lg-btn {
+    width: 100%;
+    background: #0a84ff;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 0;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    margin-bottom: 24px;
+  }
+  .lg-dc {
+    text-align: center;
+    color: #8e8e93;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .lg-dc a { color: #0a84ff; text-decoration: none; }
 </style>
 </head>
 <body>
+
+  <!-- ライセンス確認画面（初回のみ表示・以降は端末に記憶） -->
+  <div class="lgate" id="_rag">
+    <div class="lg-icon"><img src="icon.png" alt=""></div>
+    <div class="lg-title">Re:Time</div>
+    <div class="lg-form">
+      <div class="lg-field">
+        <input id="_rid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none">
+      </div>
+      <div class="lg-field">
+        <input id="_rpc" type="password" placeholder="パスコード" autocomplete="off">
+      </div>
+      <div class="lg-msg" id="_rmsg"></div>
+      <button class="lg-btn" id="_rlb">ログイン</button>
+      <div class="lg-dc">
+        この端末を新しく登録したい場合<br>
+        <a href="#" id="_rdr">端末変更をリクエスト</a>
+      </div>
+    </div>
+  </div>
 
   <!-- 壁紙レイヤー（差し替え可能） -->
   <div class="bg" id="_bg"></div>
@@ -373,7 +496,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v26';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v27';                          // ビルド確認用（更新のたびに上げる）
 
     // 伏せ/表向きのしきい値（実測: 表向き z≈-9.9 / 伏せ z≈+9.7）
     var _FD = 6;      // これより大きければ伏せ
@@ -699,6 +822,128 @@
     _tap3(_cb, function () { _fillSettings(); _sp.classList.add('on'); });
     _sx.addEventListener('click', function (e) { e.stopPropagation(); _readSettings(); _sp.classList.remove('on'); });
     _sp.addEventListener('click', function (e) { if (e.target === _sp) { _readSettings(); _sp.classList.remove('on'); } });
+  })();
+</script>
+
+<!-- ライセンス確認（ID・パスコード＋1ID1端末ロック） -->
+<script>
+  (function () {
+    'use strict';
+
+    // 端末ID（初回に生成してlocalStorageへ）
+    function _grdi() {
+      var id = localStorage.getItem('_rtdev');
+      if (!id) {
+        id = 'rt-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+        localStorage.setItem('_rtdev', id);
+      }
+      return id;
+    }
+
+    var _rmsg = document.getElementById('_rmsg');
+    var _rlb  = document.getElementById('_rlb');
+
+    function _rshe(msg) { _rmsg.classList.remove('info'); _rmsg.textContent = msg; }
+    function _rshi(msg) { _rmsg.classList.add('info'); _rmsg.textContent = msg; }
+    function _rslb(loading) {
+      _rlb.textContent = loading ? '確認中...' : 'ログイン';
+      _rlb.disabled = loading;
+      _rlb.style.opacity = loading ? '0.6' : '1';
+    }
+    function _rhga() { document.getElementById('_rag').classList.add('hidden'); }
+
+    // ログイン処理
+    function _ratl(id, pass) {
+      var fns = window.__rfns, db = window.__rdb;
+      return fns.getDoc(fns.doc(db, 'clock_licenses', id)).then(function (snap) {
+        if (!snap.exists()) return { ok: false, reason: 'invalid' };
+        var data = snap.data();
+        if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
+        var myDev = _grdi();
+        if (!data.deviceId) {
+          return fns.updateDoc(fns.doc(db, 'clock_licenses', id), { deviceId: myDev })
+            .then(function () { return { ok: true }; });
+        }
+        if (data.deviceId === myDev) return { ok: true };
+        return { ok: false, reason: 'device' };
+      });
+    }
+
+    // 自動ログイン（保存済みIDと端末IDの一致を確認）
+    function _rtal() {
+      var lid = localStorage.getItem('_rtlic');
+      if (!lid) return Promise.resolve(false);
+      var fns = window.__rfns, db = window.__rdb;
+      return fns.getDoc(fns.doc(db, 'clock_licenses', lid)).then(function (snap) {
+        if (!snap.exists()) { localStorage.removeItem('_rtlic'); return false; }
+        if (snap.data().deviceId === _grdi()) { _rhga(); return true; }
+        localStorage.removeItem('_rtlic');
+        return false;
+      }).catch(function () { return false; });
+    }
+
+    // 端末変更リクエスト
+    function _rdcr() {
+      var id   = document.getElementById('_rid').value.trim();
+      var pass = document.getElementById('_rpc').value;
+      if (!id || !pass) { _rshe('IDとパスコードを入力してください'); return; }
+      if (!window.__rdb) { _rshe('接続中です。しばらくお待ちください'); return; }
+      _rslb(true);
+      var fns = window.__rfns, db = window.__rdb;
+      fns.getDoc(fns.doc(db, 'clock_licenses', id)).then(function (snap) {
+        if (!snap.exists() || snap.data().passcode !== pass) {
+          _rshe('IDまたはパスコードが正しくありません'); _rslb(false); return;
+        }
+        var q = fns.query(
+          fns.collection(db, 'clock_deviceRequests'),
+          fns.where('licenseId', '==', id),
+          fns.where('status', '==', 'pending')
+        );
+        return fns.getDocs(q).then(function (qs) {
+          if (!qs.empty) {
+            _rshi('すでに申請済みです。承認をお待ちください');
+          } else {
+            return fns.addDoc(fns.collection(db, 'clock_deviceRequests'), {
+              licenseId: id, requestedAt: Date.now(), status: 'pending'
+            }).then(function () { _rshi('申請を送信しました。承認をお待ちください'); });
+          }
+        });
+      }).catch(function () {
+        _rshe('エラーが発生しました。再度お試しください');
+      }).finally(function () { _rslb(false); });
+    }
+
+    // ログインボタン
+    _rlb.addEventListener('click', function () {
+      var id   = document.getElementById('_rid').value.trim();
+      var pass = document.getElementById('_rpc').value;
+      if (!id || !pass) { _rshe('IDとパスコードを入力してください'); return; }
+      if (!window.__rdb) { _rshe('接続中です。しばらくお待ちください'); return; }
+      _rmsg.textContent = '';
+      _rslb(true);
+      _ratl(id, pass).then(function (res) {
+        if (res.ok) {
+          localStorage.setItem('_rtlic', id);
+          _rhga();
+        } else if (res.reason === 'device') {
+          _rshe('別の端末で登録済みです');
+        } else {
+          _rshe('IDまたはパスコードが正しくありません');
+        }
+      }).catch(function () {
+        _rshe('エラーが発生しました。再度お試しください');
+      }).finally(function () { _rslb(false); });
+    });
+
+    // 端末変更リンク
+    document.getElementById('_rdr').addEventListener('click', function (e) {
+      e.preventDefault();
+      _rdcr();
+    });
+
+    // Firebase 準備完了後に自動ログイン試行（順序保険つき）
+    window.addEventListener('_rfsready', function () { _rtal().catch(function () {}); });
+    if (window.__rdb) { _rtal().catch(function () {}); }
   })();
 </script>
 </body>
