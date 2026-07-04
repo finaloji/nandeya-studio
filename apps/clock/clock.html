@@ -58,6 +58,24 @@
       #55b4e6 100%);
   }
 
+  /* 上部の目隠し帯（本体ステータスバーの白い時計を白でぼかす）。
+     スタンドアロン(black-translucent)では本体文字が常に白なので、白帯に溶けて見えなくなる */
+  .topcov {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: calc(env(safe-area-inset-top, 20px) + 34px);
+    z-index: 5;
+    pointer-events: none;
+    display: none;
+    background: linear-gradient(180deg,
+      #ffffff 0%,
+      #ffffff 55%,
+      rgba(255, 255, 255, 0) 100%);
+  }
+  .topcov.on { display: block; }
+
   /* 日付＋時計のかたまり */
   .head {
     position: absolute;
@@ -246,12 +264,44 @@
     border-radius: 8px;
     cursor: pointer;
   }
+  /* iOS風トグルスイッチ */
+  .sp-row input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 50px;
+    height: 30px;
+    background: #39393d;
+    border-radius: 15px;
+    position: relative;
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+  .sp-row input[type="checkbox"]::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 26px;
+    height: 26px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .sp-row input[type="checkbox"]:checked {
+    background: #34c759;
+  }
+  .sp-row input[type="checkbox"]:checked::after {
+    transform: translateX(20px);
+  }
 </style>
 </head>
 <body>
 
   <!-- 壁紙レイヤー（差し替え可能） -->
   <div class="bg" id="_bg"></div>
+
+  <!-- 上部の目隠し帯（設定でON） -->
+  <div class="topcov" id="_tc"></div>
 
   <!-- 日付＋時計 -->
   <div class="head">
@@ -324,6 +374,9 @@
         </div>
         <div class="sp-row"><span>色</span><input type="color" id="_fc" value="#ffffff"></div>
         <div class="sp-row"><span>濃さ</span><input type="range" id="_fo" min="0.2" max="1" step="0.05"></div>
+
+        <div class="sp-sec">上部</div>
+        <div class="sp-row"><span>上部をぼかす</span><input type="checkbox" id="_tcon"></div>
       </div>
     </div>
   </div>
@@ -402,7 +455,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v20';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v21';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -605,6 +658,12 @@
       _d.style.fontWeight = _fwmap[ff] || 600;
     }
 
+    // 上部の目隠し帯
+    var _tc = document.getElementById('_tc');
+    function _applyTop() {
+      _tc.classList.toggle('on', !!_cfg.tcOn);
+    }
+
     // 保存済みの設定を実行時の値へ反映
     function _apply() {
       if (_cfg.dmap) _dmap = _cfg.dmap;
@@ -612,6 +671,7 @@
       if (_cfg.step != null) _RW_STEP = _cfg.step;
       _applyBg();
       _applyFont();
+      _applyTop();
     }
 
     _load();
@@ -673,6 +733,7 @@
     var _ff = document.getElementById('_ff'); // 書体
     var _fc = document.getElementById('_fc'); // 色
     var _fo = document.getElementById('_fo'); // 濃さ
+    var _tcon = document.getElementById('_tcon'); // 上部をぼかす
 
     // 現在値を入力欄に反映（開くとき）
     function _fillSettings() {
@@ -682,6 +743,7 @@
       _ff.value = _cfg.ff || '';
       _fc.value = _cfg.fc || '#ffffff';
       _fo.value = (_cfg.fo != null) ? _cfg.fo : 0.6;
+      _tcon.checked = !!_cfg.tcOn;
     }
 
     // 入力欄から値を読み取り、実行時の値へ反映して保存
@@ -703,12 +765,14 @@
       _cfg.fc = _fc.value;
       var fo = parseFloat(_fo.value);
       _cfg.fo = isNaN(fo) ? 0.6 : fo;
+      _cfg.tcOn = _tcon.checked;
       _save();
       _applyFont();
+      _applyTop();
     }
 
     // 各入力欄が変わるたびに保存（iOSはblurでchangeが発火）
-    _mi.concat([_ws, _ww, _ff]).forEach(function (el) {
+    _mi.concat([_ws, _ww, _ff, _tcon]).forEach(function (el) {
       el.addEventListener('change', _readSettings);
     });
     // 濃さのスライダー・色ピッカーはドラッグ中も即反映したいので input でも拾う
