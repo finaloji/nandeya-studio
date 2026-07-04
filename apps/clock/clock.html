@@ -203,15 +203,55 @@
       return (v == null) ? '-' : v.toFixed(1);
     }
 
-    // センサー1回分の受信（試作1-2では数値を確認表示するだけ）
+    // 伏せ/表向きのしきい値（実測: 表向き z≈-9.9 / 伏せ z≈+9.7）
+    var _FD = 6;      // これより大きければ伏せ
+    var _FU = -6;     // これより小さければ表向き
+    var _HOLD = 800;  // 伏せをこの時間キープで待機モードへ(ms)
+
+    var _st = 'up';           // up=通常(表向き) / wait=待機モード
+    var _dwn = 0;             // 伏せを検出し始めた時刻
+    var _flU = 0;             // 開発用フラッシュ表示の終了時刻
+    var _flT = '';            // 開発用フラッシュ表示の文言
+
+    function _lab() {
+      return (_st === 'wait') ? '待機' : '表';
+    }
+
+    // センサー1回分の受信
     function _rm(e) {
       var a = e.accelerationIncludingGravity || {};
       var r = e.rotationRate || {};
-      _g.textContent =
-        'z:' + _fx(a.z) +
+      var z = (a.z == null) ? 0 : a.z;
+      var now = Date.now();
+
+      // --- 伏せ/表向きの状態遷移 ---
+      var o = (z > _FD) ? 'D' : (z < _FU ? 'U' : 'M');
+      if (_st === 'up') {
+        if (o === 'D') {
+          if (_dwn === 0) {
+            _dwn = now;
+          } else if (now - _dwn >= _HOLD) {
+            _st = 'wait';
+            _dwn = 0;
+            if (navigator.vibrate) navigator.vibrate(60); // 待機入りの合図(開発用)
+          }
+        } else {
+          _dwn = 0;
+        }
+      } else if (_st === 'wait') {
+        if (o === 'U') {
+          _st = 'up';
+          _flT = '★表向き検出';
+          _flU = now + 1500;
+        }
+      }
+
+      // --- 開発用表示 ---
+      var head = (now < _flU) ? _flT : _lab();
+      _g.textContent = head +
+        '  z:' + _fx(z) +
         '  β:' + _fx(r.beta) +
-        '  γ:' + _fx(r.gamma) +
-        '  α:' + _fx(r.alpha);
+        '  γ:' + _fx(r.gamma);
     }
 
     // 購読開始（案内を消す）
