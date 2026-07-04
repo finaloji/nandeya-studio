@@ -145,7 +145,7 @@
 
   <!-- 下部ボタン -->
   <div class="foot">
-    <div class="fbtn">
+    <div class="fbtn" id="_lb">
       <svg width="25" height="25" viewBox="0 0 24 24">
         <!-- ヘッド（反射鏡のフタ） -->
         <rect x="7.3" y="3.9" width="9.4" height="2.6" rx="1.1" fill="#fff"/>
@@ -155,7 +155,7 @@
         <circle cx="12" cy="13.4" r="0.95" fill="#fff"/>
       </svg>
     </div>
-    <div class="fbtn">
+    <div class="fbtn" id="_cb">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
         <path d="M9.2 3.5l-1.1 1.6H4.5A2.5 2.5 0 0 0 2 7.6v10A2.5 2.5 0 0 0 4.5 20h15a2.5 2.5 0 0 0 2.5-2.5v-10a2.5 2.5 0 0 0-2.5-2.5h-3.6l-1.1-1.6a1 1 0 0 0-.83-.44H10.03a1 1 0 0 0-.83.44zM12 8.2a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 0 1 0-8.6zm0 1.9a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z"/>
       </svg>
@@ -237,8 +237,10 @@
     // ------------------------------------------------------------
     var _h = document.getElementById('_h');   // タップ案内
     var _g = document.getElementById('_g');    // 開発用表示
+    var _lb = document.getElementById('_lb');  // ライト(左下)
+    var _cb = document.getElementById('_cb');  // カメラ(右下)
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v5';                           // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v6';                           // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -358,6 +360,24 @@
     }
 
     document.addEventListener('click', _ask);
+
+    // 指定要素の「3回連続タップ（各タップ1秒以内）」で fn を呼ぶ共通ヘルパ
+    function _tap3(el, fn) {
+      var n = 0, last = 0;
+      el.addEventListener('click', function () {
+        var t = Date.now();
+        n = (t - last <= 1000) ? n + 1 : 1;
+        last = t;
+        if (n >= 3) { n = 0; fn(); }
+      });
+    }
+
+    // ライト(左下)を3回タップ → 巻き戻し等を中断して現在時刻へ強制リセット
+    _tap3(_lb, function () {
+      _rwStop();
+      _flT = '★リセット';
+      _flU = Date.now() + 1500;
+    });
   })();
 </script>
 </body>
