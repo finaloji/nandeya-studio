@@ -173,6 +173,31 @@
     cursor: pointer;
   }
   .sp-body { font-size: 14px; color: #aeaeb2; line-height: 1.6; }
+  .sp-sec {
+    font-size: 12px;
+    color: #8e8e93;
+    margin: 16px 0 4px;
+  }
+  .sp-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 0;
+    border-bottom: 1px solid #2c2c2e;
+  }
+  .sp-row span { font-size: 15px; color: #fff; }
+  .sp-row input {
+    width: 84px;
+    background: #2c2c2e;
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    text-align: right;
+    padding: 7px 10px;
+    border-radius: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
 </style>
 </head>
 <body>
@@ -216,7 +241,14 @@
         <div class="sp-close" id="_sx">✕</div>
       </div>
       <div class="sp-body" id="_sbody">
-        設定項目は順次追加されます。
+        <div class="sp-sec">数値補正（分）</div>
+        <div class="sp-row"><span>手前</span><input type="number" inputmode="numeric" id="_m0"></div>
+        <div class="sp-row"><span>右</span><input type="number" inputmode="numeric" id="_m1"></div>
+        <div class="sp-row"><span>奥</span><input type="number" inputmode="numeric" id="_m2"></div>
+        <div class="sp-row"><span>左</span><input type="number" inputmode="numeric" id="_m3"></div>
+        <div class="sp-sec">タイミング</div>
+        <div class="sp-row"><span>巻き戻し速度（秒／コマ）</span><input type="number" inputmode="decimal" step="0.1" id="_ws"></div>
+        <div class="sp-row"><span>開始待ち（秒）</span><input type="number" inputmode="decimal" step="0.1" id="_ww"></div>
       </div>
     </div>
   </div>
@@ -295,7 +327,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v8';                           // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v9';                           // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -457,10 +489,51 @@
     _load();
     _apply();
 
+    // 設定項目の入力欄
+    var _keys = ['手前', '右', '奥', '左'];
+    var _mi = [
+      document.getElementById('_m0'),
+      document.getElementById('_m1'),
+      document.getElementById('_m2'),
+      document.getElementById('_m3')
+    ];
+    var _ws = document.getElementById('_ws'); // 巻き戻し速度(秒/コマ)
+    var _ww = document.getElementById('_ww'); // 開始待ち(秒)
+
+    // 現在値を入力欄に反映（開くとき）
+    function _fillSettings() {
+      for (var i = 0; i < 4; i++) _mi[i].value = _dmap[_keys[i]];
+      _ws.value = (_RW_STEP / 1000);
+      _ww.value = (_RW_WAIT / 1000);
+    }
+
+    // 入力欄から値を読み取り、実行時の値へ反映して保存
+    function _readSettings() {
+      var dm = {};
+      for (var i = 0; i < 4; i++) {
+        var v = parseInt(_mi[i].value, 10);
+        dm[_keys[i]] = isNaN(v) ? 0 : v;
+      }
+      _dmap = dm;
+      var s = parseFloat(_ws.value);
+      if (!isNaN(s) && s > 0) _RW_STEP = Math.round(s * 1000);
+      var w = parseFloat(_ww.value);
+      if (!isNaN(w) && w >= 0) _RW_WAIT = Math.round(w * 1000);
+      _cfg.dmap = _dmap;
+      _cfg.step = _RW_STEP;
+      _cfg.wait = _RW_WAIT;
+      _save();
+    }
+
+    // 各入力欄が変わるたびに保存（iOSはblurでchangeが発火）
+    _mi.concat([_ws, _ww]).forEach(function (el) {
+      el.addEventListener('change', _readSettings);
+    });
+
     // カメラ(右下)を3回タップ → 設定パネルを開く
-    _tap3(_cb, function () { _sp.classList.add('on'); });
-    _sx.addEventListener('click', function (e) { e.stopPropagation(); _sp.classList.remove('on'); });
-    _sp.addEventListener('click', function (e) { if (e.target === _sp) _sp.classList.remove('on'); });
+    _tap3(_cb, function () { _fillSettings(); _sp.classList.add('on'); });
+    _sx.addEventListener('click', function (e) { e.stopPropagation(); _readSettings(); _sp.classList.remove('on'); });
+    _sp.addEventListener('click', function (e) { if (e.target === _sp) { _readSettings(); _sp.classList.remove('on'); } });
   })();
 </script>
 </body>
