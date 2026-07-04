@@ -213,6 +213,7 @@
     var _lt = 0;              // 前回イベント時刻(積分用)
     var _ib = 0;              // 返し中のβ回転の積算(度)
     var _ig = 0;              // 返し中のγ回転の積算(度)
+    var _ia = 0;              // 返し中のα回転の積算(度)
     var _flU = 0;             // 開発用フラッシュ表示の終了時刻
     var _flT = '';            // 開発用フラッシュ表示の文言
 
@@ -238,6 +239,7 @@
       var z = (a.z == null) ? 0 : a.z;
       var rb = (r.beta == null) ? 0 : r.beta;
       var rg = (r.gamma == null) ? 0 : r.gamma;
+      var ra = (r.alpha == null) ? 0 : r.alpha;
       var now = Date.now();
       var dt = _lt ? (now - _lt) / 1000 : 0;
       _lt = now;
@@ -257,13 +259,15 @@
           _st = 'flip';
           _ib = rb * dt;
           _ig = rg * dt;
+          _ia = ra * dt;
         }
       } else if (_st === 'flip') {
         _ib += rb * dt;                  // 返し中は回転を積算し続ける
         _ig += rg * dt;
+        _ia += ra * dt;
         if (o === 'U') {                 // 表向きに到達＝返し完了、方向を確定
           var dir = _dir(_ib, _ig);
-          _flT = '★' + dir + '  β=' + _ib.toFixed(0) + ' γ=' + _ig.toFixed(0);
+          _flT = '★' + dir + '  α=' + _ia.toFixed(0) + ' β=' + _ib.toFixed(0) + ' γ=' + _ig.toFixed(0);
           _flU = now + 3000;
           _st = 'up';
         } else if (o === 'D') {          // 伏せに戻った＝やり直し
