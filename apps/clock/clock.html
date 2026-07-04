@@ -367,7 +367,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v11';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v12';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -535,7 +535,19 @@
       });
     }
     function _applyBg() {
-      _bg.style.backgroundImage = _cfg.bg || '';
+      var v = _cfg.bg || '';
+      _bg.style.backgroundImage = v;
+      // ルート要素(html)にも反映して、画面外(オーバースクロール領域)まで隙間なく覆う。
+      // 標準グラデ(v='')のときは html は下端色のまま＝馴染むので背景画像は付けない
+      var de = document.documentElement;
+      if (v) {
+        de.style.backgroundImage = v;
+        de.style.backgroundSize = 'cover';
+        de.style.backgroundPosition = 'center';
+        de.style.backgroundRepeat = 'no-repeat';
+      } else {
+        de.style.backgroundImage = '';
+      }
       _markSw();
     }
 
