@@ -496,7 +496,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v28';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v29';                          // ビルド確認用（更新のたびに上げる）
 
     // 伏せ/表向きのしきい値（実測: 表向き z≈-9.9 / 伏せ z≈+9.7）
     var _FD = 6;      // これより大きければ伏せ
@@ -575,6 +575,9 @@
 
     // タップで許可要求（iOS 13+ はユーザー操作からの呼び出しが必須）
     function _ask() {
+      // ログインゲート表示中はセンサー許可を求めない（ログイン後の初タップで求める）
+      var gate = document.getElementById('_rag');
+      if (gate && !gate.classList.contains('hidden')) return;
       var DM = window.DeviceMotionEvent;
       if (DM && typeof DM.requestPermission === 'function') {
         DM.requestPermission().then(function (res) {
