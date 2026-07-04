@@ -110,34 +110,6 @@
   }
   .fbtn svg { display: block; }
 
-  /* タップ案内（許可取得前のみ表示・控えめ） */
-  .hint {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 54%;
-    text-align: center;
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
-    transition: opacity 0.5s;
-    pointer-events: none;
-  }
-  .hint.off { opacity: 0; }
-
-  /* 開発用センサー表示（一時的。2-1/2-2の検証後に削除） */
-  .dbg {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: calc(env(safe-area-inset-bottom, 8px) + 78px);
-    text-align: center;
-    font-size: 11px;
-    line-height: 1.4;
-    color: rgba(255, 255, 255, 0.5);
-    font-family: ui-monospace, monospace;
-    pointer-events: none;
-  }
-
   /* 表示設定パネル（隠し：カメラ3回タップで開く） */
   .sp {
     position: fixed;
@@ -278,12 +250,6 @@
     </div>
   </div>
 
-  <!-- タップ案内 -->
-  <div class="hint" id="_h">画面をタップ</div>
-
-  <!-- 開発用センサー表示（一時的） -->
-  <div class="dbg" id="_g"></div>
-
   <!-- 表示設定パネル（カメラ3回タップで開く） -->
   <div class="sp" id="_sp">
     <div class="sp-panel">
@@ -395,19 +361,12 @@
     // ------------------------------------------------------------
     // 数値補正センサー（DeviceMotion）の許可取得と購読
     // ------------------------------------------------------------
-    var _h = document.getElementById('_h');   // タップ案内
-    var _g = document.getElementById('_g');    // 開発用表示
     var _lb = document.getElementById('_lb');  // ライト(左下)
     var _cb = document.getElementById('_cb');  // カメラ(右下)
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v22';                          // ビルド確認用（更新のたびに上げる）
-    _g.textContent = _VER + ' 準備中';
-
-    function _fx(v) {
-      return (v == null) ? '-' : v.toFixed(1);
-    }
+    var _VER = 'v23';                          // ビルド確認用（更新のたびに上げる）
 
     // 伏せ/表向きのしきい値（実測: 表向き z≈-9.9 / 伏せ z≈+9.7）
     var _FD = 6;      // これより大きければ伏せ
@@ -420,14 +379,6 @@
     var _ib = 0;              // 返し中のβ回転の積算(度)
     var _ig = 0;              // 返し中のγ回転の積算(度)
     var _ia = 0;              // 返し中のα回転の積算(度)
-    var _flU = 0;             // 開発用フラッシュ表示の終了時刻
-    var _flT = '';            // 開発用フラッシュ表示の文言
-
-    function _lab() {
-      if (_st === 'wait') return '待機';
-      if (_st === 'flip') return '返し中';
-      return '表';
-    }
 
     // 積算した回転から返した方向を判定する（実測で確定）
     // 手前/奥 = α軸, 右/左 = β軸
@@ -478,28 +429,18 @@
           if (min > 0) {
             _rwGo(min);
           }
-          _flT = '★' + dir + '(+' + min + ')  α=' + _ia.toFixed(0) + ' β=' + _ib.toFixed(0);
-          _flU = now + 3000;
           _st = 'up';
         } else if (o === 'D') {          // 伏せに戻った＝やり直し
           _st = 'wait';
         }
       }
-
-      // --- 開発用表示 ---
-      var head = (now < _flU) ? _flT : _lab();
-      _g.textContent = _VER + ' ' + head +
-        '  z:' + _fx(z) +
-        '  β:' + _fx(rb) +
-        '  γ:' + _fx(rg);
     }
 
-    // 購読開始（案内を消す）
+    // 購読開始
     function _bind() {
       if (_on) return;
       _on = true;
       window.addEventListener('devicemotion', _rm);
-      _h.classList.add('off');
     }
 
     // タップで許可要求（iOS 13+ はユーザー操作からの呼び出しが必須）
@@ -509,12 +450,8 @@
         DM.requestPermission().then(function (res) {
           if (res === 'granted') {
             _bind();
-          } else {
-            _h.textContent = 'センサー無効';
           }
-        }).catch(function () {
-          _h.textContent = 'センサー無効';
-        });
+        }).catch(function () {});
       } else {
         // 非iOS / 許可不要な環境
         _bind();
@@ -537,8 +474,6 @@
     // ライト(左下)を3回タップ → 巻き戻し等を中断して現在時刻へ強制リセット
     _tap3(_lb, function () {
       _rwStop();
-      _flT = '★リセット';
-      _flU = Date.now() + 1500;
     });
 
     // ------------------------------------------------------------
