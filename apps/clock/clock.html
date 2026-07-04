@@ -117,6 +117,31 @@
     text-align: center;
     line-height: 1.3;
   }
+  /* 種別ごとの背景 */
+  .wtile.line { background: #06c755; }
+  .wtile.gpt { background: #000; }
+  .wtile.weather { background: linear-gradient(160deg, #5aa7e6, #3f7fc4); }
+  .wtile svg { display: block; }
+  /* 天気ウィジェットの中身 */
+  .wc-w {
+    width: 100%;
+    height: 100%;
+    padding: 8px 9px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-family: -apple-system, "Hiragino Sans", system-ui, sans-serif;
+    color: #fff;
+  }
+  .wc-w .loc { font-size: 10px; font-weight: 600; opacity: 0.95; }
+  .wc-w .tmp { font-size: 24px; font-weight: 500; line-height: 1; }
+  .wc-w .cond {
+    font-size: 9px;
+    opacity: 0.95;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
 
   /* 下部のライト・カメラボタン（ロック画面の飾り） */
   .foot {
@@ -383,6 +408,14 @@
 
         <div class="sp-sec">ウィジェット</div>
         <div class="sp-row"><span>表示する</span><input type="checkbox" id="_wgon"></div>
+        <div class="sp-row"><span>種類</span>
+          <select id="_wgt">
+            <option value="line">LINE</option>
+            <option value="battery">バッテリー</option>
+            <option value="weather">天気</option>
+            <option value="gpt">GPT</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>
@@ -461,7 +494,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v17';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v18';                          // ビルド確認用（更新のたびに上げる）
     _g.textContent = _VER + ' 準備中';
 
     function _fx(v) {
@@ -653,26 +686,44 @@
       _d.style.fontWeight = _fwmap[ff] || 600;
     }
 
-    // ウィジェット枠（スロット機構）
-    // スロット定義: { s:'sm'|'md', t:種別 } の配列。t未設定は仮表示。
-    // 5-5aでは枠の仕組みのみ。実際の見た目は5-5bで t ごとに描画する。
+    // ウィジェット枠（中央に正方形1つ）。種別ごとに中身を差し替える。
     var _wg = document.getElementById('_wg');
-    var _WGDEF = [
-      { s: 'sm', t: '' }
-    ];
+
+    // 種別ごとの中身（innerHTML）。小さい正方形(74px)に収まるよう作成。
+    var _wgHtml = {
+      // LINE: 緑地に白い吹き出しロゴ
+      line: '<svg width="46" height="44" viewBox="0 0 48 46">' +
+            '<path fill="#fff" d="M24 2C11.3 2 1 10.4 1 20.8c0 9.3 8.2 17.1 19.3 18.5.75.16 1.77.5 2.03 1.15.23.59.15 1.5.07 2.1l-.32 1.97c-.1.58-.46 2.28 2 1.24s13.3-7.83 18.15-13.42C46.2 28.7 47.5 24.9 47.5 20.8 47.5 10.4 37.2 2 24 2z"/>' +
+            '<text x="24" y="24.5" text-anchor="middle" fill="#06c755" font-size="9" font-weight="800" font-family="Arial, sans-serif">LINE</text>' +
+            '</svg>',
+      // GPT(ChatGPT): 黒地に白のOpenAIロゴ
+      gpt:  '<svg width="42" height="42" viewBox="0 0 24 24" fill="#fff">' +
+            '<path d="M22.28 9.82a5.98 5.98 0 0 0-.52-4.91 6.05 6.05 0 0 0-6.51-2.9A6.07 6.07 0 0 0 4.98 4.18a5.98 5.98 0 0 0-3.99 2.9 6.05 6.05 0 0 0 .74 7.1 5.98 5.98 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.52 2.9A5.98 5.98 0 0 0 13.26 22a6.06 6.06 0 0 0 5.77-4.21 5.99 5.99 0 0 0 4-2.9 6.06 6.06 0 0 0-.75-7.07zm-9.02 12.6a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.79.79 0 0 0 .39-.68v-6.74l2.02 1.17a.07.07 0 0 1 .04.05v5.58a4.5 4.5 0 0 1-4.5 4.5zM3.6 18.32a4.47 4.47 0 0 1-.54-3.01l.14.09 4.78 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 19.9a4.5 4.5 0 0 1-6.14-1.58zM2.34 7.9a4.48 4.48 0 0 1 2.34-1.97l-.01 5.68a.77.77 0 0 0 .39.68l5.8 3.34-2.02 1.17a.07.07 0 0 1-.07 0l-4.83-2.79A4.5 4.5 0 0 1 2.34 7.9zm16.6 3.86-5.84-3.4L15.11 7.2a.07.07 0 0 1 .07 0l4.83 2.78a4.5 4.5 0 0 1-.68 8.12v-5.68a.79.79 0 0 0-.4-.66zm2.01-3.02-.14-.09-4.77-2.77a.78.78 0 0 0-.79 0L9.42 9.24V6.9a.07.07 0 0 1 .03-.06l4.83-2.78a4.5 4.5 0 0 1 6.67 4.66zM8.32 12.9 6.3 11.73a.08.08 0 0 1-.04-.06V6.1a4.5 4.5 0 0 1 7.38-3.45l-.14.08L8.72 5.5a.79.79 0 0 0-.4.68zm1.1-2.37L12 9.02l2.6 1.5v3L12 15.02l-2.6-1.5z"/>' +
+            '</svg>',
+      // バッテリー: リング＋パーセント表示
+      battery: '<svg width="54" height="54" viewBox="0 0 52 52">' +
+            '<circle cx="26" cy="26" r="21" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="5"/>' +
+            '<circle cx="26" cy="26" r="21" fill="none" stroke="#34c759" stroke-width="5" stroke-linecap="round" stroke-dasharray="131.9" stroke-dashoffset="23.7" transform="rotate(-90 26 26)"/>' +
+            '<text x="26" y="30" text-anchor="middle" fill="#fff" font-size="14" font-weight="600" font-family="-apple-system, sans-serif">82%</text>' +
+            '</svg>',
+      // 天気: 地名＋気温＋天気
+      weather: '<div class="wc-w">' +
+            '<div class="loc">神戸市</div>' +
+            '<div class="tmp">23&deg;</div>' +
+            '<div class="cond">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#ffd54a"/>' +
+            '<g stroke="#ffd54a" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.5" y1="4.5" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.5" y2="19.5"/><line x1="4.5" y1="19.5" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.5" y2="4.5"/></g></svg>' +
+            '晴れ</div>' +
+            '</div>'
+    };
+
     function _renderWg() {
-      var list = (_cfg.wg && _cfg.wg.length) ? _cfg.wg : _WGDEF;
+      var type = _cfg.wgType || 'line';
+      var tile = document.createElement('div');
+      tile.className = 'wtile sm ' + type;
+      tile.innerHTML = _wgHtml[type] || _wgHtml.line;
       _wg.innerHTML = '';
-      list.forEach(function (w) {
-        var tile = document.createElement('div');
-        tile.className = 'wtile ' + (w.s === 'md' ? 'md' : 'sm');
-        // 種別ごとの見た目は5-5bで実装。今は枠の確認用に仮表示。
-        var ph = document.createElement('div');
-        ph.className = 'ph';
-        ph.textContent = (w.s === 'md' ? '枠(横長)' : '枠');
-        tile.appendChild(ph);
-        _wg.appendChild(tile);
-      });
+      _wg.appendChild(tile);
     }
     function _applyWg() {
       _renderWg();
@@ -748,6 +799,7 @@
     var _ff = document.getElementById('_ff'); // 書体
     var _fo = document.getElementById('_fo'); // 濃さ
     var _wgon = document.getElementById('_wgon'); // ウィジェット表示
+    var _wgt = document.getElementById('_wgt');   // ウィジェット種類
 
     // 現在値を入力欄に反映（開くとき）
     function _fillSettings() {
@@ -757,6 +809,7 @@
       _ff.value = _cfg.ff || '';
       _fo.value = (_cfg.fo != null) ? _cfg.fo : 0.6;
       _wgon.checked = !!_cfg.wgOn;
+      _wgt.value = _cfg.wgType || 'line';
     }
 
     // 入力欄から値を読み取り、実行時の値へ反映して保存
@@ -778,13 +831,14 @@
       var fo = parseFloat(_fo.value);
       _cfg.fo = isNaN(fo) ? 0.6 : fo;
       _cfg.wgOn = _wgon.checked;
+      _cfg.wgType = _wgt.value;
       _save();
       _applyFont();
       _applyWg();
     }
 
     // 各入力欄が変わるたびに保存（iOSはblurでchangeが発火）
-    _mi.concat([_ws, _ww, _ff, _wgon]).forEach(function (el) {
+    _mi.concat([_ws, _ww, _ff, _wgon, _wgt]).forEach(function (el) {
       el.addEventListener('change', _readSettings);
     });
     // 濃さのスライダーはドラッグ中も即反映したいので input でも拾う
