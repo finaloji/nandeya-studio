@@ -496,7 +496,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v30';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v31';                          // ビルド確認用（更新のたびに上げる）
 
     // 伏せ/表向きのしきい値（実測: 表向き z≈-9.9 / 伏せ z≈+9.7）
     var _FD = 6;      // これより大きければ伏せ
@@ -666,10 +666,14 @@
     }
     function _applyBg() {
       _bg.style.backgroundImage = _cfg.bg || '';
-      // 画面外(オーバースクロール領域)の塗り色を、背景の下端色に合わせて境目を消す
-      document.documentElement.style.backgroundColor = _cfg.bc || '#55b4e6';
+      // 画面外(オーバースクロール領域)の塗り色を、背景の下端色に合わせて境目を消す。
+      // ただしログインゲート表示中は黒で統一する（ゲートは黒背景のため）
+      var gate = document.getElementById('_rag');
+      var gateOn = gate && !gate.classList.contains('hidden');
+      document.documentElement.style.backgroundColor = gateOn ? '#000000' : (_cfg.bc || '#55b4e6');
       _markSw();
     }
+    window._rtApplyBg = _applyBg;
 
     // 書体（キー→font-family）
     var _fmap = {
@@ -853,7 +857,10 @@
       _rlb.disabled = loading;
       _rlb.style.opacity = loading ? '0.6' : '1';
     }
-    function _rhga() { document.getElementById('_rag').classList.add('hidden'); }
+    function _rhga() {
+      document.getElementById('_rag').classList.add('hidden');
+      if (window._rtApplyBg) window._rtApplyBg();
+    }
 
     // ログイン処理
     function _ratl(id, pass) {
