@@ -245,6 +245,93 @@
     cursor: pointer;
   }
 
+  /* 使い方（ヘルプ）オーバーレイ・アコーディオン */
+  .hp {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.55);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, "Hiragino Sans", system-ui, sans-serif;
+  }
+  .hp.on { display: flex; }
+  .hp-panel {
+    width: 88%;
+    max-width: 440px;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    background: #1c1c1e;
+    color: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .hp-head {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 18px;
+    border-bottom: 1px solid #2c2c2e;
+  }
+  .hp-title { font-size: 17px; font-weight: 600; }
+  .hp-close { font-size: 20px; color: #8e8e93; padding: 2px 8px; cursor: pointer; }
+  .hp-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 0 10px;
+  }
+  .hp-item { border-bottom: 1px solid #2c2c2e; }
+  .hp-q {
+    position: relative;
+    padding: 14px 40px 14px 18px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+  }
+  /* 右端の開閉マーク */
+  .hp-q::after {
+    content: "＋";
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #8e8e93;
+    font-size: 15px;
+  }
+  .hp-item.open .hp-q::after { content: "−"; }
+  .hp-a {
+    display: none;
+    padding: 0 18px 16px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #d1d1d6;
+  }
+  .hp-item.open .hp-a { display: block; }
+  .hp-a p { margin: 0 0 10px; }
+  .hp-a p:last-child { margin-bottom: 0; }
+  .hp-a ol, .hp-a ul { margin: 0; padding-left: 20px; }
+  .hp-a li { margin-bottom: 7px; }
+  .hp-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0 12px;
+  }
+  .hp-table th, .hp-table td {
+    border: 1px solid #3a3a3c;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .hp-table th { background: #2c2c2e; color: #fff; font-weight: 600; }
+
   /* ライセンス確認画面（初回セットアップ時のみ・以降は端末に記憶） */
   .lgate {
     position: fixed;
@@ -420,6 +507,96 @@
         </div>
         <div class="sp-row"><span>色</span><input type="color" id="_fc" value="#ffffff"></div>
         <div class="sp-row"><span>濃さ</span><input type="range" id="_fo" min="0.2" max="1" step="0.05"></div>
+
+        <div class="sp-sec">ヘルプ</div>
+        <div class="sp-btnrow">
+          <span class="sp-btn" id="_hpb">使い方を見る</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 使い方（隠し設定から開く・アコーディオン形式） -->
+  <div class="hp" id="_hp">
+    <div class="hp-panel">
+      <div class="hp-head">
+        <div class="hp-title">Re:Time の使い方</div>
+        <div class="hp-close" id="_hpx">✕</div>
+      </div>
+      <div class="hp-body">
+
+        <div class="hp-item open">
+          <div class="hp-q">1. 画面の見た目と最初の準備</div>
+          <div class="hp-a">
+            <p>iPhoneのロック画面そっくりの時計です（日付・時刻・下のライト／カメラのアイコン）。純正の時計と並べても違和感がありません。</p>
+            <p>起動して一度画面をタップすると、「動作と方向」へのアクセス許可を求められます。かならず「許可」してください。この許可がマジックの動作に必要です。一度許可すれば次回からは求められません。</p>
+          </div>
+        </div>
+
+        <div class="hp-item">
+          <div class="hp-q">2. マジックの操作</div>
+          <div class="hp-a">
+            <ol>
+              <li>スマホを画面を下（伏せた状態）でテーブルに置く</li>
+              <li>お客様に「〇〇のマジックしたのって何分前でしたっけ？」と聞く</li>
+              <li>お客様の答えに対応する方向へスマホを裏返して表向きにする（だいたい言われそうな5分や10分に設定しておくのがおすすめ）</li>
+              <li>表向きになった瞬間、「現在時刻＋指定した分数」が表示される</li>
+              <li>少し待つと、1分ずつ時刻が巻き戻り、本当の現在時刻まで戻って通常の時計に戻る</li>
+              <li>時間が戻った後は、時間が戻った演出に適したマジックをする</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="hp-item">
+          <div class="hp-q">3. 秘密の入力（返す方向 → 分数）</div>
+          <div class="hp-a">
+            <p>伏せた状態から、どの方向へ裏返すかで分数を指定します。初期設定は次のとおりです。</p>
+            <table class="hp-table">
+              <tr><th>返す方向</th><th>分数</th></tr>
+              <tr><td>手前（自分側へ倒す）</td><td>3分</td></tr>
+              <tr><td>右（右へ転がす）</td><td>6分</td></tr>
+              <tr><td>奥（向こう側へ倒す）</td><td>9分</td></tr>
+              <tr><td>左（左へ転がす）</td><td>12分</td></tr>
+            </table>
+            <p>分数は設定画面で自由に変更できます。お客様が言いそうな数字（5分・10分など）を割り当てておくと合わせやすくなります。</p>
+          </div>
+        </div>
+
+        <div class="hp-item">
+          <div class="hp-q">4. 隠し設定とリセット</div>
+          <div class="hp-a">
+            <p>設定を開く：右下のカメラのアイコンを素早く3回タップすると「表示設定」が開きます。お客様に見られても普通の時計設定にしか見えません。</p>
+            <p>やり直し（リセット）：左下のライトのアイコンを3回タップすると、いつでも現在時刻に戻せます。判定ミスや途中でやめたいときの保険に使えます。</p>
+          </div>
+        </div>
+
+        <div class="hp-item">
+          <div class="hp-q">5. 設定でできること</div>
+          <div class="hp-a">
+            <ul>
+              <li>数値補正：手前／右／奥／左のそれぞれの分数を変更</li>
+              <li>タイミング：巻き戻しの速さ、表示から巻き戻し開始までの待ち時間</li>
+              <li>背景：プリセットや自分の写真に変更</li>
+              <li>文字：書体・色・濃さ</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="hp-item">
+          <div class="hp-q">6. 演技の注意点</div>
+          <div class="hp-a">
+            <p>画面の左上には、iPhone本体の時刻（ステータスバーの時計）が小さく表示されています。マジック中はこの時刻と、画面中央に見せている時刻がズレます。スマホを持つときは左上を親指で自然に隠すように持ってください。中央の時計に注目してもらう流れにすると、左上のズレに気づかれにくくなります。</p>
+          </div>
+        </div>
+
+        <div class="hp-item">
+          <div class="hp-q">7. お問い合わせ</div>
+          <div class="hp-a">
+            <p>操作方法が分からない、うまく動かない、端末を変えたいなどのときは、お問い合わせフォームよりご連絡ください。</p>
+            <p>お問い合わせフォーム：準備中（近日公開予定）</p>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -496,7 +673,7 @@
     var _sp = document.getElementById('_sp');  // 設定パネル
     var _sx = document.getElementById('_sx');  // 設定を閉じる
     var _on = false;                           // 購読済みフラグ
-    var _VER = 'v31';                          // ビルド確認用（更新のたびに上げる）
+    var _VER = 'v32';                          // ビルド確認用（更新のたびに上げる）
 
     // 伏せ/表向きのしきい値（実測: 表向き z≈-9.9 / 伏せ z≈+9.7）
     var _FD = 6;      // これより大きければ伏せ
@@ -829,6 +1006,18 @@
     _tap3(_cb, function () { _fillSettings(); _sp.classList.add('on'); });
     _sx.addEventListener('click', function (e) { e.stopPropagation(); _readSettings(); _sp.classList.remove('on'); });
     _sp.addEventListener('click', function (e) { if (e.target === _sp) { _readSettings(); _sp.classList.remove('on'); } });
+
+    // 使い方（ヘルプ）オーバーレイ
+    var _hp  = document.getElementById('_hp');
+    var _hpb = document.getElementById('_hpb');
+    var _hpx = document.getElementById('_hpx');
+    _hpb.addEventListener('click', function () { _hp.classList.add('on'); });
+    _hpx.addEventListener('click', function () { _hp.classList.remove('on'); });
+    _hp.addEventListener('click', function (e) { if (e.target === _hp) _hp.classList.remove('on'); });
+    // 各項目の見出しタップで開閉
+    Array.prototype.forEach.call(document.querySelectorAll('.hp-q'), function (q) {
+      q.addEventListener('click', function () { q.parentNode.classList.toggle('open'); });
+    });
   })();
 </script>
 
