@@ -67,6 +67,16 @@
         radial-gradient(44% 30% at 50% 72%, rgba(160, 165, 178, 0.06) 0%, rgba(160, 165, 178, 0) 100%);
       filter: blur(28px);
     }
+    /* 画面基準の黒フェード: 全レイヤーの上に重ね、下端を確実に真っ黒へ落とす */
+    .veil::after {
+      content: '';
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 30vh;
+      background: linear-gradient(to top, #000 0%, #000 25%, rgba(0, 0, 0, 0) 100%);
+    }
 
     /* 縦積みレイアウト（セーフエリア内） */
     .stack {
