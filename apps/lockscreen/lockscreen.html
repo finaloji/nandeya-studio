@@ -2,9 +2,9 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Screen</title>
 
   <style>
@@ -76,7 +76,7 @@
       flex-direction: column;
       align-items: center;
       padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
-      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 40px);
     }
 
     .sp { width: 100%; }
@@ -118,6 +118,10 @@
       height: var(--kd);
       border-radius: 50%;
       background: rgba(255, 255, 255, 0.17);
+      /* 縁の艶: 左上と右下がわずかに明るいリム */
+      box-shadow:
+        inset 1px 1.2px 1.5px rgba(255, 255, 255, 0.32),
+        inset -1px -1.2px 1.5px rgba(255, 255, 255, 0.20);
       display: flex;
       flex-direction: column;
       align-items: center;
