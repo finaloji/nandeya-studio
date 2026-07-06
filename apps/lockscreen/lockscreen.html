@@ -117,6 +117,25 @@
       border: 1.4px solid rgba(255, 255, 255, 0.92);
       background: transparent;
     }
+    /* 入力済みドット: 即時に塗りつぶし（遅延演出なし） */
+    .dot.fl {
+      background: #fff;
+    }
+    /* エラー時の左右往復: ドット列のみ、水平方向に減衰しながら揺れる */
+    .dot-row.jx {
+      animation: jx 0.5s ease-in-out;
+    }
+    @keyframes jx {
+      0%    { transform: translateX(0); }
+      12%   { transform: translateX(-14px); }
+      25%   { transform: translateX(13px); }
+      38%   { transform: translateX(-11px); }
+      50%   { transform: translateX(9px); }
+      62%   { transform: translateX(-6px); }
+      75%   { transform: translateX(4px); }
+      88%   { transform: translateX(-2px); }
+      100%  { transform: translateX(0); }
+    }
 
     .pad-grid {
       display: grid;
@@ -235,6 +254,82 @@
       _el.addEventListener('mousedown', _dn);
       _el.addEventListener('mouseup', _up);
       _el.addEventListener('mouseleave', _up);
+    });
+
+    // 入力バッファと画面の同期
+    var _b = '';        // 入力バッファ（現在の桁列）
+    var _q1 = [];       // 確定バッファ（セッション内のみ保持）
+    var _lk = false;    // 判定処理中フラグ（この間の入力は受け付けない）
+    var _bt = 0;        // 復帰用の保険タイマー
+    var _mz = false;    // タッチ端末フラグ（マウスイベントの二重処理防止）
+    var _ds = document.querySelectorAll('.dot');
+    var _rw = document.querySelector('.dot-row');
+    var _er = document.querySelector('.edge-r');
+
+    // ドット表示と右下ラベルをバッファに合わせて更新
+    function _sy() {
+      for (var i = 0; i < _ds.length; i++) {
+        _ds[i].classList.toggle('fl', i < _b.length);
+      }
+      _er.textContent = _b.length ? '削除' : 'キャンセル';
+    }
+
+    // 判定終了: 全ドットを同時に空へ戻し、初期状態へ
+    function _rs() {
+      if (!_lk) return;
+      _lk = false;
+      clearTimeout(_bt);
+      _rw.classList.remove('jx');
+      _b = '';
+      _sy();
+    }
+
+    // 1桁確定（押し下げ時点で呼ばれる）
+    function _in(_d) {
+      if (_lk || _b.length >= 6) return;
+      _b += _d;
+      _sy();
+      if (_b.length === 6) {
+        _lk = true;
+        _q1.push(_b);
+        // 全ドット塗りを一瞬見せてから揺れを開始
+        setTimeout(function () { _rw.classList.add('jx'); }, 250);
+        // animationend が発火しない環境向けの保険
+        _bt = setTimeout(_rs, 1400);
+      }
+    }
+
+    // 最後の1桁を消す（押し下げ時点で確定・1タップ1桁）
+    function _bk() {
+      if (_lk || _b.length === 0) return;
+      _b = _b.slice(0, -1);
+      _sy();
+    }
+
+    _rw.addEventListener('animationend', _rs);
+
+    // 数字キー: touchstart / mousedown の押し下げ時点で確定
+    document.querySelectorAll('.pad-key').forEach(function (_el) {
+      var _d = _el.querySelector('.key-num').textContent;
+      _el.addEventListener('touchstart', function (_e) {
+        _mz = true;
+        // 指ごとに1入力（同時押しは発生順に処理）
+        for (var i = 0; i < _e.changedTouches.length; i++) _in(_d);
+      }, { passive: true });
+      _el.addEventListener('mousedown', function () {
+        if (_mz) return;
+        _in(_d);
+      });
+    });
+
+    // 右下ラベル: 「削除」時のみ1桁消す（0桁の「キャンセル」はハイライトのみ）
+    _er.addEventListener('touchstart', function () {
+      _mz = true;
+      _bk();
+    }, { passive: true });
+    _er.addEventListener('mousedown', function () {
+      if (_mz) return;
+      _bk();
     });
 
     // ブラウザ既定のタップ表現を抑止（長押しメニュー・ピンチ・スクロール）
