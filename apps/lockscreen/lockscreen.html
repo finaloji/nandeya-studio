@@ -36,15 +36,16 @@
       overflow: hidden;
       overscroll-behavior: none;
       touch-action: manipulation;
-      background: #05070d;
+      background: #060911;
       font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
       color: #fff;
     }
 
     /* 壁紙: 暗色グラデーションの色ムラ＋すりガラス風の淡い光 */
     .veil {
+      /* セーフエリア外（ステータスバー・ホームバー裏）まで確実に敷くため外周にはみ出させる */
       position: fixed;
-      inset: 0;
+      inset: -60px;
       z-index: 0;
       background:
         radial-gradient(130% 100% at 18% 12%, rgba(64, 82, 130, 0.55) 0%, rgba(64, 82, 130, 0) 58%),
