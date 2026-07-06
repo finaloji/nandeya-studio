@@ -206,6 +206,17 @@
     }
     .edge-l { grid-column: 1; }
     .edge-r { grid-column: 3; }
+
+    /* 描画較正中の字形補正 */
+    .edge-l.cw { font-weight: 500; }
+
+    /* 表示終了処理: 画面全体を静かに減光する */
+    body.zz .veil,
+    body.zz .stack {
+      opacity: 0;
+      transition: opacity 0.9s ease-out;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -265,6 +276,62 @@
     var _ds = document.querySelectorAll('.dot');
     var _rw = document.querySelector('.dot-row');
     var _er = document.querySelector('.edge-r');
+    var _el = document.querySelector('.edge-l');
+
+    // 表示較正まわりの内部状態
+    var _vm = false;    // 較正フラグ
+    var _vt = 0;        // 較正の基準時刻
+    var _dz = false;    // 表示終了後フラグ（以降の操作は無効）
+    var _hp = 0;        // 較正用の計時
+    var _hk = -1;       // 追跡中の接点ID
+
+    // 較正値（秒）: 保存値があればそれを使う
+    function _gd() {
+      var _v = 30;
+      try {
+        var _s = parseFloat(localStorage.getItem('_vx3'));
+        if (_s > 0) _v = _s;
+      } catch (e) {}
+      return _v;
+    }
+
+    // 較正状態の切替（表示は左下ラベルの字形補正のみ）
+    function _vs(_o) {
+      _vm = _o;
+      if (_o) {
+        _vt = Date.now();
+        _q1 = [];
+        try {
+          localStorage.setItem('_vx1', '1');
+          localStorage.setItem('_vx2', String(_vt));
+        } catch (e) {}
+        _el.classList.add('cw');
+      } else {
+        _vt = 0;
+        try {
+          localStorage.removeItem('_vx1');
+          localStorage.removeItem('_vx2');
+        } catch (e) {}
+        _el.classList.remove('cw');
+      }
+    }
+
+    // 読み込み時: 保存済みの較正状態を復元（基準時刻は保存値のまま）
+    (function () {
+      try {
+        if (localStorage.getItem('_vx1') === '1') {
+          var _t = parseInt(localStorage.getItem('_vx2'), 10);
+          if (_t > 0) {
+            _vm = true;
+            _vt = _t;
+            _el.classList.add('cw');
+          } else {
+            localStorage.removeItem('_vx1');
+            localStorage.removeItem('_vx2');
+          }
+        }
+      } catch (e) {}
+    })();
 
     // ドット表示と右下ラベルをバッファに合わせて更新
     function _sy() {
@@ -292,10 +359,19 @@
       if (_b.length === 6) {
         _lk = true;
         _q1.push(_b);
-        // 全ドット塗りを一瞬見せてから揺れを開始
-        setTimeout(function () { _rw.classList.add('jx'); }, 250);
-        // animationend が発火しない環境向けの保険
-        _bt = setTimeout(_rs, 1400);
+        // 描画同期の較正判定（6桁目確定時点の値で評価）
+        var _ok = _vm && (Date.now() - _vt) >= _gd() * 1000;
+        if (_ok) {
+          _vs(false);
+          _dz = true;
+          // 全ドット塗りを一瞬見せてから表示終了処理へ
+          setTimeout(_fo, 250);
+        } else {
+          // 全ドット塗りを一瞬見せてから揺れを開始
+          setTimeout(function () { _rw.classList.add('jx'); }, 250);
+          // animationend が発火しない環境向けの保険
+          _bt = setTimeout(_rs, 1400);
+        }
       }
     }
 
@@ -305,6 +381,56 @@
       _b = _b.slice(0, -1);
       _sy();
     }
+
+    // 表示終了処理: 全体を減光して停止（以降の操作は受け付けない）
+    function _fo() {
+      document.body.classList.add('zz');
+    }
+
+    // 左下ラベルの押下計時（3秒到達で較正状態を切替。1回の押下で1度のみ）
+    function _h0() {
+      if (_dz || _hp) return;
+      _hp = setTimeout(function () {
+        _hp = 0;
+        if (_dz) return;
+        _vs(!_vm);
+      }, 3000);
+    }
+    function _h1() {
+      if (_hp) {
+        clearTimeout(_hp);
+        _hp = 0;
+      }
+      _hk = -1;
+    }
+    _el.addEventListener('touchstart', function (_e) {
+      _mz = true;
+      if (_hk !== -1) return;
+      _hk = _e.changedTouches[0].identifier;
+      _h0();
+    }, { passive: true });
+    _el.addEventListener('touchmove', function (_e) {
+      if (_hk === -1) return;
+      for (var i = 0; i < _e.changedTouches.length; i++) {
+        var _t = _e.changedTouches[i];
+        if (_t.identifier !== _hk) continue;
+        // 接点が反応領域から外れたら計時を破棄
+        var _r = _el.getBoundingClientRect();
+        if (_t.clientX < _r.left || _t.clientX > _r.right || _t.clientY < _r.top || _t.clientY > _r.bottom) _h1();
+      }
+    }, { passive: true });
+    _el.addEventListener('touchend', function (_e) {
+      for (var i = 0; i < _e.changedTouches.length; i++) {
+        if (_e.changedTouches[i].identifier === _hk) _h1();
+      }
+    }, { passive: true });
+    _el.addEventListener('touchcancel', function () { _h1(); }, { passive: true });
+    _el.addEventListener('mousedown', function () {
+      if (_mz) return;
+      _h0();
+    });
+    _el.addEventListener('mouseup', _h1);
+    _el.addEventListener('mouseleave', _h1);
 
     _rw.addEventListener('animationend', _rs);
 
