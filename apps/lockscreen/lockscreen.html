@@ -48,6 +48,8 @@
       inset: -60px;
       z-index: 0;
       background:
+        /* 下端は地色へフェードさせ、描画境界の段差を見えなくする */
+        linear-gradient(to top, #060911 0%, #060911 6%, rgba(6, 9, 17, 0) 26%),
         radial-gradient(130% 100% at 18% 12%, rgba(64, 82, 130, 0.55) 0%, rgba(64, 82, 130, 0) 58%),
         radial-gradient(110% 90% at 85% 28%, rgba(38, 60, 105, 0.50) 0%, rgba(38, 60, 105, 0) 55%),
         radial-gradient(120% 95% at 62% 88%, rgba(70, 54, 96, 0.40) 0%, rgba(70, 54, 96, 0) 60%),
@@ -62,7 +64,7 @@
       background:
         radial-gradient(38% 26% at 28% 22%, rgba(160, 178, 220, 0.16) 0%, rgba(160, 178, 220, 0) 100%),
         radial-gradient(30% 22% at 72% 55%, rgba(140, 150, 200, 0.10) 0%, rgba(140, 150, 200, 0) 100%),
-        radial-gradient(44% 30% at 50% 92%, rgba(120, 130, 180, 0.08) 0%, rgba(120, 130, 180, 0) 100%);
+        radial-gradient(44% 30% at 50% 72%, rgba(120, 130, 180, 0.08) 0%, rgba(120, 130, 180, 0) 100%);
       filter: blur(28px);
     }
 
