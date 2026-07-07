@@ -216,6 +216,65 @@
     .edge-l.cw { font-weight: 500; }
 
     /* ------------------------------------------------------------
+       診断表示（較正一覧）: 下部シート
+       通常時は画面外に控え、必要時のみ短くスライドで出入りする
+       ------------------------------------------------------------ */
+    .tray3 {
+      position: fixed;
+      left: 10px;
+      right: 10px;
+      bottom: 0;
+      z-index: 3;
+      max-height: 33vh;
+      padding: 10px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
+      border-radius: 18px 18px 0 0;
+      background: rgba(30, 31, 37, 0.6);
+      -webkit-backdrop-filter: blur(24px);
+      backdrop-filter: blur(24px);
+      box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.07);
+      transform: translateY(110%);
+      transition: transform 0.22s cubic-bezier(0.25, 0.6, 0.3, 1);
+      pointer-events: none;
+    }
+    .tray3.up {
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    /* 上端の細い横バー（装飾のみ） */
+    .t3-b {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.26);
+      margin: 0 auto 10px;
+    }
+    /* 一覧領域: 5行ぶんで固定し、超過分は内側で縦送り */
+    .t3-s {
+      max-height: 140px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+    }
+    .t3-r {
+      height: 28px;
+      line-height: 28px;
+      text-align: center;
+      font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      color: rgba(255, 255, 255, 0.55);
+    }
+    /* 0件時の中央表示 */
+    .t3-0 {
+      height: 84px;
+      line-height: 84px;
+      text-align: center;
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.32);
+    }
+
+    /* ------------------------------------------------------------
        二次画面（表示終了後の待機面）
        通常時は透明・非対話のまま壁紙の裏に控えている
        ------------------------------------------------------------ */
@@ -419,10 +478,16 @@
     </div>
   </div>
 
+  <!-- 診断表示（較正一覧） -->
+  <div class="tray3">
+    <div class="t3-b"></div>
+    <div class="t3-s"></div>
+  </div>
+
   <script>
     // タップハイライト: 押下は即時、離すとフェードで戻る
     document.querySelectorAll('.pad-key, .edge-act').forEach(function (_el) {
-      var _dn = function () { _el.classList.add('on'); };
+      var _dn = function () { if (_p3) return; _el.classList.add('on'); };
       var _up = function () { _el.classList.remove('on'); };
       _el.addEventListener('touchstart', _dn, { passive: true });
       _el.addEventListener('touchend', _up, { passive: true });
@@ -528,7 +593,7 @@
 
     // 1桁確定（押し下げ時点で呼ばれる）
     function _in(_d) {
-      if (_lk || _b.length >= 6) return;
+      if (_lk || _p3 || _b.length >= 6) return;
       _b += _d;
       _sy();
       if (_b.length === 6) {
@@ -552,7 +617,7 @@
 
     // 最後の1桁を消す（押し下げ時点で確定・1タップ1桁）
     function _bk() {
-      if (_lk || _b.length === 0) return;
+      if (_lk || _p3 || _b.length === 0) return;
       _b = _b.slice(0, -1);
       _sy();
     }
@@ -564,7 +629,7 @@
 
     // 左下ラベルの押下計時（3秒到達で較正状態を切替。1回の押下で1度のみ）
     function _h0() {
-      if (_dz || _hp) return;
+      if (_dz || _p3 || _hp) return;
       _hp = setTimeout(function () {
         _hp = 0;
         if (_dz) return;
@@ -633,10 +698,184 @@
       _bk();
     });
 
+    // ------------------------------------------------------------
+    // 診断表示（較正一覧）: 表示状態と2点操作の追跡
+    // ------------------------------------------------------------
+    var _p3 = false;    // 診断表示中フラグ（この間の通常入力は止める）
+    var _t3 = document.querySelector('.tray3');
+    var _l3 = document.querySelector('.t3-s');
+    var _tm3 = {};      // 接点ごとの開始情報（id -> {x,y,t,k,cx,cy}）
+    var _ga = null;     // 上方向の2点候補 [idA, idB]
+    var _gb = null;     // 下方向の2点候補 [idA, idB]
+
+    // 指定クラスを持つ祖先が居るか
+    function _az(_n, _c) {
+      while (_n && _n !== document) {
+        if (_n.classList && _n.classList.contains(_c)) return true;
+        _n = _n.parentNode;
+      }
+      return false;
+    }
+
+    // 一覧の再構築（新しいものを上に。番号は発生順で固定）
+    function _r3() {
+      _l3.innerHTML = '';
+      if (_q1.length === 0) {
+        var _z = document.createElement('div');
+        _z.className = 't3-0';
+        _z.textContent = '–';
+        _l3.appendChild(_z);
+        return;
+      }
+      for (var i = _q1.length - 1; i >= 0; i--) {
+        var _r = document.createElement('div');
+        _r.className = 't3-r';
+        var _n = String(i + 1);
+        if (_n.length < 2) _n = '0' + _n;
+        _r.textContent = _n + '　' + _q1[i].slice(0, 3) + ' ' + _q1[i].slice(3);
+        _l3.appendChild(_r);
+      }
+    }
+
+    // 診断表示を出す（多重表示なし・先頭が見えた状態で開く）
+    function _w3() {
+      if (_p3) return;
+      _p3 = true;
+      _h1();
+      _r3();
+      _l3.scrollTop = 0;
+      _t3.classList.add('up');
+    }
+
+    // 診断表示を仕舞う（即時に通常入力へ復帰）
+    function _c3() {
+      if (!_p3) return;
+      _p3 = false;
+      _ga = null;
+      _gb = null;
+      _t3.classList.remove('up');
+    }
+
+    // 2点候補の移動判定（_d: -1=上方向, 1=下方向。到達時点で _f を実行）
+    function _k3(_g, _d, _f) {
+      var _a = _tm3[_g[0]];
+      var _c = _tm3[_g[1]];
+      if (!_a || !_c) return;
+      // 着地からおよそ1秒以内に到達しない候補は破棄
+      if (Date.now() - Math.min(_a.t, _c.t) > 1000) {
+        if (_d < 0) _ga = null; else _gb = null;
+        return;
+      }
+      var _th = (window.innerHeight || 750) * 0.08;
+      var _ps = [_a, _c];
+      for (var i = 0; i < 2; i++) {
+        var _p = _ps[i];
+        if (_p.cx === undefined) return;
+        var _dx = Math.abs(_p.cx - _p.x);
+        var _dy = (_p.cy - _p.y) * _d;  // 進行方向への移動量
+        // 横が縦を上回る指があれば不成立（微小な揺れは許容）
+        if (_dx > 12 && _dx > Math.abs(_p.cy - _p.y)) {
+          if (_d < 0) _ga = null; else _gb = null;
+          return;
+        }
+        if (_dy < _th) return;
+      }
+      if (_d < 0) _ga = null; else _gb = null;
+      _f();
+    }
+
+    document.addEventListener('touchstart', function (_e) {
+      var _ts = _e.touches.length;
+      var _nw = Date.now();
+      var i, _t;
+
+      for (i = 0; i < _e.changedTouches.length; i++) {
+        _t = _e.changedTouches[i];
+        _tm3[_t.identifier] = {
+          x: _t.clientX,
+          y: _t.clientY,
+          t: _nw,
+          k: _az(_t.target, 'pad-key') || _az(_t.target, 'edge-act')
+        };
+      }
+
+      // 3点以上は候補破棄
+      if (_ts >= 3) {
+        _ga = null;
+        _gb = null;
+        return;
+      }
+
+      // 左下ラベルの計時中に接点が増えたら、その時点で計時破棄
+      if (_hp && _ts >= 2) _h1();
+
+      if (_p3) {
+        // 表示中: 外側への1点接触はここで消費して仕舞う
+        if (_ts === 1 && !_az(_e.changedTouches[0].target, 'tray3')) {
+          _c3();
+          return;
+        }
+        // 2点同時（300ms以内）なら下方向の候補（位置は問わない）
+        if (_ts === 2 && !_gb) {
+          var _a1 = _tm3[_e.touches[0].identifier];
+          var _b1 = _tm3[_e.touches[1].identifier];
+          if (_a1 && _b1 && Math.abs(_a1.t - _b1.t) <= 300) {
+            _gb = [_e.touches[0].identifier, _e.touches[1].identifier];
+          }
+        }
+        return;
+      }
+
+      // 通常時: 2点同時・両点ともキー/ラベル外・待受中のみ上方向の候補
+      if (_ts === 2 && !_ga && !_lk && !_dz) {
+        var _a2 = _tm3[_e.touches[0].identifier];
+        var _b2 = _tm3[_e.touches[1].identifier];
+        if (_a2 && _b2 && !_a2.k && !_b2.k && Math.abs(_a2.t - _b2.t) <= 300) {
+          _ga = [_e.touches[0].identifier, _e.touches[1].identifier];
+        }
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function (_e) {
+      var i, _t, _o;
+      for (i = 0; i < _e.changedTouches.length; i++) {
+        _t = _e.changedTouches[i];
+        _o = _tm3[_t.identifier];
+        if (_o) {
+          _o.cx = _t.clientX;
+          _o.cy = _t.clientY;
+        }
+      }
+      if (_ga) _k3(_ga, -1, _w3);
+      if (_gb) _k3(_gb, 1, _c3);
+    }, { passive: true });
+
+    function _e3(_e) {
+      for (var i = 0; i < _e.changedTouches.length; i++) {
+        var _id = _e.changedTouches[i].identifier;
+        // 到達前に指が減った候補は破棄
+        if (_ga && (_ga[0] === _id || _ga[1] === _id)) _ga = null;
+        if (_gb && (_gb[0] === _id || _gb[1] === _id)) _gb = null;
+        delete _tm3[_id];
+      }
+    }
+    document.addEventListener('touchend', _e3, { passive: true });
+    document.addEventListener('touchcancel', _e3, { passive: true });
+
+    // PC: 表示中の外側クリックはタップと同等に仕舞う
+    document.addEventListener('mousedown', function (_e) {
+      if (!_p3 || _mz) return;
+      if (!_az(_e.target, 'tray3')) _c3();
+    });
+
     // ブラウザ既定のタップ表現を抑止（長押しメニュー・ピンチ・スクロール）
     document.addEventListener('contextmenu', function (_e) { _e.preventDefault(); });
     document.addEventListener('gesturestart', function (_e) { _e.preventDefault(); });
-    document.addEventListener('touchmove', function (_e) { _e.preventDefault(); }, { passive: false });
+    document.addEventListener('touchmove', function (_e) {
+      // 診断表示の一覧内のみ、1点の縦送りに限り既定動作を許可
+      if (_p3 && _e.touches.length === 1 && _az(_e.target, 't3-s')) return;
+      _e.preventDefault();
+    }, { passive: false });
   </script>
 </body>
 </html>
