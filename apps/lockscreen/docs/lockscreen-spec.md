@@ -1,7 +1,8 @@
 # ロック画面マジックアプリ 製品仕様書 v1.0
 
 **アプリ名（内部名）**: lockscreen
-**配置先**: `apps/lockscreen/lockscreen.html`（1ファイル完結）
+**ホーム画面表示名**: CIPHER
+**配置先**: `apps/lockscreen/lockscreen.html`（本体）＋ `apps/lockscreen/manifest.json` ＋ `apps/lockscreen/icons/`（apple-touch-icon.png / icon-192.png / icon-512.png）
 **ホスティング**: `https://finaloji.github.io/nandeya-studio/apps/lockscreen/lockscreen.html`
 
 ---
