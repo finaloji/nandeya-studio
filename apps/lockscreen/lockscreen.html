@@ -408,7 +408,11 @@
        素材は下端合わせで敷き、Dockが画面の底に接する（上側の余りは許容） */
     .p2-x {
       position: fixed;
-      inset: 0;
+      top: 0;
+      left: 0;
+      right: 0;
+      /* 下端はホームバーのセーフエリア分だけ画面外へはみ出させ、黒帯を防ぐ */
+      bottom: calc(-1 * env(safe-area-inset-bottom, 0px) - 2px);
       z-index: 0;
       display: none;
       background-repeat: no-repeat;
