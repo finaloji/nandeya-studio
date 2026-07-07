@@ -277,6 +277,7 @@
     <button class="tab-btn active" data-tab="sw">ストップウォッチ</button>
     <button class="tab-btn" data-tab="calc">電卓フォース</button>
     <button class="tab-btn" data-tab="clock">Re:Time</button>
+    <button class="tab-btn" data-tab="cipher">CIPHER</button>
   </div>
 
   <!-- ストップウォッチタブ -->
@@ -443,6 +444,61 @@
       </table>
     </section>
   </div>
+
+  <!-- CIPHER タブ -->
+  <div id="tab-cipher" class="tab-panel">
+    <section>
+      <h2>ID発行</h2>
+      <div class="form-row">
+        <div class="field">
+          <label for="cpIssueId">ID</label>
+          <input type="text" id="cpIssueId" placeholder="例: cipher001">
+        </div>
+        <div class="field">
+          <label for="cpIssuePasscode">パスコード</label>
+          <div class="inline-btn-group">
+            <input type="text" id="cpIssuePasscode" placeholder="例: A1B2C3">
+            <button class="btn-sub" id="cpGenPasscodeBtn" type="button">自動生成</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="cpIssueNote">メモ（任意）</label>
+          <input type="text" id="cpIssueNote" placeholder="例: 〇〇さん用">
+        </div>
+        <div class="field">
+          <button class="btn" id="cpIssueBtn" type="button">発行</button>
+        </div>
+      </div>
+      <div class="msg" id="cpIssueMsg"></div>
+    </section>
+
+    <section>
+      <h2>端末変更リクエスト</h2>
+      <table>
+        <thead>
+          <tr><th>対象ID</th><th>申請日時</th><th>操作</th></tr>
+        </thead>
+        <tbody id="cpRequestTableBody">
+          <tr class="loading-row"><td colspan="3">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>ライセンス一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>パスコード</th><th>端末登録状況</th>
+            <th>メモ</th><th>発行日</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="cpLicenseTableBody">
+          <tr class="loading-row"><td colspan="6">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
 </div>
 
 <script type="module">
@@ -487,6 +543,8 @@
       loadCalcDeviceRequests();
       loadRtLicenses();
       loadRtDeviceRequests();
+      loadCipherLicenses();
+      loadCipherDeviceRequests();
     } else {
       gateErrorEl.textContent = "パスワードが正しくありません";
     }
@@ -1141,6 +1199,200 @@
     try {
       await updateDoc(doc(db, RT_LICENSES, id), { deviceId: null });
       await loadRtLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("端末登録のリセットに失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  // =============================================
+  // CIPHER（ロック画面）用
+  // ※Firestoreルール上、作成/リセットの deviceId は null を使う
+  // =============================================
+  const CIPHER_LICENSES = "cipher_licenses";
+  const CIPHER_REQUESTS = "cipher_deviceRequests";
+
+  const cpIssueMsgEl       = document.getElementById("cpIssueMsg");
+  const cpIssueIdEl        = document.getElementById("cpIssueId");
+  const cpIssuePasscodeEl  = document.getElementById("cpIssuePasscode");
+  const cpIssueNoteEl      = document.getElementById("cpIssueNote");
+  const cpIssueBtnEl       = document.getElementById("cpIssueBtn");
+  const cpGenPasscodeBtnEl = document.getElementById("cpGenPasscodeBtn");
+  const cpTableBodyEl      = document.getElementById("cpLicenseTableBody");
+  const cpRequestBodyEl    = document.getElementById("cpRequestTableBody");
+
+  function setCpIssueMsg(text, type) {
+    cpIssueMsgEl.textContent = text;
+    cpIssueMsgEl.className = "msg" + (type ? " " + type : "");
+  }
+
+  function setCpFormDisabled(disabled) {
+    cpIssueIdEl.disabled = disabled;
+    cpIssuePasscodeEl.disabled = disabled;
+    cpIssueNoteEl.disabled = disabled;
+    cpGenPasscodeBtnEl.disabled = disabled;
+    cpIssueBtnEl.disabled = disabled;
+  }
+
+  cpGenPasscodeBtnEl.addEventListener("click", () => {
+    cpIssuePasscodeEl.value = generatePasscode();
+  });
+
+  cpIssueBtnEl.addEventListener("click", async () => {
+    const id       = cpIssueIdEl.value.trim();
+    const passcode = cpIssuePasscodeEl.value.trim();
+    const note     = cpIssueNoteEl.value.trim();
+    if (!id || !passcode) { setCpIssueMsg("IDとパスコードを入力してください", "err"); return; }
+
+    setCpFormDisabled(true);
+    cpIssueBtnEl.textContent = "処理中...";
+    setCpIssueMsg("", "");
+
+    try {
+      const ref = doc(db, CIPHER_LICENSES, id);
+      if ((await getDoc(ref)).exists()) {
+        setCpIssueMsg("このIDは既に使われています", "err");
+        return;
+      }
+      await setDoc(ref, { passcode, deviceId: null, createdAt: Date.now(), note: note || "" });
+      setCpIssueMsg("発行しました", "ok");
+      cpIssueIdEl.value = "";
+      cpIssuePasscodeEl.value = "";
+      cpIssueNoteEl.value = "";
+      await loadCipherLicenses();
+    } catch (err) {
+      console.error(err);
+      setCpIssueMsg("発行に失敗しました: " + (err && err.message ? err.message : err), "err");
+    } finally {
+      setCpFormDisabled(false);
+      cpIssueBtnEl.textContent = "発行";
+    }
+  });
+
+  async function loadCipherLicenses() {
+    cpTableBodyEl.innerHTML = '<tr class="loading-row"><td colspan="6">読み込み中...</td></tr>';
+    try {
+      const snapshot = await getDocs(collection(db, CIPHER_LICENSES));
+      const items = [];
+      snapshot.forEach(d => items.push({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      if (items.length === 0) {
+        cpTableBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">まだライセンスがありません</td></tr>';
+        return;
+      }
+
+      cpTableBodyEl.innerHTML = "";
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        const registered = !!item.deviceId;
+        const createdAtText = item.createdAt ? new Date(item.createdAt).toLocaleDateString("ja-JP") : "-";
+        tr.innerHTML = `
+          <td data-label="ID">${escapeHtml(item.id)}</td>
+          <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
+          <td data-label="端末登録状況">
+            <span class="${registered ? "status-registered" : "status-unregistered"}">
+              ${registered ? "登録済み" : "未登録"}
+            </span>
+          </td>
+          <td data-label="メモ">${escapeHtml(item.note || "")}</td>
+          <td data-label="発行日">${escapeHtml(createdAtText)}</td>
+          <td data-label="操作">
+            <div class="action-cell">
+              <button class="btn-sub reset-btn" type="button" ${registered ? "" : "disabled"}>端末登録をリセット</button>
+              <button class="btn-danger delete-btn" type="button">削除</button>
+            </div>
+          </td>`;
+        tr.querySelector(".reset-btn").addEventListener("click", e => handleCipherResetDevice(item.id, e.target));
+        tr.querySelector(".delete-btn").addEventListener("click", e => handleCipherDelete(item.id, e.target));
+        cpTableBodyEl.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      cpTableBodyEl.innerHTML = `<tr class="empty-row"><td colspan="6">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
+    }
+  }
+
+  async function loadCipherDeviceRequests() {
+    cpRequestBodyEl.innerHTML = '<tr class="loading-row"><td colspan="3">読み込み中...</td></tr>';
+    try {
+      const q = query(collection(db, CIPHER_REQUESTS), where("status", "==", "pending"));
+      const snapshot = await getDocs(q);
+      const items = [];
+      snapshot.forEach(d => items.push({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0));
+
+      if (items.length === 0) {
+        cpRequestBodyEl.innerHTML = '<tr class="empty-row"><td colspan="3">保留中の申請はありません</td></tr>';
+        return;
+      }
+
+      cpRequestBodyEl.innerHTML = "";
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        const dateText = item.requestedAt ? new Date(item.requestedAt).toLocaleString("ja-JP") : "-";
+        tr.innerHTML = `
+          <td data-label="対象ID">${escapeHtml(item.licenseId || "")}</td>
+          <td data-label="申請日時">${escapeHtml(dateText)}</td>
+          <td data-label="操作"><button class="btn-sub approve-btn" type="button">承認</button></td>`;
+        tr.querySelector(".approve-btn").addEventListener("click", e => handleCipherApproveRequest(item.id, item.licenseId, e.target));
+        cpRequestBodyEl.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      cpRequestBodyEl.innerHTML = `<tr class="empty-row"><td colspan="3">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
+    }
+  }
+
+  async function handleCipherApproveRequest(requestId, licenseId, buttonEl) {
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      const licenseRef = doc(db, CIPHER_LICENSES, licenseId);
+      if (!(await getDoc(licenseRef)).exists()) {
+        alert("対象のライセンスが見つかりません");
+        buttonEl.disabled = false;
+        buttonEl.textContent = original;
+        return;
+      }
+      await updateDoc(licenseRef, { deviceId: null });
+      await updateDoc(doc(db, CIPHER_REQUESTS, requestId), { status: "approved" });
+      await loadCipherDeviceRequests();
+      await loadCipherLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("承認処理に失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  async function handleCipherDelete(id, buttonEl) {
+    if (!confirm("本当に削除しますか？")) return;
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      await deleteDoc(doc(db, CIPHER_LICENSES, id));
+      await loadCipherLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("削除に失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  async function handleCipherResetDevice(id, buttonEl) {
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      await updateDoc(doc(db, CIPHER_LICENSES, id), { deviceId: null });
+      await loadCipherLicenses();
     } catch (err) {
       console.error(err);
       alert("端末登録のリセットに失敗しました: " + (err && err.message ? err.message : err));
