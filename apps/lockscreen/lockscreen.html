@@ -756,6 +756,16 @@
       _t3.classList.remove('up');
     }
 
+    // 表示終了状態から一次画面へ復帰（入力は初期状態・一覧は保持）
+    function _u2() {
+      if (!_dz) return;
+      _dz = false;
+      _lk = false;
+      _b = '';
+      _sy();
+      document.body.classList.remove('zz');
+    }
+
     // 2点候補の移動判定（_d: -1=上方向, 1=下方向。到達時点で _f を実行）
     function _k3(_g, _d, _f) {
       var _a = _tm3[_g[0]];
@@ -826,6 +836,18 @@
         return;
       }
 
+      // 表示終了後: 2点同時（300ms以内）なら下方向の候補（一次画面への復帰用）
+      if (_dz) {
+        if (_ts === 2 && !_gb) {
+          var _a3 = _tm3[_e.touches[0].identifier];
+          var _b3 = _tm3[_e.touches[1].identifier];
+          if (_a3 && _b3 && Math.abs(_a3.t - _b3.t) <= 300) {
+            _gb = [_e.touches[0].identifier, _e.touches[1].identifier];
+          }
+        }
+        return;
+      }
+
       // 通常時: 2点同時・両点ともキー/ラベル外・待受中のみ上方向の候補
       if (_ts === 2 && !_ga && !_lk && !_dz) {
         var _a2 = _tm3[_e.touches[0].identifier];
@@ -847,7 +869,7 @@
         }
       }
       if (_ga) _k3(_ga, -1, _w3);
-      if (_gb) _k3(_gb, 1, _c3);
+      if (_gb) _k3(_gb, 1, _dz ? _u2 : _c3);
     }, { passive: true });
 
     function _e3(_e) {
