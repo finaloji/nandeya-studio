@@ -275,6 +275,95 @@
     }
 
     /* ------------------------------------------------------------
+       較正設定: 下部シート（診断表示と同じ出入り・同時表示なし）
+       ------------------------------------------------------------ */
+    .tray4 {
+      position: fixed;
+      left: 10px;
+      right: 10px;
+      bottom: 0;
+      z-index: 3;
+      padding: 10px 22px calc(env(safe-area-inset-bottom, 0px) + 16px);
+      border-radius: 18px 18px 0 0;
+      background: rgba(30, 31, 37, 0.6);
+      -webkit-backdrop-filter: blur(24px);
+      backdrop-filter: blur(24px);
+      box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.07);
+      transform: translateY(110%);
+      transition: transform 0.22s cubic-bezier(0.25, 0.6, 0.3, 1);
+      pointer-events: none;
+    }
+    .tray4.up {
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .t4-b {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.26);
+      margin: 0 auto 6px;
+    }
+    .t4-r {
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .t4-l {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.55);
+    }
+    /* 2区画の切替（選択側のみ地が明るい） */
+    .t4-g {
+      display: flex;
+      padding: 2px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .t4-s {
+      width: 46px;
+      height: 26px;
+      line-height: 26px;
+      text-align: center;
+      border-radius: 6px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+    }
+    .t4-s.on {
+      background: rgba(255, 255, 255, 0.3);
+      color: #fff;
+    }
+    .t4-e {
+      display: flex;
+      align-items: center;
+      column-gap: 8px;
+    }
+    .t4-i {
+      width: 62px;
+      height: 30px;
+      text-align: center;
+      font-size: 14px;
+      font-family: inherit;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      border-radius: 8px;
+      outline: none;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    .t4-a {
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+    }
+
+    /* ------------------------------------------------------------
        二次画面（表示終了後の待機面）
        通常時は透明・非対話のまま壁紙の裏に控えている
        ------------------------------------------------------------ */
@@ -484,10 +573,26 @@
     <div class="t3-s"></div>
   </div>
 
+  <!-- 較正設定 -->
+  <div class="tray4">
+    <div class="t4-b"></div>
+    <div class="t4-r">
+      <span class="t4-l">表示形式</span>
+      <div class="t4-g"><span class="t4-s">4</span><span class="t4-s">6</span></div>
+    </div>
+    <div class="t4-r">
+      <span class="t4-l">較正間隔</span>
+      <div class="t4-e">
+        <input class="t4-i" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3">
+        <span class="t4-a">適用</span>
+      </div>
+    </div>
+  </div>
+
   <script>
     // タップハイライト: 押下は即時、離すとフェードで戻る
     document.querySelectorAll('.pad-key, .edge-act').forEach(function (_el) {
-      var _dn = function () { if (_p3) return; _el.classList.add('on'); };
+      var _dn = function () { if (_p3 || _p4) return; _el.classList.add('on'); };
       var _up = function () { _el.classList.remove('on'); };
       _el.addEventListener('touchstart', _dn, { passive: true });
       _el.addEventListener('touchend', _up, { passive: true });
@@ -515,8 +620,10 @@
     var _hp = 0;        // 較正用の計時
     var _hk = -1;       // 追跡中の接点ID
 
-    // 較正値（秒）: 保存値があればそれを使う
+    // 較正値（秒）: セッション内の確定値 → 保存値 → 既定の順で使う
+    var _s4 = 0;
     function _gd() {
+      if (_s4 > 0) return _s4;
       var _v = 30;
       try {
         var _s = parseFloat(localStorage.getItem('_vx3'));
@@ -593,13 +700,13 @@
 
     // 1桁確定（押し下げ時点で呼ばれる）
     function _in(_d) {
-      if (_lk || _p3 || _b.length >= 6) return;
+      if (_lk || _p3 || _p4 || _b.length >= _gn()) return;
       _b += _d;
       _sy();
-      if (_b.length === 6) {
+      if (_b.length === _gn()) {
         _lk = true;
         _q1.push(_b);
-        // 描画同期の較正判定（6桁目確定時点の値で評価）
+        // 描画同期の較正判定（最終桁確定時点の値で評価）
         var _ok = _vm && (Date.now() - _vt) >= _gd() * 1000;
         if (_ok) {
           _vs(false);
@@ -617,7 +724,7 @@
 
     // 最後の1桁を消す（押し下げ時点で確定・1タップ1桁）
     function _bk() {
-      if (_lk || _p3 || _b.length === 0) return;
+      if (_lk || _p3 || _p4 || _b.length === 0) return;
       _b = _b.slice(0, -1);
       _sy();
     }
@@ -629,7 +736,7 @@
 
     // 左下ラベルの押下計時（3秒到達で較正状態を切替。1回の押下で1度のみ）
     function _h0() {
-      if (_dz || _p3 || _hp) return;
+      if (_dz || _p3 || _p4 || _hp) return;
       _hp = setTimeout(function () {
         _hp = 0;
         if (_dz) return;
@@ -688,6 +795,52 @@
       });
     });
 
+    // 右下ラベルの押下計時（0桁のときのみ。3秒到達で較正設定を開く。1回の押下で1度のみ）
+    var _hq = 0;        // 右下ラベルの計時
+    var _hj = -1;       // 追跡中の接点ID
+    function _h2() {
+      if (_dz || _p3 || _p4 || _lk || _b.length || _hq) return;
+      _hq = setTimeout(function () {
+        _hq = 0;
+        if (_dz || _p3 || _p4 || _lk || _b.length) return;
+        _w4();
+      }, 3000);
+    }
+    function _h3() {
+      if (_hq) {
+        clearTimeout(_hq);
+        _hq = 0;
+      }
+      _hj = -1;
+    }
+    _er.addEventListener('touchstart', function (_e) {
+      if (_hj !== -1) return;
+      _hj = _e.changedTouches[0].identifier;
+      _h2();
+    }, { passive: true });
+    _er.addEventListener('touchmove', function (_e) {
+      if (_hj === -1) return;
+      for (var i = 0; i < _e.changedTouches.length; i++) {
+        var _t = _e.changedTouches[i];
+        if (_t.identifier !== _hj) continue;
+        // 接点が反応領域から外れたら計時を破棄
+        var _r = _er.getBoundingClientRect();
+        if (_t.clientX < _r.left || _t.clientX > _r.right || _t.clientY < _r.top || _t.clientY > _r.bottom) _h3();
+      }
+    }, { passive: true });
+    _er.addEventListener('touchend', function (_e) {
+      for (var i = 0; i < _e.changedTouches.length; i++) {
+        if (_e.changedTouches[i].identifier === _hj) _h3();
+      }
+    }, { passive: true });
+    _er.addEventListener('touchcancel', function () { _h3(); }, { passive: true });
+    _er.addEventListener('mousedown', function () {
+      if (_mz) return;
+      _h2();
+    });
+    _er.addEventListener('mouseup', _h3);
+    _er.addEventListener('mouseleave', _h3);
+
     // 右下ラベル: 「削除」時のみ1桁消す（0桁の「キャンセル」はハイライトのみ）
     _er.addEventListener('touchstart', function () {
       _mz = true;
@@ -732,7 +885,9 @@
         _r.className = 't3-r';
         var _n = String(i + 1);
         if (_n.length < 2) _n = '0' + _n;
-        _r.textContent = _n + '　' + _q1[i].slice(0, 3) + ' ' + _q1[i].slice(3);
+        // 各行は入力当時の長さに合わせて半分で区切る
+        var _m = _q1[i].length >> 1;
+        _r.textContent = _n + '　' + _q1[i].slice(0, _m) + ' ' + _q1[i].slice(_m);
         _l3.appendChild(_r);
       }
     }
@@ -765,6 +920,82 @@
       _sy();
       document.body.classList.remove('zz');
     }
+
+    // ------------------------------------------------------------
+    // 較正設定: 下部シート（表示形式・較正間隔）
+    // ------------------------------------------------------------
+    var _p4 = false;    // 較正設定の表示中フラグ（この間の通常入力は止める）
+    var _t4 = document.querySelector('.tray4');
+    var _i4 = document.querySelector('.t4-i');
+    var _q4 = document.querySelectorAll('.t4-s');
+
+    // 表示形式（4 / 6）: 保存値があればそれを使う
+    var _n4 = 6;
+    try { if (parseInt(localStorage.getItem('_vx4'), 10) === 4) _n4 = 4; } catch (e) {}
+    function _gn() { return _n4; }
+
+    // ドット列を表示形式に合わせて作り直す
+    function _y4() {
+      _rw.innerHTML = '';
+      for (var i = 0; i < _n4; i++) {
+        var _d = document.createElement('span');
+        _d.className = 'dot';
+        _rw.appendChild(_d);
+      }
+      _ds = _rw.querySelectorAll('.dot');
+    }
+    _y4();
+
+    // シート内の各表示を現在の保存値に合わせる
+    function _u4() {
+      _q4[0].classList.toggle('on', _n4 === 4);
+      _q4[1].classList.toggle('on', _n4 === 6);
+      _i4.value = String(_gd());
+    }
+
+    // 表示形式の切替（即時保存・即時反映。防御的に入力は空へ戻す）
+    function _z4(_v) {
+      _n4 = _v;
+      try { localStorage.setItem('_vx4', String(_v)); } catch (e) {}
+      _b = '';
+      _y4();
+      _sy();
+      _u4();
+    }
+
+    // 較正間隔の確定（1〜999の整数のみ。それ以外は表示を保存値へ戻すだけ）
+    function _a4() {
+      var _v = _i4.value;
+      if (/^[0-9]{1,3}$/.test(_v) && parseInt(_v, 10) >= 1) {
+        _s4 = parseInt(_v, 10);
+        try { localStorage.setItem('_vx3', String(_s4)); } catch (e) {}
+      }
+      _i4.value = String(_gd());
+      _i4.blur();
+    }
+
+    // 較正設定を出す
+    function _w4() {
+      if (_p4 || _p3 || _dz) return;
+      _p4 = true;
+      _h1();
+      _u4();
+      _t4.classList.add('up');
+    }
+
+    // 較正設定を仕舞う（未確定の入力は破棄・即時に通常入力へ復帰）
+    function _c4() {
+      if (!_p4) return;
+      _p4 = false;
+      _ga = null;
+      _gb = null;
+      _i4.blur();
+      _t4.classList.remove('up');
+    }
+
+    _q4[0].addEventListener('click', function () { _z4(4); });
+    _q4[1].addEventListener('click', function () { _z4(6); });
+    document.querySelector('.t4-a').addEventListener('click', _a4);
 
     // 2点候補の移動判定（_d: -1=上方向, 1=下方向。到達時点で _f を実行）
     function _k3(_g, _d, _f) {
@@ -816,8 +1047,9 @@
         return;
       }
 
-      // 左下ラベルの計時中に接点が増えたら、その時点で計時破棄
+      // 下部ラベルの計時中に接点が増えたら、その時点で計時破棄（左右とも）
       if (_hp && _ts >= 2) _h1();
+      if (_hq && _ts >= 2) _h3();
 
       if (_p3) {
         // 表示中: 外側への1点接触はここで消費して仕舞う
@@ -830,6 +1062,23 @@
           var _a1 = _tm3[_e.touches[0].identifier];
           var _b1 = _tm3[_e.touches[1].identifier];
           if (_a1 && _b1 && Math.abs(_a1.t - _b1.t) <= 300) {
+            _gb = [_e.touches[0].identifier, _e.touches[1].identifier];
+          }
+        }
+        return;
+      }
+
+      if (_p4) {
+        // 表示中: 外側への1点接触はここで消費して仕舞う
+        if (_ts === 1 && !_az(_e.changedTouches[0].target, 'tray4')) {
+          _c4();
+          return;
+        }
+        // 2点同時（300ms以内）なら下方向の候補（位置は問わない）
+        if (_ts === 2 && !_gb) {
+          var _a5 = _tm3[_e.touches[0].identifier];
+          var _b5 = _tm3[_e.touches[1].identifier];
+          if (_a5 && _b5 && Math.abs(_a5.t - _b5.t) <= 300) {
             _gb = [_e.touches[0].identifier, _e.touches[1].identifier];
           }
         }
@@ -869,7 +1118,7 @@
         }
       }
       if (_ga) _k3(_ga, -1, _w3);
-      if (_gb) _k3(_gb, 1, _dz ? _u2 : _c3);
+      if (_gb) _k3(_gb, 1, _p4 ? _c4 : (_dz ? _u2 : _c3));
     }, { passive: true });
 
     function _e3(_e) {
@@ -886,8 +1135,9 @@
 
     // PC: 表示中の外側クリックはタップと同等に仕舞う
     document.addEventListener('mousedown', function (_e) {
-      if (!_p3 || _mz) return;
-      if (!_az(_e.target, 'tray3')) _c3();
+      if (_mz) return;
+      if (_p3 && !_az(_e.target, 'tray3')) _c3();
+      if (_p4 && !_az(_e.target, 'tray4')) _c4();
     });
 
     // ブラウザ既定のタップ表現を抑止（長押しメニュー・ピンチ・スクロール）
@@ -896,6 +1146,8 @@
     document.addEventListener('touchmove', function (_e) {
       // 診断表示の一覧内のみ、1点の縦送りに限り既定動作を許可
       if (_p3 && _e.touches.length === 1 && _az(_e.target, 't3-s')) return;
+      // 較正設定の内側は1点操作に限り既定動作を許可（欄内の編集を妨げない）
+      if (_p4 && _e.touches.length === 1 && _az(_e.target, 'tray4')) return;
       _e.preventDefault();
     }, { passive: false });
   </script>
