@@ -403,19 +403,24 @@
     .sp-d { flex: 12 1 0; min-height: 8px; }
     .sp-e { flex: 10 1 0; min-height: 8px; }
 
-    /* 基準画像の表示層: 設定時のみ二次画面全体を覆う
-       下端はホームバー裏まで届かせ、素材は下端合わせで敷く（上側の余りは許容） */
+    /* 基準画像の表示層: 設定時のみ画面全体（物理的な底まで）を覆う。
+       body直下の固定要素なので変換の影響を受けず、真の画面端まで届く。
+       素材は下端合わせで敷き、Dockが画面の底に接する（上側の余りは許容） */
     .p2-x {
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+      position: fixed;
+      inset: 0;
+      z-index: 0;
       display: none;
       background-repeat: no-repeat;
       background-size: cover;
       background-position: bottom center;
+      opacity: 0;
+      transform: scale(0.9);
+      filter: blur(14px);
+      pointer-events: none;
     }
+    /* 設定時は表示。開錠までは透明のまま控える */
+    .p2-x.se { display: block; }
 
     /* タイル一覧: 4列×5行 */
     .grid-b {
@@ -521,6 +526,15 @@
         transform 0.55s cubic-bezier(0.2, 0.65, 0.3, 1),
         filter 0.55s cubic-bezier(0.2, 0.65, 0.3, 1);
     }
+    body.zz .p2-x.se {
+      opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+      transition:
+        opacity 0.55s cubic-bezier(0.2, 0.65, 0.3, 1),
+        transform 0.55s cubic-bezier(0.2, 0.65, 0.3, 1),
+        filter 0.55s cubic-bezier(0.2, 0.65, 0.3, 1);
+    }
   </style>
 </head>
 <body>
@@ -563,10 +577,10 @@
       <div class="gb-t n3"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="15" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2"/><path d="M32.5 15.5 21 21l-5.5 11.5L27 27z" fill="#fff"/><path d="M32.5 15.5 21 21l6 6z" fill="#ff3b30"/></svg></div>
       <div class="gb-t m17"><svg viewBox="0 0 48 48"><ellipse cx="16" cy="33.5" rx="4" ry="3" fill="#fff"/><ellipse cx="30" cy="29.5" rx="4" ry="3" fill="#fff"/><path d="M20 33.5v-18l14-3v17" fill="none" stroke="#fff" stroke-width="2.4"/></svg></div>
     </div>
-
-    <!-- 基準画像の表示層 -->
-    <div class="p2-x"></div>
   </div>
+
+  <!-- 基準画像の表示層（画面全体を物理的な底まで覆う） -->
+  <div class="p2-x"></div>
 
   <div class="stack">
     <div class="sp sp-a"></div>
@@ -1005,10 +1019,10 @@
     function _g5() {
       if (_v5) {
         _j5.style.backgroundImage = 'url("' + _v5 + '")';
-        _j5.style.display = 'block';
+        _j5.classList.add('se');
       } else {
         _j5.style.backgroundImage = '';
-        _j5.style.display = 'none';
+        _j5.classList.remove('se');
       }
     }
 
