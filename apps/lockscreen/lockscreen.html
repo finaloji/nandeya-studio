@@ -13,9 +13,14 @@
       --kd: min(23vw, 11.5vh, 84px);
       --gx: calc(var(--kd) * 0.28); /* 横間隔 */
       --gy: calc(var(--kd) * 0.26); /* 縦間隔 */
+      /* 二次画面のタイル寸法（同じく上限つき） */
+      --td: min(19vw, 7.4vh, 64px);
     }
     @supports (height: 1svh) {
-      :root { --kd: min(23vw, 11.5svh, 84px); }
+      :root {
+        --kd: min(23vw, 11.5svh, 84px);
+        --td: min(19vw, 7.4svh, 64px);
+      }
     }
 
     * {
@@ -210,17 +215,177 @@
     /* 描画較正中の字形補正 */
     .edge-l.cw { font-weight: 500; }
 
-    /* 表示終了処理: 画面全体を静かに減光する */
-    body.zz .veil,
+    /* ------------------------------------------------------------
+       二次画面（表示終了後の待機面）
+       通常時は透明・非対話のまま壁紙の裏に控えている
+       ------------------------------------------------------------ */
+    .pane2 {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+      padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+      opacity: 0;
+      transform: scale(0.9);
+      filter: blur(14px);
+      pointer-events: none;
+    }
+
+    .sp-d { flex: 12 1 0; min-height: 8px; }
+    .sp-e { flex: 10 1 0; min-height: 8px; }
+
+    /* タイル一覧: 4列×5行 */
+    .grid-b {
+      display: grid;
+      grid-template-columns: repeat(4, var(--td));
+      column-gap: calc(var(--td) * 0.45);
+      row-gap: calc(var(--td) * 0.28);
+    }
+    .gb-c {
+      width: var(--td);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .gb-t {
+      width: var(--td);
+      height: var(--td);
+      border-radius: calc(var(--td) * 0.235);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+    }
+    .gb-t svg { width: 100%; height: 100%; display: block; }
+    .gb-l {
+      margin-top: 4px;
+      font-size: max(10px, calc(var(--td) * 0.17));
+      font-weight: 400;
+      color: #fff;
+      line-height: 1.2;
+      white-space: nowrap;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+    }
+
+    /* 中段の細長カプセル */
+    .pill-b {
+      display: flex;
+      align-items: center;
+      column-gap: 5px;
+      padding: 7px 15px;
+      border-radius: 999px;
+      background: rgba(120, 120, 128, 0.38);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    /* 最下段の横長パネル（ラベルなしタイル4個） */
+    .bar-b {
+      display: grid;
+      grid-template-columns: repeat(4, var(--td));
+      column-gap: calc(var(--td) * 0.45);
+      padding: calc(var(--td) * 0.2);
+      border-radius: calc(var(--td) * 0.53);
+      background: rgba(120, 120, 128, 0.30);
+      -webkit-backdrop-filter: blur(22px);
+      backdrop-filter: blur(22px);
+    }
+
+    /* タイル地色 */
+    .m1  { background: #000; }
+    .m2  { background: #fff; }
+    .m3  { background: #fff; }
+    .m4  { background: linear-gradient(145deg, #33353c, #121318); }
+    .m5  { background: #e9e5da; }
+    .m6  { background: linear-gradient(180deg, #4a9ff5, #1868d1); }
+    .m7  { background: #fff; }
+    .m8  { background: #1c1c1e; }
+    .m9  { background: radial-gradient(circle at 50% 42%, #9a9aa0, #55555c); }
+    .m10 { background: #fff; }
+    .m11 { background: #fff; }
+    .m12 { background: #fff; }
+    .m13 { background: #1c1c1e; }
+    .m14 { background: #fff; }
+    .m15 { background: #1c1c1e; }
+    .m16 { background: linear-gradient(180deg, #26282e, #0e0f13); }
+    .m17 { background: linear-gradient(180deg, #fb5c74, #fa233b); }
+    .m18 { background: #000; }
+    .m19 { background: #fff; }
+    .m20 { background: linear-gradient(180deg, #a05cf7, #6e2bd9); }
+    .n1  { background: linear-gradient(180deg, #5cd964, #2ec848); }
+    .n2  { background: linear-gradient(180deg, #59b8f9, #1d77ef); }
+    .n3  { background: radial-gradient(circle at 50% 45%, #5ac8fa, #1e6ae1); }
+
+    /* 表示終了処理: 一次層は上方向へ抜けながら減光し、
+       二次画面がわずかに拡大しつつ鮮明化して入れ替わる */
     body.zz .stack {
       opacity: 0;
-      transition: opacity 0.9s ease-out;
+      transform: translateY(-9%);
+      transition:
+        opacity 0.4s cubic-bezier(0.2, 0.6, 0.35, 1),
+        transform 0.4s cubic-bezier(0.2, 0.6, 0.35, 1);
       pointer-events: none;
+    }
+    body.zz .pane2 {
+      opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+      transition:
+        opacity 0.55s cubic-bezier(0.2, 0.65, 0.3, 1),
+        transform 0.55s cubic-bezier(0.2, 0.65, 0.3, 1),
+        filter 0.55s cubic-bezier(0.2, 0.65, 0.3, 1);
     }
   </style>
 </head>
 <body>
   <div class="veil"></div>
+
+  <!-- 二次画面（表示終了後の待機面） -->
+  <div class="pane2">
+    <div class="grid-b">
+      <div class="gb-c"><div class="gb-t m1"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#fff"/><line x1="24" y1="6.5" x2="24" y2="9.5" stroke="#000" stroke-width="1.5"/><line x1="38.5" y1="24" x2="41.5" y2="24" stroke="#000" stroke-width="1.5"/><line x1="24" y1="38.5" x2="24" y2="41.5" stroke="#000" stroke-width="1.5"/><line x1="6.5" y1="24" x2="9.5" y2="24" stroke="#000" stroke-width="1.5"/><line x1="24" y1="24" x2="24" y2="11" stroke="#000" stroke-width="2.6" stroke-linecap="round"/><line x1="24" y1="24" x2="33" y2="29" stroke="#000" stroke-width="2.2" stroke-linecap="round"/><line x1="24" y1="24" x2="17" y2="34" stroke="#f60" stroke-width="1.2" stroke-linecap="round"/></svg></div><div class="gb-l">時計</div></div>
+      <div class="gb-c"><div class="gb-t m2"><svg viewBox="0 0 48 48"><text x="24" y="15" text-anchor="middle" font-size="9" fill="#e33" font-family="-apple-system, sans-serif">7月</text><text x="24" y="38" text-anchor="middle" font-size="24" font-weight="300" fill="#111" font-family="-apple-system, sans-serif">7</text></svg></div><div class="gb-l">カレンダー</div></div>
+      <div class="gb-c"><div class="gb-t m3"><svg viewBox="0 0 48 48"><g transform="translate(24,25)"><ellipse cx="0" cy="-9.5" rx="4.6" ry="9.5" fill="#ffcc00" opacity="0.8"/><ellipse cx="0" cy="-9.5" rx="4.6" ry="9.5" fill="#ff9500" opacity="0.8" transform="rotate(45)"/><ellipse cx="0" cy="-9.5" rx="4.6" ry="9.5" fill="#ff2d55" opacity="0.8" transform="rotate(90)"/><ellipse cx="0" cy="-9.5" rx="4.6" ry="9.5" fill="#af52de" opacity="0.8" transform="rotate(135)"/><ellipse cx="0" cy="-9.5" rx="4.6" ry="9.5" fill="#5856d6" opacity="0.8" transform="rotate(180)"/><ellipse cx="0" cy="-9.5" rx="4.6" ry="9.5" fill="#007aff" opacity="0.8" transform="rotate(225)"/><ellipse cx="0" cy="-9.5" rx="4.6" ry="9.5" fill="#5ac8fa" opacity="0.8" transform="rotate(270)"/><ellipse cx="0" cy="-9.5" rx="4.6" ry="9.5" fill="#34c759" opacity="0.8" transform="rotate(315)"/></g></svg></div><div class="gb-l">写真</div></div>
+      <div class="gb-c"><div class="gb-t m4"><svg viewBox="0 0 48 48"><circle cx="24" cy="25" r="12" fill="#1b1c22" stroke="#565963" stroke-width="2"/><circle cx="24" cy="25" r="7" fill="#2e3f63"/><circle cx="21" cy="22" r="2" fill="#7d9bd0"/></svg></div><div class="gb-l">カメラ</div></div>
+      <div class="gb-c"><div class="gb-t m5"><svg viewBox="0 0 48 48"><path d="M0 0h48v20L28 30 0 16z" fill="#cde6b4"/><path d="M48 26v22H18l14-18z" fill="#a8d4f5"/><path d="M6 48 34 4l7 5L16 48z" fill="#fff"/><path d="M9 48 36 6l3 2L14 48z" fill="#f7c948"/></svg></div><div class="gb-l">マップ</div></div>
+      <div class="gb-c"><div class="gb-t m6"><svg viewBox="0 0 48 48"><circle cx="16" cy="15" r="6.5" fill="#ffd60a"/><circle cx="19" cy="29" r="6.5" fill="#fff"/><circle cx="28" cy="26" r="8" fill="#fff"/><rect x="13" y="27" width="22" height="9" rx="4.5" fill="#fff"/></svg></div><div class="gb-l">天気</div></div>
+      <div class="gb-c"><div class="gb-t m7"><svg viewBox="0 0 48 48"><rect x="0" y="0" width="48" height="13" fill="#f6e6a8"/><line x1="8" y1="22" x2="40" y2="22" stroke="#d9d9de" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="30" x2="40" y2="30" stroke="#d9d9de" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="38" x2="28" y2="38" stroke="#d9d9de" stroke-width="2" stroke-linecap="round"/></svg></div><div class="gb-l">メモ</div></div>
+      <div class="gb-c"><div class="gb-t m8"><svg viewBox="0 0 48 48"><text x="14" y="23" text-anchor="middle" font-size="14" fill="#ff9f0a" font-family="-apple-system, sans-serif">＋</text><text x="33" y="23" text-anchor="middle" font-size="14" fill="#d8d8dc" font-family="-apple-system, sans-serif">−</text><text x="14" y="40" text-anchor="middle" font-size="14" fill="#d8d8dc" font-family="-apple-system, sans-serif">×</text><text x="33" y="40" text-anchor="middle" font-size="14" fill="#ff9f0a" font-family="-apple-system, sans-serif">＝</text></svg></div><div class="gb-l">計算機</div></div>
+      <div class="gb-c"><div class="gb-t m9"><svg viewBox="0 0 48 48"><g transform="translate(24,24)"><circle r="8.5" fill="none" stroke="#e3e4e8" stroke-width="4.6"/><g fill="#e3e4e8"><rect x="-2.3" y="-15.5" width="4.6" height="6.5" rx="1.6"/><rect x="-2.3" y="-15.5" width="4.6" height="6.5" rx="1.6" transform="rotate(45)"/><rect x="-2.3" y="-15.5" width="4.6" height="6.5" rx="1.6" transform="rotate(90)"/><rect x="-2.3" y="-15.5" width="4.6" height="6.5" rx="1.6" transform="rotate(135)"/><rect x="-2.3" y="-15.5" width="4.6" height="6.5" rx="1.6" transform="rotate(180)"/><rect x="-2.3" y="-15.5" width="4.6" height="6.5" rx="1.6" transform="rotate(225)"/><rect x="-2.3" y="-15.5" width="4.6" height="6.5" rx="1.6" transform="rotate(270)"/><rect x="-2.3" y="-15.5" width="4.6" height="6.5" rx="1.6" transform="rotate(315)"/></g></g></svg></div><div class="gb-l">設定</div></div>
+      <div class="gb-c"><div class="gb-t m10"><svg viewBox="0 0 48 48"><path d="M8 16c0-1.7 1.3-3 3-3h8l4 4h14c1.7 0 3 1.3 3 3v14c0 1.7-1.3 3-3 3H11c-1.7 0-3-1.3-3-3z" fill="#3aa0f2"/><path d="M8 21h32v12c0 1.7-1.3 3-3 3H11c-1.7 0-3-1.3-3-3z" fill="#63b9f7"/></svg></div><div class="gb-l">ファイル</div></div>
+      <div class="gb-c"><div class="gb-t m11"><svg viewBox="0 0 48 48"><circle cx="11" cy="15" r="3" fill="#ff9f0a"/><line x1="18" y1="15" x2="39" y2="15" stroke="#c7c7cc" stroke-width="2.6" stroke-linecap="round"/><circle cx="11" cy="24" r="3" fill="#0a84ff"/><line x1="18" y1="24" x2="39" y2="24" stroke="#c7c7cc" stroke-width="2.6" stroke-linecap="round"/><circle cx="11" cy="33" r="3" fill="#ff375f"/><line x1="18" y1="33" x2="32" y2="33" stroke="#c7c7cc" stroke-width="2.6" stroke-linecap="round"/></svg></div><div class="gb-l">リマインダー</div></div>
+      <div class="gb-c"><div class="gb-t m12"><svg viewBox="0 0 48 48"><path d="M24 38c-8-5.5-13-10-13-16a7 7 0 0 1 13-3.5A7 7 0 0 1 37 22c0 6-5 10.5-13 16z" fill="#ff2d55"/></svg></div><div class="gb-l">ヘルスケア</div></div>
+      <div class="gb-c"><div class="gb-t m13"><svg viewBox="0 0 48 48"><polyline points="8,33 16,25 23,29 31,16 40,22" fill="none" stroke="#30d158" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/><circle cx="40" cy="22" r="2" fill="#30d158"/></svg></div><div class="gb-l">株価</div></div>
+      <div class="gb-c"><div class="gb-t m14"><svg viewBox="0 0 48 48"><rect x="7" y="9" rx="5" width="22" height="16" fill="#2f7cf6"/><text x="18" y="21" text-anchor="middle" font-size="10" fill="#fff" font-family="-apple-system, sans-serif">A</text><rect x="20" y="22" rx="5" width="22" height="16" fill="#eceff3" stroke="#d0d0d5"/><text x="31" y="34" text-anchor="middle" font-size="10" fill="#333" font-family="-apple-system, sans-serif">あ</text></svg></div><div class="gb-l">翻訳</div></div>
+      <div class="gb-c"><div class="gb-t m15"><svg viewBox="0 0 48 48"><line x1="10" y1="20" x2="10" y2="28" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><line x1="14" y1="16.5" x2="14" y2="31.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><line x1="18" y1="12.5" x2="18" y2="35.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><line x1="22" y1="9" x2="22" y2="39" stroke="#ff453a" stroke-width="2.2" stroke-linecap="round"/><line x1="26" y1="14.5" x2="26" y2="33.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><line x1="30" y1="11.5" x2="30" y2="36.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><line x1="34" y1="18" x2="34" y2="30" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><line x1="38" y1="20.5" x2="38" y2="27.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></div><div class="gb-l">ボイスメモ</div></div>
+      <div class="gb-c"><div class="gb-t m16"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17" fill="#eceef2"/><path d="M24 10.5 28 24l-4 13.5L20 24z" fill="#c7ccd4"/><path d="M24 10.5 28 24H20z" fill="#e8402a"/><circle cx="24" cy="24" r="1.8" fill="#fff"/></svg></div><div class="gb-l">コンパス</div></div>
+      <div class="gb-c"><div class="gb-t m17"><svg viewBox="0 0 48 48"><ellipse cx="16" cy="33.5" rx="4" ry="3" fill="#fff"/><ellipse cx="30" cy="29.5" rx="4" ry="3" fill="#fff"/><path d="M20 33.5v-18l14-3v17" fill="none" stroke="#fff" stroke-width="2.4"/></svg></div><div class="gb-l">ミュージック</div></div>
+      <div class="gb-c"><div class="gb-t m18"><svg viewBox="0 0 48 48"><path d="M18.5 14.5l17 9.5-17 9.5z" fill="#fff"/></svg></div><div class="gb-l">ビデオ</div></div>
+      <div class="gb-c"><div class="gb-t m19"><svg viewBox="0 0 48 48"><path d="M24 15.5c-3.2-2.4-8.2-2.9-13-1.8v19.6c4.8-1.1 9.8-.6 13 1.8 3.2-2.4 8.2-2.9 13-1.8V13.7c-4.8-1.1-9.8-.6-13 1.8z" fill="#ff9500"/><path d="M24 15.5v19.6" stroke="#fff" stroke-width="1.6"/></svg></div><div class="gb-l">ブック</div></div>
+      <div class="gb-c"><div class="gb-t m20"><svg viewBox="0 0 48 48"><circle cx="24" cy="26" r="3.5" fill="#fff"/><path d="M17 33a10 10 0 0 1 0-14" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M31 19a10 10 0 0 1 0 14" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M12 38a17 17 0 0 1 0-24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/><path d="M36 14a17 17 0 0 1 0 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/></svg></div><div class="gb-l">ラジオ</div></div>
+    </div>
+
+    <div class="sp sp-d"></div>
+
+    <div class="pill-b"><svg viewBox="0 0 20 20" width="12" height="12"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2"/><line x1="12.8" y1="12.8" x2="17" y2="17" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round"/></svg><span>検索</span></div>
+
+    <div class="sp sp-e"></div>
+
+    <div class="bar-b">
+      <div class="gb-t n1"><svg viewBox="0 0 48 48"><path d="M33.8 29.3l-3.1-1.3a2.6 2.6 0 0 0-2.9.6l-1.2 1.2c-2 .8-6.6-3.7-6.4-5.9l1.2-1.2a2.6 2.6 0 0 0 .6-2.9l-1.3-3.1c-.6-1.5-2.5-2-3.8-1.1-1.9 1.4-3 3.4-2.4 5.9.7 3 2.7 6.4 5.5 9.2s6.2 4.8 9.2 5.5c2.5.6 4.5-.5 5.9-2.4.9-1.3.4-3.2-1.1-3.8z" fill="#fff"/></svg></div>
+      <div class="gb-t n2"><svg viewBox="0 0 48 48"><rect x="9" y="14" width="30" height="21" rx="4" fill="#fff"/><path d="M10.5 17 24 26.5 37.5 17" fill="none" stroke="#4aa3f5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="gb-t n3"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="15" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2"/><path d="M32.5 15.5 21 21l-5.5 11.5L27 27z" fill="#fff"/><path d="M32.5 15.5 21 21l6 6z" fill="#ff3b30"/></svg></div>
+      <div class="gb-t m17"><svg viewBox="0 0 48 48"><ellipse cx="16" cy="33.5" rx="4" ry="3" fill="#fff"/><ellipse cx="30" cy="29.5" rx="4" ry="3" fill="#fff"/><path d="M20 33.5v-18l14-3v17" fill="none" stroke="#fff" stroke-width="2.4"/></svg></div>
+    </div>
+  </div>
 
   <div class="stack">
     <div class="sp sp-a"></div>
@@ -333,6 +498,16 @@
       } catch (e) {}
     })();
 
+    // 二次画面のタイル内日付表記を当日に合わせる
+    (function () {
+      var _n = new Date();
+      var _tx = document.querySelectorAll('.m2 text');
+      if (_tx.length === 2) {
+        _tx[0].textContent = (_n.getMonth() + 1) + '月';
+        _tx[1].textContent = _n.getDate();
+      }
+    })();
+
     // ドット表示と右下ラベルをバッファに合わせて更新
     function _sy() {
       for (var i = 0; i < _ds.length; i++) {
@@ -382,7 +557,7 @@
       _sy();
     }
 
-    // 表示終了処理: 全体を減光して停止（以降の操作は受け付けない）
+    // 表示終了処理: 一次層を退場させ、二次画面へ表示を引き継ぐ（以降の操作は受け付けない）
     function _fo() {
       document.body.classList.add('zz');
     }
