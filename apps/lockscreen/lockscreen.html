@@ -362,6 +362,22 @@
       color: rgba(255, 255, 255, 0.6);
       cursor: pointer;
     }
+    /* 取り込み処理中: 押した区画は淡色 */
+    .t4-a.dm {
+      opacity: 0.35;
+    }
+    /* 取り込み処理中はシート内の各操作を受け付けない */
+    .tray4.wt .t4-s,
+    .tray4.wt .t4-a,
+    .tray4.wt .t4-i {
+      pointer-events: none;
+    }
+    /* 取り込み失敗時: 該当行が短く左右に振れる */
+    .t4-r.jx {
+      animation: jx 0.5s ease-in-out;
+    }
+    /* 基準画像の選択用入力（非表示・呼び出しのみ） */
+    .t4-f { display: none; }
 
     /* ------------------------------------------------------------
        二次画面（表示終了後の待機面）
@@ -386,6 +402,16 @@
 
     .sp-d { flex: 12 1 0; min-height: 8px; }
     .sp-e { flex: 10 1 0; min-height: 8px; }
+
+    /* 基準画像の表示層: 設定時のみ二次画面全体を覆う（上端合わせ・左右中央） */
+    .p2-x {
+      position: absolute;
+      inset: 0;
+      display: none;
+      background-repeat: no-repeat;
+      background-size: cover;
+      background-position: top center;
+    }
 
     /* タイル一覧: 4列×5行 */
     .grid-b {
@@ -533,6 +559,9 @@
       <div class="gb-t n3"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="15" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2"/><path d="M32.5 15.5 21 21l-5.5 11.5L27 27z" fill="#fff"/><path d="M32.5 15.5 21 21l6 6z" fill="#ff3b30"/></svg></div>
       <div class="gb-t m17"><svg viewBox="0 0 48 48"><ellipse cx="16" cy="33.5" rx="4" ry="3" fill="#fff"/><ellipse cx="30" cy="29.5" rx="4" ry="3" fill="#fff"/><path d="M20 33.5v-18l14-3v17" fill="none" stroke="#fff" stroke-width="2.4"/></svg></div>
     </div>
+
+    <!-- 基準画像の表示層 -->
+    <div class="p2-x"></div>
   </div>
 
   <div class="stack">
@@ -585,6 +614,14 @@
       <div class="t4-e">
         <input class="t4-i" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3">
         <span class="t4-a">適用</span>
+      </div>
+    </div>
+    <div class="t4-r t4-x">
+      <span class="t4-l">基準画像</span>
+      <div class="t4-e">
+        <span class="t4-a t4-a5">選択</span>
+        <span class="t4-a t4-d5">解除</span>
+        <input class="t4-f" type="file" accept="image/*">
       </div>
     </div>
   </div>
@@ -951,6 +988,7 @@
       _q4[0].classList.toggle('on', _n4 === 4);
       _q4[1].classList.toggle('on', _n4 === 6);
       _i4.value = String(_gd());
+      _o5();
     }
 
     // 表示形式の切替（即時保存・即時反映。防御的に入力は空へ戻す）
@@ -996,6 +1034,124 @@
     _q4[0].addEventListener('click', function () { _z4(4); });
     _q4[1].addEventListener('click', function () { _z4(6); });
     document.querySelector('.t4-a').addEventListener('click', _a4);
+
+    // ------------------------------------------------------------
+    // 基準画像: 二次画面の表示素材（他の設定とは独立）
+    // ------------------------------------------------------------
+    var _v5 = null;                              // 保存済みの表示素材
+    var _k5 = false;                             // 取り込み処理中フラグ
+    var _j5 = document.querySelector('.p2-x');   // 二次画面の表示層
+    var _r5 = document.querySelector('.t4-x');   // シート内の該当行
+    var _f5 = document.querySelector('.t4-f');   // 選択用の隠し入力
+    var _b5 = document.querySelector('.t4-a5');  // 「選択」/「変更」
+    var _d5 = document.querySelector('.t4-d5');  // 「解除」
+
+    try { _v5 = localStorage.getItem('_vx5') || null; } catch (e) {}
+
+    // 表示素材を二次画面の表示層へ反映（未設定なら層ごと引っ込める）
+    function _g5() {
+      if (_v5) {
+        _j5.style.backgroundImage = 'url("' + _v5 + '")';
+        _j5.style.display = 'block';
+      } else {
+        _j5.style.backgroundImage = '';
+        _j5.style.display = 'none';
+      }
+    }
+
+    // 行の区画表示を現在の状態に合わせる
+    function _o5() {
+      _b5.textContent = _v5 ? '変更' : '選択';
+      _d5.style.display = _v5 ? '' : 'none';
+    }
+
+    // 取り込み終了（_ok: 成否）。失敗時は行が短く左右に振れるのみ
+    function _n5(_ok) {
+      _k5 = false;
+      _b5.classList.remove('dm');
+      _t4.classList.remove('wt');
+      if (_ok) {
+        _g5();
+      } else {
+        _r5.classList.remove('jx');
+        void _r5.offsetWidth;
+        _r5.classList.add('jx');
+      }
+      _o5();
+    }
+    _r5.addEventListener('animationend', function () { _r5.classList.remove('jx'); });
+
+    // 取り込み処理: 縦長は上端約6%を切り落とし、長辺2000pxへ縮小、
+    // 品質を段階的に下げながら保存を試みる（シートを閉じても継続）
+    function _x5(_fl) {
+      if (_k5) return;
+      _k5 = true;
+      _b5.classList.add('dm');
+      _t4.classList.add('wt');
+      var _fr = new FileReader();
+      _fr.onerror = function () { _n5(false); };
+      _fr.onabort = function () { _n5(false); };
+      _fr.onload = function () {
+        var _im = new Image();
+        _im.onerror = function () { _n5(false); };
+        _im.onload = function () {
+          try {
+            var _w = _im.naturalWidth;
+            var _h = _im.naturalHeight;
+            if (!_w || !_h) { _n5(false); return; }
+            var _cy = (_h > _w) ? Math.round(_h * 0.06) : 0;
+            var _hh = _h - _cy;
+            var _lg = Math.max(_w, _hh);
+            var _sc = (_lg > 2000) ? 2000 / _lg : 1;
+            var _cw = Math.round(_w * _sc);
+            var _ch = Math.round(_hh * _sc);
+            var _cv = document.createElement('canvas');
+            _cv.width = _cw;
+            _cv.height = _ch;
+            _cv.getContext('2d').drawImage(_im, 0, _cy, _w, _hh, 0, 0, _cw, _ch);
+            var _qs = [0.85, 0.7, 0.55, 0.4];
+            var _ok = false;
+            for (var i = 0; i < _qs.length && !_ok; i++) {
+              var _du = _cv.toDataURL('image/jpeg', _qs[i]);
+              try {
+                localStorage.setItem('_vx5', _du);
+                _v5 = _du;
+                _ok = true;
+              } catch (e) {}
+            }
+            _n5(_ok);
+          } catch (e2) {
+            _n5(false);
+          }
+        };
+        _im.src = _fr.result;
+      };
+      try {
+        _fr.readAsDataURL(_fl);
+      } catch (e3) {
+        _n5(false);
+      }
+    }
+
+    _b5.addEventListener('click', function () {
+      if (_k5) return;
+      _f5.value = '';
+      _f5.click();
+    });
+    _d5.addEventListener('click', function () {
+      if (_k5) return;
+      _v5 = null;
+      try { localStorage.removeItem('_vx5'); } catch (e) {}
+      _g5();
+      _o5();
+    });
+    _f5.addEventListener('change', function () {
+      if (_f5.files && _f5.files.length) _x5(_f5.files[0]);
+    });
+
+    // 読み込み時: 保存済みの表示素材があれば反映
+    _g5();
+    _o5();
 
     // 2点候補の移動判定（_d: -1=上方向, 1=下方向。到達時点で _f を実行）
     function _k3(_g, _d, _f) {
