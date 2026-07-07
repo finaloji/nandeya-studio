@@ -72,15 +72,19 @@
         radial-gradient(44% 30% at 50% 72%, rgba(160, 165, 178, 0.06) 0%, rgba(160, 165, 178, 0) 100%);
       filter: blur(28px);
     }
-    /* 画面基準の黒フェード: 全レイヤーの上に重ね、下端を確実に真っ黒へ落とす */
+    /* 画面基準の黒フェード: 全レイヤーの上に重ね、上端・下端をともに真っ黒へ落とす
+       （上端はステータスバーの黒帯へ、下端はホームバー側へ自然に繋げる） */
     .veil::after {
       content: '';
       position: fixed;
       left: 0;
       right: 0;
+      top: 0;
       bottom: 0;
-      height: 30vh;
-      background: linear-gradient(to top, #000 0%, #000 25%, rgba(0, 0, 0, 0) 100%);
+      pointer-events: none;
+      background:
+        linear-gradient(to bottom, #000 0%, #000 4%, rgba(0, 0, 0, 0) 22%),
+        linear-gradient(to top, #000 0%, #000 7.5%, rgba(0, 0, 0, 0) 30%);
     }
 
     /* 縦積みレイアウト（セーフエリア内） */
@@ -411,8 +415,8 @@
       top: 0;
       left: 0;
       right: 0;
-      /* 下端はホームバーのセーフエリア分だけ画面外へはみ出させ、黒帯を防ぐ */
-      bottom: calc(-1 * env(safe-area-inset-bottom, 0px) - 2px);
+      /* black指定でビューポートが物理的な底まで届くため、下端はぴったり合わせる */
+      bottom: 0;
       z-index: 0;
       display: none;
       background-repeat: no-repeat;
