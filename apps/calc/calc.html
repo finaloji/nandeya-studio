@@ -1146,6 +1146,11 @@
     if (window.__cdb) {
       _ctal().catch(function() {});
     }
+
+    // Service Worker 登録（Android PWA対応）
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
   </script>
 </body>
 </html>
