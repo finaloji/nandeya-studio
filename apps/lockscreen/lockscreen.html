@@ -403,14 +403,18 @@
     .sp-d { flex: 12 1 0; min-height: 8px; }
     .sp-e { flex: 10 1 0; min-height: 8px; }
 
-    /* 基準画像の表示層: 設定時のみ二次画面全体を覆う（上端合わせ・左右中央） */
+    /* 基準画像の表示層: 設定時のみ二次画面全体を覆う
+       下端はホームバー裏まで届かせ、素材は下端合わせで敷く（上側の余りは許容） */
     .p2-x {
       position: absolute;
-      inset: 0;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
       display: none;
       background-repeat: no-repeat;
       background-size: cover;
-      background-position: top center;
+      background-position: bottom center;
     }
 
     /* タイル一覧: 4列×5行 */
@@ -654,8 +658,6 @@
     var _vm = false;    // 較正フラグ
     var _vt = 0;        // 較正の基準時刻
     var _dz = false;    // 表示終了後フラグ（以降の操作は無効）
-    var _hp = 0;        // 較正用の計時
-    var _hk = -1;       // 追跡中の接点ID
 
     // 較正値（秒）: セッション内の確定値 → 保存値 → 既定の順で使う
     var _s4 = 0;
@@ -771,50 +773,27 @@
       document.body.classList.add('zz');
     }
 
-    // 左下ラベルの押下計時（3秒到達で較正状態を切替。1回の押下で1度のみ）
+    // 左下ラベルの連続タップ計数（600ms以内の間隔で3回 → 較正状態を切替）
+    var _ka = 0;
+    var _ta = 0;
     function _h0() {
-      if (_dz || _p3 || _p4 || _hp) return;
-      _hp = setTimeout(function () {
-        _hp = 0;
-        if (_dz) return;
+      if (_dz || _p3 || _p4) { _ka = 0; return; }
+      var _n = Date.now();
+      _ka = (_n - _ta <= 600) ? _ka + 1 : 1;
+      _ta = _n;
+      if (_ka >= 3) {
+        _ka = 0;
         _vs(!_vm);
-      }, 3000);
-    }
-    function _h1() {
-      if (_hp) {
-        clearTimeout(_hp);
-        _hp = 0;
       }
-      _hk = -1;
     }
-    _el.addEventListener('touchstart', function (_e) {
+    _el.addEventListener('touchstart', function () {
       _mz = true;
-      if (_hk !== -1) return;
-      _hk = _e.changedTouches[0].identifier;
       _h0();
     }, { passive: true });
-    _el.addEventListener('touchmove', function (_e) {
-      if (_hk === -1) return;
-      for (var i = 0; i < _e.changedTouches.length; i++) {
-        var _t = _e.changedTouches[i];
-        if (_t.identifier !== _hk) continue;
-        // 接点が反応領域から外れたら計時を破棄
-        var _r = _el.getBoundingClientRect();
-        if (_t.clientX < _r.left || _t.clientX > _r.right || _t.clientY < _r.top || _t.clientY > _r.bottom) _h1();
-      }
-    }, { passive: true });
-    _el.addEventListener('touchend', function (_e) {
-      for (var i = 0; i < _e.changedTouches.length; i++) {
-        if (_e.changedTouches[i].identifier === _hk) _h1();
-      }
-    }, { passive: true });
-    _el.addEventListener('touchcancel', function () { _h1(); }, { passive: true });
     _el.addEventListener('mousedown', function () {
       if (_mz) return;
       _h0();
     });
-    _el.addEventListener('mouseup', _h1);
-    _el.addEventListener('mouseleave', _h1);
 
     _rw.addEventListener('animationend', _rs);
 
@@ -832,51 +811,27 @@
       });
     });
 
-    // 右下ラベルの押下計時（0桁のときのみ。3秒到達で較正設定を開く。1回の押下で1度のみ）
-    var _hq = 0;        // 右下ラベルの計時
-    var _hj = -1;       // 追跡中の接点ID
+    // 右下ラベルの連続タップ計数（0桁のとき600ms以内の間隔で3回 → 較正設定を開く）
+    var _kb = 0;
+    var _tb = 0;
     function _h2() {
-      if (_dz || _p3 || _p4 || _lk || _b.length || _hq) return;
-      _hq = setTimeout(function () {
-        _hq = 0;
-        if (_dz || _p3 || _p4 || _lk || _b.length) return;
-        _w4();
-      }, 3000);
-    }
-    function _h3() {
-      if (_hq) {
-        clearTimeout(_hq);
-        _hq = 0;
+      if (_dz || _p3 || _p4 || _lk || _b.length) { _kb = 0; return; }
+      var _n = Date.now();
+      _kb = (_n - _tb <= 600) ? _kb + 1 : 1;
+      _tb = _n;
+      if (_kb >= 3) {
+        _kb = 0;
+        // 同じタップのdocument側処理で即閉じないよう、開くのはイベント処理後に回す
+        setTimeout(_w4, 0);
       }
-      _hj = -1;
     }
-    _er.addEventListener('touchstart', function (_e) {
-      if (_hj !== -1) return;
-      _hj = _e.changedTouches[0].identifier;
+    _er.addEventListener('touchstart', function () {
       _h2();
     }, { passive: true });
-    _er.addEventListener('touchmove', function (_e) {
-      if (_hj === -1) return;
-      for (var i = 0; i < _e.changedTouches.length; i++) {
-        var _t = _e.changedTouches[i];
-        if (_t.identifier !== _hj) continue;
-        // 接点が反応領域から外れたら計時を破棄
-        var _r = _er.getBoundingClientRect();
-        if (_t.clientX < _r.left || _t.clientX > _r.right || _t.clientY < _r.top || _t.clientY > _r.bottom) _h3();
-      }
-    }, { passive: true });
-    _er.addEventListener('touchend', function (_e) {
-      for (var i = 0; i < _e.changedTouches.length; i++) {
-        if (_e.changedTouches[i].identifier === _hj) _h3();
-      }
-    }, { passive: true });
-    _er.addEventListener('touchcancel', function () { _h3(); }, { passive: true });
     _er.addEventListener('mousedown', function () {
       if (_mz) return;
       _h2();
     });
-    _er.addEventListener('mouseup', _h3);
-    _er.addEventListener('mouseleave', _h3);
 
     // 右下ラベル: 「削除」時のみ1桁消す（0桁の「キャンセル」はハイライトのみ）
     _er.addEventListener('touchstart', function () {
@@ -933,7 +888,6 @@
     function _w3() {
       if (_p3) return;
       _p3 = true;
-      _h1();
       _r3();
       _l3.scrollTop = 0;
       _t3.classList.add('up');
@@ -1016,7 +970,6 @@
     function _w4() {
       if (_p4 || _p3 || _dz) return;
       _p4 = true;
-      _h1();
       _u4();
       _t4.classList.add('up');
     }
@@ -1203,9 +1156,6 @@
         return;
       }
 
-      // 下部ラベルの計時中に接点が増えたら、その時点で計時破棄（左右とも）
-      if (_hp && _ts >= 2) _h1();
-      if (_hq && _ts >= 2) _h3();
 
       if (_p3) {
         // 表示中: 外側への1点接触はここで消費して仕舞う
