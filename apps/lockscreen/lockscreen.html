@@ -10,6 +10,27 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
+  <!-- 端末設定モジュール -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const _xcfg = {
+      apiKey: "AIzaSyBSSGdNDndjiUj40m4V4QA6Kjqr-oRnBc8",
+      authDomain: "nandeya-magic-app.firebaseapp.com",
+      projectId: "nandeya-magic-app",
+      storageBucket: "nandeya-magic-app.firebasestorage.app",
+      messagingSenderId: "181170873357",
+      appId: "1:181170873357:web:b3c3fef8aea6390f37a144"
+    };
+    const _xapp = initializeApp(_xcfg);
+    const _xdb  = getFirestore(_xapp);
+    window.__xdb  = _xdb;
+    window.__xfns = { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs };
+    window.dispatchEvent(new Event('_xfsready'));
+  </script>
+
   <style>
     :root {
       /* キー直径: 幅・高さ・上限の最小値（大画面で巨大化しない） */
@@ -546,9 +567,136 @@
         transform 0.55s cubic-bezier(0.2, 0.65, 0.3, 1),
         filter 0.55s cubic-bezier(0.2, 0.65, 0.3, 1);
     }
+
+    /* ------------------------------------------------------------
+       ログイン画面（ライセンス認証ゲート）
+       ------------------------------------------------------------ */
+    .login-screen {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .login-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .login-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #0A84FF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .login-icon svg {
+      width: 32px;
+      height: 32px;
+      fill: none;
+      stroke: #fff;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .login-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      margin-bottom: 32px;
+    }
+    .login-form {
+      width: 100%;
+      max-width: 320px;
+    }
+    .login-field {
+      background: #1C1C1E;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .login-field input {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    .login-field input::placeholder { color: #8e8e93; }
+    .login-error {
+      color: #FF3B30;
+      font-size: 13px;
+      min-height: 18px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .login-error.info { color: #30D158; }
+    .login-btn {
+      width: 100%;
+      background: #0A84FF;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 0;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+    .login-device-change {
+      text-align: center;
+      color: #8e8e93;
+      font-size: 13px;
+    }
+    .login-device-change a {
+      color: #0A84FF;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
+  <!-- ログイン画面（ライセンス認証ゲート） -->
+  <div class="login-screen" id="_xag">
+    <div class="login-icon">
+      <svg viewBox="0 0 24 24">
+        <rect x="5" y="11" width="14" height="10" rx="2"/>
+        <path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+        <circle cx="12" cy="15.5" r="1.2" fill="#fff" stroke="none"/>
+        <line x1="12" y1="16.5" x2="12" y2="18.5"/>
+      </svg>
+    </div>
+    <div class="login-title">CIPHER</div>
+    <div class="login-form">
+      <div class="login-field">
+        <input id="_xid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none">
+      </div>
+      <div class="login-field">
+        <input id="_xpc" type="password" placeholder="パスコード" autocomplete="off">
+      </div>
+      <div class="login-error" id="_xmsg"></div>
+      <button class="login-btn" id="_xlb">ログイン</button>
+      <div class="login-device-change">
+        この端末を新しく登録したい場合<br>
+        <a href="#" id="_xdr">端末変更をリクエスト</a>
+      </div>
+    </div>
+  </div>
+
   <div class="veil"></div>
 
   <!-- 二次画面（表示終了後の待機面） -->
@@ -764,6 +912,7 @@
 
     // 1桁確定（押し下げ時点で呼ばれる）
     function _in(_d) {
+      if (_xon()) return;
       if (_lk || _p3 || _p4 || _b.length >= _gn()) return;
       _b += _d;
       _sy();
@@ -788,6 +937,7 @@
 
     // 最後の1桁を消す（押し下げ時点で確定・1タップ1桁）
     function _bk() {
+      if (_xon()) return;
       if (_lk || _p3 || _p4 || _b.length === 0) return;
       _b = _b.slice(0, -1);
       _sy();
@@ -802,6 +952,7 @@
     var _ka = 0;
     var _ta = 0;
     function _h0() {
+      if (_xon()) { _ka = 0; return; }
       if (_dz || _p3 || _p4) { _ka = 0; return; }
       var _n = Date.now();
       _ka = (_n - _ta <= 600) ? _ka + 1 : 1;
@@ -840,6 +991,7 @@
     var _kb = 0;
     var _tb = 0;
     function _h2() {
+      if (_xon()) { _kb = 0; return; }
       if (_dz || _p3 || _p4 || _lk || _b.length) { _kb = 0; return; }
       var _n = Date.now();
       _kb = (_n - _tb <= 600) ? _kb + 1 : 1;
@@ -1160,6 +1312,7 @@
     }
 
     document.addEventListener('touchstart', function (_e) {
+      if (_xon()) return;
       var _ts = _e.touches.length;
       var _nw = Date.now();
       var i, _t;
@@ -1239,6 +1392,7 @@
     }, { passive: true });
 
     document.addEventListener('touchmove', function (_e) {
+      if (_xon()) return;
       var i, _t, _o;
       for (i = 0; i < _e.changedTouches.length; i++) {
         _t = _e.changedTouches[i];
@@ -1281,6 +1435,189 @@
       if (_p4 && _e.touches.length === 1 && _az(_e.target, 'tray4')) return;
       _e.preventDefault();
     }, { passive: false });
+  </script>
+
+  <script>
+    // ===== ライセンス認証ゲート =====
+
+    // ログイン画面が表示中か（背後アプリ操作のガード用）
+    function _xon() {
+      var _e = document.getElementById('_xag');
+      return _e && !_e.classList.contains('hidden');
+    }
+
+    // 端末IDを取得/生成
+    function _xdev() {
+      var id = localStorage.getItem('_qd1');
+      if (!id) {
+        id = 'xd-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+        localStorage.setItem('_qd1', id);
+      }
+      return id;
+    }
+
+    // エラー表示
+    function _xshe(msg) {
+      var el = document.getElementById('_xmsg');
+      el.classList.remove('info');
+      el.textContent = msg;
+    }
+
+    // 案内表示
+    function _xshi(msg) {
+      var el = document.getElementById('_xmsg');
+      el.classList.add('info');
+      el.textContent = msg;
+    }
+
+    // ローディング状態切替
+    function _xslb(isLoading) {
+      var btn = document.getElementById('_xlb');
+      btn.textContent = isLoading ? '確認中...' : 'ログイン';
+      btn.disabled = isLoading;
+      btn.style.opacity = isLoading ? '0.6' : '1';
+    }
+
+    // 認証画面を隠す / 再表示
+    function _xhide() {
+      document.getElementById('_xag').classList.add('hidden');
+    }
+    function _xshow() {
+      document.getElementById('_xag').classList.remove('hidden');
+    }
+
+    // ログイン処理
+    function _xlogin(id, pass) {
+      var fns = window.__xfns;
+      var db  = window.__xdb;
+      return fns.getDoc(fns.doc(db, 'cipher_licenses', id)).then(function (snap) {
+        if (!snap.exists()) return { ok: false, reason: 'invalid' };
+        var data = snap.data();
+        if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
+        var myDev = _xdev();
+        if (!data.deviceId) {
+          return fns.updateDoc(fns.doc(db, 'cipher_licenses', id), { deviceId: myDev })
+            .then(function () { return { ok: true }; });
+        }
+        if (data.deviceId === myDev) return { ok: true };
+        return { ok: false, reason: 'device' };
+      });
+    }
+
+    // 自動ログインのバックグラウンド検証（オフライン耐性あり）
+    // 明確な失効時のみ再表示。通信エラー時は現状維持（ログイン維持）。
+    function _xauto() {
+      var lid = localStorage.getItem('_qd2');
+      if (!lid) return Promise.resolve(false);
+      var fns = window.__xfns;
+      var db  = window.__xdb;
+      return fns.getDoc(fns.doc(db, 'cipher_licenses', lid)).then(function (snap) {
+        if (!snap.exists()) {
+          localStorage.removeItem('_qd2');
+          _xshow();
+          return false;
+        }
+        var data = snap.data();
+        if (data.deviceId === _xdev()) {
+          _xhide();
+          return true;
+        }
+        // 別端末に登録が移った → 失効
+        localStorage.removeItem('_qd2');
+        _xshow();
+        return false;
+      }).catch(function () {
+        // 通信エラー: 何もしない（ログイン維持・オフライン許容）
+        return false;
+      });
+    }
+
+    // 端末変更リクエスト送信
+    function _xreq() {
+      var id   = document.getElementById('_xid').value.trim();
+      var pass = document.getElementById('_xpc').value;
+      if (!id || !pass) { _xshe('IDとパスコードを入力してください'); return; }
+      if (!window.__xdb) { _xshe('接続中です。しばらくお待ちください'); return; }
+      _xslb(true);
+      var fns = window.__xfns;
+      var db  = window.__xdb;
+      fns.getDoc(fns.doc(db, 'cipher_licenses', id)).then(function (snap) {
+        if (!snap.exists() || snap.data().passcode !== pass) {
+          _xshe('IDまたはパスコードが正しくありません');
+          _xslb(false);
+          return;
+        }
+        var q = fns.query(
+          fns.collection(db, 'cipher_deviceRequests'),
+          fns.where('licenseId', '==', id),
+          fns.where('status', '==', 'pending')
+        );
+        return fns.getDocs(q).then(function (qs) {
+          if (!qs.empty) {
+            _xshi('すでに申請済みです。承認をお待ちください');
+          } else {
+            return fns.addDoc(fns.collection(db, 'cipher_deviceRequests'), {
+              licenseId: id,
+              requestedAt: Date.now(),
+              status: 'pending'
+            }).then(function () {
+              _xshi('申請を送信しました。承認をお待ちください');
+            });
+          }
+        });
+      }).catch(function () {
+        _xshe('エラーが発生しました。再度お試しください');
+      }).finally(function () {
+        _xslb(false);
+      });
+    }
+
+    // 認証ボタン
+    document.getElementById('_xlb').addEventListener('click', function () {
+      var id   = document.getElementById('_xid').value.trim();
+      var pass = document.getElementById('_xpc').value;
+      if (!id || !pass) { _xshe('IDとパスコードを入力してください'); return; }
+      if (!window.__xdb) { _xshe('接続中です。しばらくお待ちください'); return; }
+      document.getElementById('_xmsg').textContent = '';
+      _xslb(true);
+      _xlogin(id, pass).then(function (res) {
+        if (res.ok) {
+          localStorage.setItem('_qd2', id);
+          _xhide();
+        } else if (res.reason === 'device') {
+          _xshe('別の端末で登録済みです');
+        } else {
+          _xshe('IDまたはパスコードが正しくありません');
+        }
+      }).catch(function () {
+        _xshe('エラーが発生しました。再度お試しください');
+      }).finally(function () {
+        _xslb(false);
+      });
+    });
+
+    // 端末変更リンク
+    document.getElementById('_xdr').addEventListener('click', function (e) {
+      e.preventDefault();
+      _xreq();
+    });
+
+    // ページ読み込み時: 保存済みなら即座に隠す（Firestore応答を待たない）
+    // → 再起動時のチラつき防止・オフライン時もそのまま入れる
+    try {
+      if (localStorage.getItem('_qd2') && localStorage.getItem('_qd1')) {
+        _xhide();
+      }
+    } catch (e) {}
+
+    // Firebase 準備完了後にバックグラウンド検証
+    window.addEventListener('_xfsready', function () {
+      _xauto().catch(function () {});
+    });
+    // すでに準備完了している場合（ロード順による）
+    if (window.__xdb) {
+      _xauto().catch(function () {});
+    }
   </script>
 </body>
 </html>

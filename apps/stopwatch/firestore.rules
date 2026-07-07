@@ -116,6 +116,35 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------
+    // cipher_licenses コレクション（CIPHER / ロック画面用）
+    // ---------------------------------------------------------
+    match /cipher_licenses/{licenseId} {
+      allow read: if true;
+      allow create: if resource == null
+        && request.resource.data.passcode is string
+        && request.resource.data.deviceId == null
+        && request.resource.data.note is string;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['deviceId']);
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------
+    // cipher_deviceRequests コレクション（CIPHER用）
+    // ---------------------------------------------------------
+    match /cipher_deviceRequests/{requestId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['licenseId', 'requestedAt', 'status'])
+        && request.resource.data.licenseId is string
+        && request.resource.data.requestedAt is number
+        && request.resource.data.status == 'pending';
+      allow update: if resource.data.status == 'pending'
+        && request.resource.data.status == 'approved'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------
     // それ以外のすべてのコレクション・ドキュメント
     // 想定外のアクセスはすべて拒否する
     // ---------------------------------------------------------
