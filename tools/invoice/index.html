@@ -103,6 +103,13 @@
   .auth-error { font-size: 13px; color: #c0392b; min-height: 18px; margin-bottom: 8px; text-align: center; }
   .btn-auth { width: 100%; min-height: 48px; padding: 12px; font-size: 16px; border: none; border-radius: 8px; background: #4a90d9; color: #fff; cursor: pointer; font-weight: bold; }
 
+  /* ===== 案件の保存 ===== */
+  .btn-save-case { width: 100%; padding: 14px; font-size: 16px; border: none; border-radius: 8px; background: #2e7d32; color: #fff; cursor: pointer; font-weight: bold; }
+  .btn-save-case:disabled { opacity: .5; cursor: default; }
+  .save-status { font-size: 13px; padding: 8px 0 0; min-height: 20px; }
+  .save-status.ok { color: #2e7d32; }
+  .save-status.err { color: #c0392b; }
+
   /* ===== 料金マスタ編集画面 ===== */
   .qi-edit-wrap { margin-top: 14px; border-top: 1px solid #eee; padding-top: 12px; }
   .btn-master-edit { width: 100%; padding: 12px; font-size: 14px; border: 1px solid #4a90d9; border-radius: 8px; background: #eef5fc; color: #4a90d9; cursor: pointer; font-weight: bold; }
@@ -276,6 +283,14 @@
   <!-- プレビュー表示ボタン -->
   <div class="section">
     <button type="button" class="btn-preview" id="btnPreview" onclick="togglePreview()">プレビューを表示</button>
+  </div>
+
+  <!-- 案件の保存 -->
+  <div class="section">
+    <div class="section-title">案件の保存</div>
+    <div class="section-note">入力内容を社内で共有できるよう保存します（全メンバーが閲覧できます）</div>
+    <button type="button" class="btn-save-case" id="btnSaveCase" onclick="saveCase()">この内容を保存する</button>
+    <div class="save-status" id="saveStatus"></div>
   </div>
 </div>
 
@@ -486,26 +501,40 @@ function getRows() {
   return document.getElementById('detailRows').getElementsByClassName('detail-row');
 }
 
-function calculate() {
+// 明細・交通費・値引きから金額を計算して返す（表示は書き換えない）
+function computeTotals() {
   var rows = getRows();
   var detailTotal = 0;
+  var amounts = [];
   for (var i = 0; i < rows.length; i++) {
     var qty = toNum(rows[i].getElementsByClassName('item-qty')[0].value);
     var price = toNum(rows[i].getElementsByClassName('item-price')[0].value);
     var amt = qty * price;
+    amounts.push(amt);
     detailTotal += amt;
-    rows[i].getElementsByClassName('col-amt')[0].textContent = formatYen(amt);
   }
   var transportation = toNum(document.getElementById('transportation').value);
   var discount = toNum(document.getElementById('discount').value);
   var subtotal = detailTotal + transportation;
   var tax = Math.floor(detailTotal * 0.1);
   var total = subtotal + tax - discount;
-  document.getElementById('dispSubtotal').textContent = formatYen(subtotal);
-  document.getElementById('dispTax').textContent = formatYen(tax);
-  document.getElementById('dispTransport').textContent = formatYen(transportation);
-  document.getElementById('dispDiscount').textContent = discount > 0 ? '−' + formatYen(discount) : formatYen(discount);
-  document.getElementById('dispTotal').textContent = formatYen(total);
+  return {
+    amounts: amounts, detailTotal: detailTotal, transportation: transportation,
+    discount: discount, subtotal: subtotal, tax: tax, total: total
+  };
+}
+
+function calculate() {
+  var rows = getRows();
+  var t = computeTotals();
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].getElementsByClassName('col-amt')[0].textContent = formatYen(t.amounts[i]);
+  }
+  document.getElementById('dispSubtotal').textContent = formatYen(t.subtotal);
+  document.getElementById('dispTax').textContent = formatYen(t.tax);
+  document.getElementById('dispTransport').textContent = formatYen(t.transportation);
+  document.getElementById('dispDiscount').textContent = t.discount > 0 ? '−' + formatYen(t.discount) : formatYen(t.discount);
+  document.getElementById('dispTotal').textContent = formatYen(t.total);
   updatePreview();
 }
 
@@ -1133,6 +1162,92 @@ function saveMaster() {
   });
 }
 
+/* ===== 案件の保存（Firestore） ===== */
+var currentCaseId = null; // 編集中の既存案件ID（新規はnull。再編集は4-2で実装）
+
+// 明細名からマジシャンを推定（一覧表示用。手入力で一致しなければ空）
+function guessMagicianName(items) {
+  if (!masterData || !Array.isArray(masterData.magicians)) return '';
+  for (var i = 0; i < items.length; i++) {
+    var name = items[i].name;
+    if (!name) continue;
+    for (var m = 0; m < masterData.magicians.length; m++) {
+      var mag = masterData.magicians[m];
+      var lists = [mag.plans || [], mag.options || []];
+      for (var l = 0; l < lists.length; l++) {
+        for (var k = 0; k < lists[l].length; k++) {
+          if (lists[l][k].itemName === name) return mag.name;
+        }
+      }
+    }
+  }
+  return '';
+}
+
+function collectCaseData() {
+  var rows = getRows();
+  var items = [];
+  for (var i = 0; i < rows.length; i++) {
+    items.push({
+      name: rows[i].getElementsByClassName('item-name')[0].value.trim(),
+      qty: toNum(rows[i].getElementsByClassName('item-qty')[0].value),
+      price: toNum(rows[i].getElementsByClassName('item-price')[0].value)
+    });
+  }
+  var t = computeTotals();
+  var data = {
+    docType: docType,
+    customerName: document.getElementById('customerName').value.trim(),
+    contactName: document.getElementById('contactName').value.trim(),
+    issueDate: document.getElementById('issueDate').value,
+    dueDate: docType === 'invoice' ? document.getElementById('dueDate').value : savedDueDate,
+    items: items,
+    transportation: t.transportation,
+    discount: t.discount,
+    notes: document.getElementById('notes').value,
+    subtotal: t.subtotal,
+    tax: t.tax,
+    total: t.total,
+    magicianName: guessMagicianName(items),
+    status: '見積中'
+  };
+  return data;
+}
+
+function setSaveStatus(msg, type) {
+  var el = document.getElementById('saveStatus');
+  el.textContent = msg || '';
+  el.className = 'save-status' + (type ? ' ' + type : '');
+}
+
+function saveCase() {
+  var data = collectCaseData();
+  var hasItem = false;
+  for (var i = 0; i < data.items.length; i++) {
+    if (data.items[i].name !== '' || data.items[i].price > 0) { hasItem = true; break; }
+  }
+  if (data.customerName === '' && !hasItem) {
+    setSaveStatus('宛名か明細を入力してから保存してください。', 'err');
+    return;
+  }
+  if (!window._saveCase) {
+    setSaveStatus('Firebaseに接続できないため保存できません。通信を確認してください。', 'err');
+    return;
+  }
+  var btn = document.getElementById('btnSaveCase');
+  btn.disabled = true;
+  setSaveStatus('保存しています…', '');
+  window._saveCase(currentCaseId, data).then(function (id) {
+    currentCaseId = id;
+    setSaveStatus('保存しました。', 'ok');
+    btn.disabled = false;
+  }).catch(function (e) {
+    console.warn('case save failed:', e);
+    setSaveStatus('保存に失敗しました。通信状況を確認して、もう一度お試しください。', 'err');
+    btn.disabled = false;
+  });
+}
+
 function initForm() {
   document.getElementById('issueDate').value = getTodayValue();
   savedDueDate = getNextMonthEndValue();
@@ -1220,7 +1335,7 @@ initAuth();
 <script type="module">
 try {
   const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-  const { getFirestore, doc, getDoc, setDoc, serverTimestamp } =
+  const { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection, serverTimestamp } =
     await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
   const firebaseConfig = {
     apiKey: "AIzaSyB_poTbSo_L3n4YoLpKPdEmvXCAfHAjL3U",
@@ -1324,6 +1439,20 @@ try {
   window._saveMaster = async function (data) {
     const ref = doc(window._fs, 'invoice', 'master');
     await setDoc(ref, Object.assign({}, data, { updatedAt: serverTimestamp() }));
+  };
+
+  // 案件の保存。id が null なら新規作成し、新しいIDを返す。既存IDなら更新する
+  window._saveCase = async function (id, data) {
+    if (id) {
+      const ref = doc(window._fs, 'cases', id);
+      await updateDoc(ref, Object.assign({}, data, { updatedAt: serverTimestamp() }));
+      return id;
+    }
+    const ref = await addDoc(collection(window._fs, 'cases'), Object.assign({}, data, {
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }));
+    return ref.id;
   };
 
   window.dispatchEvent(new Event('_fsready'));

@@ -15,7 +15,7 @@
 | Firebase | 3-1 | Firebase初期化とパスコード認証 | 完了 |
 | Firebase | 3-2 | 料金マスタの読み込み＋マジシャン別かんたん入力 | 完了 |
 | Firebase | 3-3 | 料金マスタ編集画面 | 完了 |
-| 案件管理 | 4-1 | 案件の保存（Firestoreへ書き込み） | 未着手 |
+| 案件管理 | 4-1 | 案件の保存（Firestoreへ書き込み） | 完了（要ルール更新） |
 | 案件管理 | 4-2 | 案件一覧の表示・再編集・複製・削除 | 未着手 |
 | 案件管理 | 4-3 | ステータス管理（変更UI・一覧の絞り込み） | 未着手 |
 | 案件管理 | 4-4 | 見積書→請求書の変換 | 未着手 |
@@ -26,7 +26,22 @@
 
 - [x] Firebase プロジェクトの新規作成（invoice-tool-1f049・Firestore有効化済み）
 - [x] 共通パスコードの値を決める（決定済み。コードにはSHA-256ハッシュのみ記載）
-- [ ] Firestoreセキュリティルールの設定（3-2 までに必要。ルールはClaudeが用意する）
+- [x] Firestoreセキュリティルールの設定（`invoice/master` の読み書きを許可済み）
+- [ ] Firestoreセキュリティルールに `cases` コレクションを追加（4-1 の案件保存に必要。下記ルールを貼り付け）
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /invoice/{docId} {
+      allow read, write: if true;
+    }
+    match /cases/{caseId} {
+      allow read, write: if true;
+    }
+  }
+}
+```
 
 ## メモ
 
