@@ -104,7 +104,9 @@
   .btn-auth { width: 100%; min-height: 48px; padding: 12px; font-size: 16px; border: none; border-radius: 8px; background: #4a90d9; color: #fff; cursor: pointer; font-weight: bold; }
 
   /* ===== 印刷（PDF保存） ===== */
-  @page { size: A4 portrait; margin: 10mm; }
+  /* .print-area 自体が 794x1123px（A4フルサイズ）＋内側パディングで作られているため、
+     @page 側にも余白を付けると二重になってあふれる。@page の余白は0にする */
+  @page { size: A4 portrait; margin: 0; }
   @media print {
     body { background: #fff; }
     .input-area { display: none !important; }
