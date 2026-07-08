@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "invoice-tool",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8080"],
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".claude/serve.ps1", "-Port", "8080"],
       "port": 8080
     }
   ]
