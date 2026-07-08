@@ -103,6 +103,38 @@
   .auth-error { font-size: 13px; color: #c0392b; min-height: 18px; margin-bottom: 8px; text-align: center; }
   .btn-auth { width: 100%; min-height: 48px; padding: 12px; font-size: 16px; border: none; border-radius: 8px; background: #4a90d9; color: #fff; cursor: pointer; font-weight: bold; }
 
+  /* ===== 料金マスタ編集画面 ===== */
+  .qi-edit-wrap { margin-top: 14px; border-top: 1px solid #eee; padding-top: 12px; }
+  .btn-master-edit { width: 100%; padding: 12px; font-size: 14px; border: 1px solid #4a90d9; border-radius: 8px; background: #eef5fc; color: #4a90d9; cursor: pointer; font-weight: bold; }
+
+  .master-area { max-width: 600px; margin: 0 auto; padding: 12px; }
+  .master-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .master-topbar h1 { font-size: 18px; }
+  .btn-master-close { padding: 8px 14px; min-height: 40px; font-size: 14px; border: 1px solid #ccc; border-radius: 5px; background: #fff; color: #555; cursor: pointer; }
+  .master-status { font-size: 13px; padding: 6px 0; min-height: 22px; }
+  .master-status.ok { color: #2e7d32; }
+  .master-status.err { color: #c0392b; }
+
+  .mg-card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #fafbfc; }
+  .mg-name-row { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+  .mg-name-row .mg-name { flex: 1; margin-bottom: 0; font-weight: bold; }
+  .mini-btn { flex: none; width: 40px; min-height: 44px; border: 1px solid #ccc; border-radius: 5px; background: #fff; font-size: 16px; cursor: pointer; color: #555; }
+  .mini-btn.del { color: #c0392b; }
+  .mini-btn:disabled { opacity: .35; cursor: default; }
+
+  .mg-sub { font-size: 12px; font-weight: bold; color: #888; margin: 8px 0 6px; }
+  .edit-item { border: 1px solid #e2e6ea; border-radius: 6px; padding: 8px; margin-bottom: 8px; background: #fff; }
+  .ei-row { display: flex; gap: 6px; align-items: flex-start; }
+  .ei-label { flex: 1; margin-bottom: 6px; }
+  .ei-price { width: 40%; margin-bottom: 6px; }
+  .ei-item { width: 100%; margin-bottom: 0; }
+  .ei-mini-label { font-size: 11px; color: #999; margin-bottom: 2px; }
+  .btn-add-item { width: 100%; padding: 9px; font-size: 13px; border: 1px dashed #4a90d9; border-radius: 6px; background: #fff; color: #4a90d9; cursor: pointer; font-weight: bold; }
+  .btn-add-magician { width: 100%; padding: 12px; font-size: 15px; border: 1px dashed #4a90d9; border-radius: 8px; background: #fff; color: #4a90d9; cursor: pointer; font-weight: bold; margin-top: 4px; }
+  .master-footer { position: sticky; bottom: 0; background: #f0f2f5; padding: 12px 0; margin-top: 8px; }
+  .btn-master-save { width: 100%; padding: 14px; font-size: 16px; border: none; border-radius: 8px; background: #4a90d9; color: #fff; cursor: pointer; font-weight: bold; }
+  .btn-master-save:disabled { opacity: .5; cursor: default; }
+
   /* ===== 印刷（PDF保存） ===== */
   /* .print-area 自体が 794x1123px（A4フルサイズ）＋内側パディングで作られているため、
      @page 側にも余白を付けると二重になってあふれる。@page の余白は0にする */
@@ -110,6 +142,7 @@
   @media print {
     body { background: #fff; }
     .input-area { display: none !important; }
+    .master-area { display: none !important; }
     .preview-area { display: block !important; max-width: none; margin: 0; padding: 0; }
     .preview-toolbar { display: none !important; }
     .preview-scale-outer { max-width: none; height: auto !important; overflow: visible !important; }
@@ -202,6 +235,9 @@
       <div class="qi-divider"></div>
       <div class="qi-sub">その他の項目</div>
       <div class="menu-buttons" id="otherMenu"></div>
+      <div class="qi-edit-wrap">
+        <button type="button" class="btn-master-edit" onclick="openMaster()">料金マスタを編集</button>
+      </div>
     </div>
   </div>
 
@@ -240,6 +276,31 @@
   <!-- プレビュー表示ボタン -->
   <div class="section">
     <button type="button" class="btn-preview" id="btnPreview" onclick="togglePreview()">プレビューを表示</button>
+  </div>
+</div>
+
+<!-- 料金マスタ編集画面 -->
+<div class="master-area" id="masterArea" style="display:none;">
+  <div class="master-topbar">
+    <h1>料金マスタ編集</h1>
+    <button type="button" class="btn-master-close" onclick="closeMaster()">× 閉じる</button>
+  </div>
+  <div class="master-status" id="masterEditStatus"></div>
+
+  <div class="section">
+    <div class="section-title">マジシャン</div>
+    <div id="magicianEditList"></div>
+    <button type="button" class="btn-add-magician" onclick="addMagician()">＋ マジシャンを追加</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">その他の項目</div>
+    <div id="otherEditList"></div>
+    <button type="button" class="btn-add-item" onclick="addOther()">＋ 項目を追加</button>
+  </div>
+
+  <div class="master-footer">
+    <button type="button" class="btn-master-save" id="btnMasterSave" onclick="saveMaster()">保存する</button>
   </div>
 </div>
 
@@ -757,6 +818,321 @@ function quickAdd(itemName, price) {
   calculate();
 }
 
+/* ===== 料金マスタ編集画面 ===== */
+var editMasterData = null;
+
+function elMaker(tag, cls) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  return e;
+}
+
+function setMasterStatus(msg, type) {
+  var el = document.getElementById('masterEditStatus');
+  el.textContent = msg || '';
+  el.className = 'master-status' + (type ? ' ' + type : '');
+}
+
+function openMaster() {
+  if (masterLoadState !== 'loaded' || !masterData) {
+    alert('料金マスタがまだ読み込まれていません。少し待ってから開いてください。');
+    return;
+  }
+  // 編集用のディープコピー（保存するまで実データには反映しない）
+  editMasterData = JSON.parse(JSON.stringify(masterData));
+  if (!Array.isArray(editMasterData.magicians)) editMasterData.magicians = [];
+  if (!Array.isArray(editMasterData.others)) editMasterData.others = [];
+  renderMaster();
+  setMasterStatus('');
+  document.getElementById('inputArea').style.display = 'none';
+  document.getElementById('previewArea').style.display = 'none';
+  document.getElementById('masterArea').style.display = '';
+  window.scrollTo(0, 0);
+}
+
+function closeMaster() {
+  document.getElementById('masterArea').style.display = 'none';
+  document.getElementById('inputArea').style.display = '';
+  editMasterData = null;
+  window.scrollTo(0, 0);
+}
+
+// 明細1件分（プラン・オプション・その他共通）の編集行を作る
+function buildEditItem(item, onDelete) {
+  var wrap = elMaker('div', 'edit-item');
+  var row = elMaker('div', 'ei-row');
+
+  var labelInput = elMaker('input', 'ei-label');
+  labelInput.type = 'text';
+  labelInput.placeholder = '表示名（例：テーブル）';
+  labelInput.value = item && item.label ? item.label : '';
+
+  var priceInput = elMaker('input', 'ei-price');
+  priceInput.type = 'number';
+  priceInput.inputMode = 'numeric';
+  priceInput.min = '0';
+  priceInput.placeholder = '金額';
+  priceInput.value = (item && toNum(item.price) > 0) ? toNum(item.price) : '';
+
+  var delBtn = elMaker('button', 'mini-btn del');
+  delBtn.type = 'button';
+  delBtn.textContent = '×';
+  delBtn.onclick = onDelete;
+
+  row.appendChild(labelInput);
+  row.appendChild(priceInput);
+  row.appendChild(delBtn);
+
+  var itemInput = elMaker('input', 'ei-item');
+  itemInput.type = 'text';
+  itemInput.placeholder = '明細に印字される名前';
+  itemInput.value = item && item.itemName ? item.itemName : '';
+
+  wrap.appendChild(row);
+  wrap.appendChild(itemInput);
+  return wrap;
+}
+
+function renderMaster() {
+  var list = document.getElementById('magicianEditList');
+  list.innerHTML = '';
+  var mags = editMasterData.magicians;
+  for (var i = 0; i < mags.length; i++) {
+    (function (mi) {
+      var mag = mags[mi];
+      var card = elMaker('div', 'mg-card');
+
+      // 名前 ＋ 並び替え・削除
+      var nameRow = elMaker('div', 'mg-name-row');
+      var nameInput = elMaker('input', 'mg-name');
+      nameInput.type = 'text';
+      nameInput.placeholder = 'マジシャン名';
+      nameInput.value = mag.name || '';
+      var upBtn = elMaker('button', 'mini-btn');
+      upBtn.type = 'button';
+      upBtn.textContent = '↑';
+      upBtn.disabled = (mi === 0);
+      upBtn.onclick = function () { moveMagician(mi, -1); };
+      var downBtn = elMaker('button', 'mini-btn');
+      downBtn.type = 'button';
+      downBtn.textContent = '↓';
+      downBtn.disabled = (mi === mags.length - 1);
+      downBtn.onclick = function () { moveMagician(mi, 1); };
+      var delBtn = elMaker('button', 'mini-btn del');
+      delBtn.type = 'button';
+      delBtn.textContent = '×';
+      delBtn.onclick = function () { delMagician(mi); };
+      nameRow.appendChild(nameInput);
+      nameRow.appendChild(upBtn);
+      nameRow.appendChild(downBtn);
+      nameRow.appendChild(delBtn);
+      card.appendChild(nameRow);
+
+      // 料金プラン
+      var planTitle = elMaker('div', 'mg-sub');
+      planTitle.textContent = '料金プラン';
+      card.appendChild(planTitle);
+      var plans = Array.isArray(mag.plans) ? mag.plans : (mag.plans = []);
+      for (var j = 0; j < plans.length; j++) {
+        (function (pj) {
+          card.appendChild(buildEditItem(plans[pj], function () { delPlan(mi, pj); }));
+        })(j);
+      }
+      var addPlanBtn = elMaker('button', 'btn-add-item');
+      addPlanBtn.type = 'button';
+      addPlanBtn.textContent = '＋ プランを追加';
+      addPlanBtn.onclick = function () { addPlan(mi); };
+      card.appendChild(addPlanBtn);
+
+      // オプション
+      var optTitle = elMaker('div', 'mg-sub');
+      optTitle.textContent = 'オプション';
+      card.appendChild(optTitle);
+      var options = Array.isArray(mag.options) ? mag.options : (mag.options = []);
+      for (var k = 0; k < options.length; k++) {
+        (function (ok) {
+          card.appendChild(buildEditItem(options[ok], function () { delOption(mi, ok); }));
+        })(k);
+      }
+      var addOptBtn = elMaker('button', 'btn-add-item');
+      addOptBtn.type = 'button';
+      addOptBtn.textContent = '＋ オプションを追加';
+      addOptBtn.onclick = function () { addOption(mi); };
+      card.appendChild(addOptBtn);
+
+      list.appendChild(card);
+    })(i);
+  }
+
+  // その他の項目
+  var otherList = document.getElementById('otherEditList');
+  otherList.innerHTML = '';
+  var others = editMasterData.others;
+  for (var m = 0; m < others.length; m++) {
+    (function (om) {
+      otherList.appendChild(buildEditItem(others[om], function () { delOther(om); }));
+    })(m);
+  }
+}
+
+// DOM の現在値を editMasterData に取り込む（構造変更の前に呼ぶ）
+function readItemsFrom(container) {
+  var items = [];
+  var nodes = container.getElementsByClassName('edit-item');
+  for (var i = 0; i < nodes.length; i++) {
+    var node = nodes[i];
+    items.push({
+      label: node.getElementsByClassName('ei-label')[0].value.trim(),
+      itemName: node.getElementsByClassName('ei-item')[0].value.trim(),
+      price: toNum(node.getElementsByClassName('ei-price')[0].value)
+    });
+  }
+  return items;
+}
+
+function collectMaster() {
+  var cards = document.getElementById('magicianEditList').getElementsByClassName('mg-card');
+  var mags = [];
+  for (var i = 0; i < cards.length; i++) {
+    var card = cards[i];
+    var name = card.getElementsByClassName('mg-name')[0].value.trim();
+    // カード内の最初の＋ボタンより前がプラン、後がオプション。
+    // 構造上、mg-plans/mg-options のクラスで分けていないため、DOM順で判定する。
+    var plans = [];
+    var options = [];
+    var children = card.children;
+    var mode = null;
+    for (var c = 0; c < children.length; c++) {
+      var ch = children[c];
+      if (ch.className === 'mg-sub') {
+        mode = (ch.textContent.indexOf('オプション') >= 0) ? 'opt' : 'plan';
+      } else if (ch.className === 'edit-item') {
+        var it = {
+          label: ch.getElementsByClassName('ei-label')[0].value.trim(),
+          itemName: ch.getElementsByClassName('ei-item')[0].value.trim(),
+          price: toNum(ch.getElementsByClassName('ei-price')[0].value)
+        };
+        if (mode === 'opt') options.push(it); else plans.push(it);
+      }
+    }
+    mags.push({ name: name, plans: plans, options: options });
+  }
+  var others = readItemsFrom(document.getElementById('otherEditList'));
+  editMasterData = { magicians: mags, others: others };
+}
+
+function moveMagician(i, dir) {
+  collectMaster();
+  var arr = editMasterData.magicians;
+  var to = i + dir;
+  if (to < 0 || to >= arr.length) return;
+  var tmp = arr[i];
+  arr[i] = arr[to];
+  arr[to] = tmp;
+  renderMaster();
+}
+
+function delMagician(i) {
+  collectMaster();
+  var mag = editMasterData.magicians[i];
+  var name = mag && mag.name ? mag.name : 'このマジシャン';
+  if (!confirm(name + 'を削除しますか？')) { renderMaster(); return; }
+  editMasterData.magicians.splice(i, 1);
+  renderMaster();
+}
+
+function addMagician() {
+  collectMaster();
+  editMasterData.magicians.push({ name: '', plans: [{ label: '', itemName: '', price: 0 }], options: [] });
+  renderMaster();
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function addPlan(i) {
+  collectMaster();
+  editMasterData.magicians[i].plans.push({ label: '', itemName: '', price: 0 });
+  renderMaster();
+}
+
+function delPlan(i, j) {
+  collectMaster();
+  editMasterData.magicians[i].plans.splice(j, 1);
+  renderMaster();
+}
+
+function addOption(i) {
+  collectMaster();
+  editMasterData.magicians[i].options.push({ label: '', itemName: '', price: 0 });
+  renderMaster();
+}
+
+function delOption(i, j) {
+  collectMaster();
+  editMasterData.magicians[i].options.splice(j, 1);
+  renderMaster();
+}
+
+function addOther() {
+  collectMaster();
+  editMasterData.others.push({ label: '', itemName: '', price: 0 });
+  renderMaster();
+}
+
+function delOther(j) {
+  collectMaster();
+  editMasterData.others.splice(j, 1);
+  renderMaster();
+}
+
+// 空行（表示名も明細名も未入力）を除いた保存用データを作る
+function cleanMaster(data) {
+  function keep(it) { return (it.label && it.label !== '') || (it.itemName && it.itemName !== ''); }
+  function cleanItems(arr) {
+    var out = [];
+    for (var i = 0; i < arr.length; i++) {
+      if (keep(arr[i])) {
+        out.push({
+          label: arr[i].label || arr[i].itemName,
+          itemName: arr[i].itemName || arr[i].label,
+          price: toNum(arr[i].price)
+        });
+      }
+    }
+    return out;
+  }
+  var mags = [];
+  for (var m = 0; m < data.magicians.length; m++) {
+    var mag = data.magicians[m];
+    if (!mag.name || mag.name === '') continue; // 名前なしのマジシャンは保存しない
+    mags.push({ name: mag.name, plans: cleanItems(mag.plans || []), options: cleanItems(mag.options || []) });
+  }
+  return { magicians: mags, others: cleanItems(data.others || []) };
+}
+
+function saveMaster() {
+  collectMaster();
+  var clean = cleanMaster(editMasterData);
+  if (!window._saveMaster) {
+    setMasterStatus('Firebaseに接続できないため保存できません。通信を確認してください。', 'err');
+    return;
+  }
+  var btn = document.getElementById('btnMasterSave');
+  btn.disabled = true;
+  setMasterStatus('保存しています…', '');
+  window._saveMaster(clean).then(function () {
+    // 実データとかんたん入力を更新
+    masterData = clean;
+    onMasterLoaded(clean);
+    setMasterStatus('保存しました。', 'ok');
+    btn.disabled = false;
+    setTimeout(closeMaster, 700);
+  }).catch(function (e) {
+    console.warn('master save failed:', e);
+    setMasterStatus('保存に失敗しました。通信状況を確認して、もう一度お試しください。', 'err');
+    btn.disabled = false;
+  });
+}
+
 function initForm() {
   document.getElementById('issueDate').value = getTodayValue();
   savedDueDate = getNextMonthEndValue();
@@ -942,6 +1318,12 @@ try {
       console.warn('master load failed:', e);
       window.onMasterFailed();
     }
+  };
+
+  // 料金マスタの保存（編集画面から呼ばれる）。ドキュメント全体を上書きする
+  window._saveMaster = async function (data) {
+    const ref = doc(window._fs, 'invoice', 'master');
+    await setDoc(ref, Object.assign({}, data, { updatedAt: serverTimestamp() }));
   };
 
   window.dispatchEvent(new Event('_fsready'));
