@@ -193,6 +193,40 @@
     display: none;
   }
 
+  /* 起動直後〜発話中: 光が一段強くなり、速い周期で滑らかに脈動 */
+  body.speaking .card-case {
+    animation: awake-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes awake-pulse {
+    0%, 100% {
+      box-shadow:
+        0 0 55px rgba(140, 95, 220, 0.45),
+        0 0 120px rgba(140, 95, 220, 0.22),
+        inset 0 0 24px rgba(0, 0, 0, 0.5);
+    }
+    50% {
+      box-shadow:
+        0 0 75px rgba(150, 105, 235, 0.6),
+        0 0 160px rgba(150, 105, 235, 0.32),
+        inset 0 0 24px rgba(0, 0, 0, 0.45);
+    }
+  }
+
+  /* 発話中はスペードマークの輝きも増す */
+  body.speaking .case-mark .suit {
+    text-shadow: 0 0 26px rgba(212, 175, 55, 0.85);
+  }
+
+  /* WAITING状態: 脈動が収まり、IDLEよりやや明るい静的な光 */
+  body.waiting .card-case {
+    animation: none;
+    box-shadow:
+      0 0 50px rgba(130, 90, 210, 0.35),
+      0 0 110px rgba(130, 90, 210, 0.18),
+      inset 0 0 24px rgba(0, 0, 0, 0.5);
+  }
+
   /* 開始済み表示（初期は非表示） */
   .booting {
     display: none;
@@ -204,7 +238,8 @@
     animation: pulse 3s ease-in-out infinite;
   }
 
-  body.started .booting {
+  /* 「…」は発話終了後のWAITINGでのみ表示 */
+  body.waiting .booting {
     display: block;
   }
 </style>
@@ -241,16 +276,114 @@
   </div>
 
 <script>
-  // 状態: 0=IDLE(待機), 1=STARTED(開始済み)
+  // 状態: 0=IDLE(待機), 1=SPEAKING(INTRO発話中), 2=WAITING(発話終了後の待機)
   var phase = 0;
 
   var startBtn = document.querySelector('.btn-start');
+
+  // INTRO台本（文単位で順に発話する。将来のペルソナ差し替えを見据えて1か所に集約）
+  var introLines = [
+    '初めまして。代理のマジシャンです。',
+    '担当は、人類的な事情で離席中。',
+    '私が、代わりを務めます。'
+  ];
+
+  var SENTENCE_PAUSE_MS = 600;   // 文間ポーズ
+  var START_DELAY_MS = 800;      // START押下から発話開始までの溜め
+  var SPEAK_TIMEOUT_MS = 18000;  // 発話が進まない場合の保険タイムアウト
+
+  var speakTimeoutId = 0;
+
+  // 再読み込み後に前回の音声が残らないようにする
+  if (window.speechSynthesis) {
+    speechSynthesis.cancel();
+    window.addEventListener('pagehide', function() {
+      speechSynthesis.cancel();
+    });
+  }
+
+  // 日本語音声を優先して選択（無ければnullを返し、lang指定のみでデフォルトに任せる）
+  function pickJaVoice() {
+    var voices = speechSynthesis.getVoices();
+    for (var i = 0; i < voices.length; i++) {
+      if (voices[i].lang && voices[i].lang.indexOf('ja') === 0) return voices[i];
+    }
+    return null;
+  }
+
+  // WAITINGへの遷移（onend完走とタイムアウトの競合に備え、1回だけ実行）
+  function toWaiting() {
+    if (phase !== 1) return;
+    phase = 2;
+    clearTimeout(speakTimeoutId);
+    // タイムアウト経由の場合に詰まった発話が後から鳴らないよう止める
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    document.body.classList.remove('speaking');
+    document.body.classList.add('waiting');
+  }
+
+  // INTROを文単位で順に発話する
+  function speakIntro() {
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      // 音声合成が使えない環境でも視覚遷移は最後まで進める
+      toWaiting();
+      return;
+    }
+
+    var index = 0;
+
+    function speakNext() {
+      if (phase !== 1) return;
+      if (index >= introLines.length) {
+        toWaiting();
+        return;
+      }
+      var u = new SpeechSynthesisUtterance(introLines[index]);
+      index++;
+      u.lang = 'ja-JP';
+      var voice = pickJaVoice();
+      if (voice) u.voice = voice;
+      u.rate = 0.9;   // 話速: 標準よりわずかに遅め
+      u.pitch = 0.9;  // 抑揚: やや平坦・無機質寄り
+      // ※音量はデバイスのメディア音量に従う。マナーモード・音量ゼロの検知は行わない
+      u.onend = function() {
+        setTimeout(speakNext, SENTENCE_PAUSE_MS);
+      };
+      u.onerror = function() {
+        // エラーでも止まらず次の文へ進む
+        setTimeout(speakNext, SENTENCE_PAUSE_MS);
+      };
+      speechSynthesis.speak(u);
+      // iOSで発話キューが詰まる既知事象への保険
+      speechSynthesis.resume();
+    }
+
+    // ※ getVoices() は非同期ロードのため空のことがある。
+    //   各文の発話時に pickJaVoice() で選び直すので、ロード後の文から日本語音声が反映される。
+    //   見つからない間も u.lang='ja-JP' でデフォルト音声に任せて発話は進める
+    speakNext();
+  }
 
   // スタートボタン押下（連打は最初の1回のみ有効）
   function onStart() {
     if (phase !== 0) return;
     phase = 1;
     document.body.classList.add('started');
+    document.body.classList.add('speaking');
+
+    // iOSはユーザー操作起点でないと発話しないため、
+    // クリックハンドラ内で無音の短い発話を同期発火して"解錠"しておく
+    if (window.speechSynthesis && window.SpeechSynthesisUtterance) {
+      var unlock = new SpeechSynthesisUtterance(' ');
+      unlock.volume = 0;
+      speechSynthesis.speak(unlock);
+    }
+
+    // 発話が始まらない・途中で止まる場合の保険（正常終了すれば発動しない）
+    speakTimeoutId = setTimeout(toWaiting, SPEAK_TIMEOUT_MS);
+
+    // 短い溜めを置いてから発話開始
+    setTimeout(speakIntro, START_DELAY_MS);
   }
 
   startBtn.addEventListener('click', onStart);
