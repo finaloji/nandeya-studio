@@ -22,6 +22,17 @@
   .type-toggle button { flex: 1; padding: 12px; font-size: 18px; border: 3px solid #4a90d9; border-radius: 8px; background: #fff; color: #4a90d9; cursor: pointer; font-weight: 900; letter-spacing: 2px; }
   .type-toggle button.active { background: #4a90d9; color: #fff; }
 
+  /* ===== かんたん入力 ===== */
+  .quick-input select { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px; background: #fff; min-height: 44px; color: #333; }
+  .qi-status { font-size: 13px; color: #999; padding: 4px 0; }
+  .qi-error-text { color: #c0392b; margin-bottom: 10px; }
+  .menu-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .menu-btn { padding: 10px 14px; min-height: 44px; font-size: 14px; border: 1px solid #4a90d9; border-radius: 8px; background: #fff; color: #4a90d9; cursor: pointer; font-weight: bold; }
+  .menu-btn:active { background: #4a90d9; color: #fff; }
+  .menu-price { font-weight: normal; margin-left: 4px; font-size: 13px; }
+  .qi-sub { font-size: 13px; font-weight: bold; color: #666; margin: 12px 0 6px; }
+  .qi-divider { border-top: 1px solid #eee; margin-top: 14px; }
+
   .detail-row { border-bottom: 1px solid #eee; padding-bottom: 4px; margin-bottom: 10px; }
   .detail-row .row { display: flex; gap: 8px; align-items: flex-start; }
   .col-name { flex: 1; }
@@ -160,6 +171,28 @@
     <div id="dueDateArea" style="display:none;">
       <label>支払期限</label>
       <input type="date" id="dueDate" oninput="updatePreview()">
+    </div>
+  </div>
+
+  <!-- かんたん入力 -->
+  <div class="section quick-input">
+    <div class="section-title">かんたん入力</div>
+    <div class="qi-status" id="qiLoading">料金マスタを読み込んでいます…</div>
+    <div id="qiError" style="display:none;">
+      <div class="qi-status qi-error-text">料金マスタを読み込めませんでした。手入力で明細を追加してください。</div>
+      <button type="button" class="btn-add" onclick="retryMaster()">再読み込み</button>
+    </div>
+    <div id="qiBody" style="display:none;">
+      <label>マジシャン</label>
+      <select id="magicianSelect" onchange="showMagicianMenu()"></select>
+      <div class="menu-buttons" id="magicianMenu"></div>
+      <div id="optionArea" style="display:none;">
+        <div class="qi-sub">オプション</div>
+        <div class="menu-buttons" id="optionMenu"></div>
+      </div>
+      <div class="qi-divider"></div>
+      <div class="qi-sub">その他の項目</div>
+      <div class="menu-buttons" id="otherMenu"></div>
     </div>
   </div>
 
@@ -591,6 +624,130 @@ function doPrint() {
   window.print();
 }
 
+/* ===== かんたん入力（料金マスタ） ===== */
+var authPassed = false;
+var masterLoadState = 'idle'; // idle | loading | loaded | failed
+var masterData = null;
+
+function setQuickView(view) {
+  document.getElementById('qiLoading').style.display = view === 'loading' ? '' : 'none';
+  document.getElementById('qiError').style.display = view === 'error' ? '' : 'none';
+  document.getElementById('qiBody').style.display = view === 'body' ? '' : 'none';
+}
+
+// 認証済み かつ Firestore 準備完了 のとき1回だけ読み込む
+function maybeLoadMaster() {
+  if (!authPassed) return;
+  if (masterLoadState === 'loading' || masterLoadState === 'loaded') return;
+  if (window._fsFailed) {
+    onMasterFailed();
+    return;
+  }
+  if (window._fs && window._loadMaster) {
+    masterLoadState = 'loading';
+    setQuickView('loading');
+    window._loadMaster();
+  }
+}
+
+function retryMaster() {
+  if (window._fs && window._loadMaster) {
+    masterLoadState = 'idle';
+    maybeLoadMaster();
+  } else {
+    onMasterFailed();
+  }
+}
+
+window.addEventListener('_fsready', maybeLoadMaster);
+
+// module script から呼ばれる（マスタ読み込み成功）
+function onMasterLoaded(data) {
+  masterLoadState = 'loaded';
+  masterData = {
+    magicians: (data && Array.isArray(data.magicians)) ? data.magicians : [],
+    others: (data && Array.isArray(data.others)) ? data.others : []
+  };
+  var select = document.getElementById('magicianSelect');
+  select.innerHTML = '';
+  var def = document.createElement('option');
+  def.value = '';
+  def.textContent = 'マジシャンを選択';
+  select.appendChild(def);
+  for (var i = 0; i < masterData.magicians.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = masterData.magicians[i].name;
+    select.appendChild(opt);
+  }
+  renderMenuButtons(document.getElementById('otherMenu'), masterData.others);
+  showMagicianMenu();
+  setQuickView('body');
+}
+
+// module script から呼ばれる（マスタ読み込み失敗）
+function onMasterFailed() {
+  masterLoadState = 'failed';
+  setQuickView('error');
+}
+
+function makeMenuBtn(item) {
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'menu-btn';
+  btn.appendChild(document.createTextNode(item.label));
+  var span = document.createElement('span');
+  span.className = 'menu-price';
+  var price = toNum(item.price);
+  span.textContent = price > 0 ? '¥' + price.toLocaleString('ja-JP') : '金額入力';
+  btn.appendChild(span);
+  btn.onclick = function () { quickAdd(item.itemName, price); };
+  return btn;
+}
+
+function renderMenuButtons(container, items) {
+  container.innerHTML = '';
+  if (!Array.isArray(items)) return;
+  for (var i = 0; i < items.length; i++) {
+    container.appendChild(makeMenuBtn(items[i]));
+  }
+}
+
+function showMagicianMenu() {
+  var select = document.getElementById('magicianSelect');
+  var optionArea = document.getElementById('optionArea');
+  var magicianMenu = document.getElementById('magicianMenu');
+  var idx = select.value === '' ? -1 : parseInt(select.value, 10);
+  var magician = (masterData && idx >= 0) ? masterData.magicians[idx] : null;
+  if (!magician) {
+    magicianMenu.innerHTML = '';
+    optionArea.style.display = 'none';
+    return;
+  }
+  renderMenuButtons(magicianMenu, magician.plans);
+  if (Array.isArray(magician.options) && magician.options.length > 0) {
+    renderMenuButtons(document.getElementById('optionMenu'), magician.options);
+    optionArea.style.display = '';
+  } else {
+    optionArea.style.display = 'none';
+  }
+}
+
+function quickAdd(itemName, price) {
+  addRow();
+  var rows = getRows();
+  var row = rows[rows.length - 1];
+  row.getElementsByClassName('item-name')[0].value = itemName;
+  var priceInput = row.getElementsByClassName('item-price')[0];
+  if (price > 0) {
+    priceInput.value = price;
+  } else {
+    // 金額0の項目は単価を手入力してもらう
+    priceInput.focus();
+  }
+  calculate();
+}
+
 function initForm() {
   document.getElementById('issueDate').value = getTodayValue();
   savedDueDate = getNextMonthEndValue();
@@ -619,6 +776,9 @@ function sha256Hex(str) {
 function showTool() {
   document.getElementById('authGate').style.display = 'none';
   document.getElementById('inputArea').style.display = '';
+  // 認証通過後に料金マスタの読み込みを開始する（未認証ではFirestoreへアクセスしない）
+  authPassed = true;
+  maybeLoadMaster();
 }
 
 function showGate() {
@@ -670,11 +830,12 @@ function initAuth() {
 initAuth();
 </script>
 
-<!-- Firebase 初期化（後続スプリント用。失敗しても認証・本体には影響しない） -->
+<!-- Firebase 初期化・料金マスタ読み込み（失敗しても認証・本体には影響しない） -->
 <script type="module">
 try {
   const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-  const { getFirestore } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+  const { getFirestore, doc, getDoc, setDoc, serverTimestamp } =
+    await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
   const firebaseConfig = {
     apiKey: "AIzaSyB_poTbSo_L3n4YoLpKPdEmvXCAfHAjL3U",
     authDomain: "invoice-tool-1f049.firebaseapp.com",
@@ -685,10 +846,100 @@ try {
   };
   const app = initializeApp(firebaseConfig);
   window._fs = getFirestore(app);
+
+  // 料金マスタ初期データ（マスタ未投入時に自動投入する）
+  const p = (label, itemName, price) => ({ label, itemName, price });
+  const DEFAULT_MASTER = {
+    magicians: [
+      { name: '大輝', plans: [
+        p('テーブル', 'テーブルマジックショー公演費（大輝）', 50000),
+        p('サロン', 'サロンマジックショー公演費（大輝）', 80000),
+        p('ステージ', 'ステージマジックショー公演費（大輝）', 120000),
+        p('イリュージョン', 'イリュージョンマジックショー公演費（大輝）', 180000)
+      ], options: [] },
+      { name: 'パンドラ', plans: [
+        p('テーブル', 'テーブルマジックショー公演費（パンドラ）', 40000),
+        p('サロン', 'サロンマジックショー公演費（パンドラ）', 60000),
+        p('ステージ', 'ステージマジックショー公演費（パンドラ）', 100000)
+      ], options: [] },
+      { name: 'まさゆき', plans: [
+        p('テーブル', 'テーブルマジックショー公演費（まさゆき）', 30000),
+        p('サロン', 'サロンマジックショー公演費（まさゆき）', 50000),
+        p('ステージ', 'ステージマジックショー公演費（まさゆき）', 90000),
+        p('イリュージョン', 'イリュージョンマジックショー公演費（まさゆき）', 150000),
+        p('催眠術', '催眠術ショー公演費（まさゆき）', 30000)
+      ], options: [] },
+      { name: '滝沢涼', plans: [
+        p('テーブル', 'テーブルマジックショー公演費（滝沢涼）', 45000),
+        p('サロン', 'サロンマジックショー公演費（滝沢涼）', 50000)
+      ], options: [] },
+      { name: '輝', plans: [
+        p('テーブル', 'テーブルマジックショー公演費（輝）', 35000),
+        p('サロン', 'サロンマジックショー公演費（輝）', 60000)
+      ], options: [] },
+      { name: '慶匠', plans: [
+        p('テーブル', 'テーブルマジックショー公演費（慶匠）', 35000),
+        p('サロン', 'サロンマジックショー公演費（慶匠）', 50000)
+      ], options: [] },
+      { name: 'Junmaki', plans: [
+        p('テーブル', 'テーブルマジックショー公演費（Junmaki）', 100000),
+        p('サロン', 'サロンマジックショー公演費（Junmaki）', 120000),
+        p('和風', '和風マジックショー公演費（Junmaki）', 180000),
+        p('マジック＆バルーン', 'マジック＆バルーンショー公演費（Junmaki）', 150000),
+        p('バルーングリーティング', 'バルーングリーティング公演費（Junmaki）', 100000),
+        p('変面', '変面マジックショー公演費（Junmaki）', 210000),
+        p('イリュージョン', 'イリュージョンマジックショー公演費（Junmaki）', 280000)
+      ], options: [
+        p('バルーンプレゼント', 'バルーンプレゼントオプション（Junmaki）', 15000)
+      ] },
+      { name: 'ちゃっぴー', plans: [
+        p('テーブル', 'テーブルマジックショー公演費（ちゃっぴー）', 60000),
+        p('サロン', 'サロンマジックショー公演費（ちゃっぴー）', 100000),
+        p('イリュージョン', 'イリュージョンマジックショー公演費（ちゃっぴー）', 280000)
+      ], options: [
+        p('変面', '変面オプション（ちゃっぴー）', 50000),
+        p('ジャグリング', 'ジャグリングオプション（ちゃっぴー）', 10000)
+      ] }
+    ],
+    others: [
+      p('マジシャン追加費用', 'マジシャン追加費用', 0),
+      p('照明代', '照明代', 30000),
+      p('スモーク代', 'スモーク代', 5000),
+      p('簡易ステージ設営費', '簡易ステージ設営費', 5000),
+      p('キャンセル代', 'キャンセル代', 0)
+    ]
+  };
+
+  // 料金マスタの読み込み（認証通過後に maybeLoadMaster() 経由で呼ばれる）
+  window._loadMaster = async function () {
+    try {
+      const ref = doc(window._fs, 'invoice', 'master');
+      const snap = await getDoc(ref);
+      let data;
+      if (snap.exists()) {
+        data = snap.data();
+      } else {
+        // マスタ未投入なら初期データを自動投入。書き込み失敗時はセッション内で初期データを利用
+        data = DEFAULT_MASTER;
+        try {
+          await setDoc(ref, Object.assign({}, DEFAULT_MASTER, { updatedAt: serverTimestamp() }));
+        } catch (e2) {
+          console.warn('master seed failed:', e2);
+        }
+      }
+      window.onMasterLoaded(data);
+    } catch (e) {
+      console.warn('master load failed:', e);
+      window.onMasterFailed();
+    }
+  };
+
   window.dispatchEvent(new Event('_fsready'));
 } catch (e) {
   // Firebase不通でもパスコード認証とツール本体は動作させる
   console.warn('Firebase init failed:', e);
+  window._fsFailed = true;
+  if (window.onMasterFailed) window.onMasterFailed();
 }
 </script>
 </body>
