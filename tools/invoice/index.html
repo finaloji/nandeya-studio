@@ -37,6 +37,9 @@
   .summary-table td { padding: 8px 4px; font-size: 14px; border-bottom: 1px solid #eee; }
   .summary-table td:last-child { text-align: right; white-space: nowrap; }
   .summary-table tr.total-row td { font-size: 18px; font-weight: bold; color: #4a90d9; border-bottom: none; padding-top: 12px; }
+
+  .section-note { font-size: 12px; color: #999; margin-bottom: 8px; }
+  textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px; background: #fff; font-family: inherit; line-height: 1.5; min-height: 260px; resize: vertical; }
 </style>
 </head>
 <body>
@@ -96,6 +99,13 @@
       <tr class="total-row"><td>合計金額</td><td id="dispTotal">0円</td></tr>
     </table>
   </div>
+
+  <!-- 備考 -->
+  <div class="section">
+    <div class="section-title">備考</div>
+    <div class="section-note">帳票の［内容詳細］欄に印字されます</div>
+    <textarea id="notes"></textarea>
+  </div>
 </div>
 
 <script>
@@ -121,6 +131,29 @@ function getNextMonthEndValue() {
   return toDateValue(end);
 }
 
+function buildDefaultNotes(type) {
+  var common =
+    '大変お世話になっております。お手数ですがご確認をお願いいたします。\n' +
+    'ご不明な点やご質問等がございましたら、お気軽にお問合せ下さい。';
+  if (type === 'invoice') {
+    return common + '\n' +
+      '\n' +
+      '※お振込み手数料はご負担をお願いいたします。\n' +
+      '\n' +
+      '【振込先】\n' +
+      '住信SBIネット銀行\n' +
+      '法人第一支店　支店番号 106\n' +
+      '普通　2385254\n' +
+      'カ）ナンデヤ';
+  }
+  return common;
+}
+
+function isNotesUnedited() {
+  var v = document.getElementById('notes').value;
+  return v === buildDefaultNotes('estimate') || v === buildDefaultNotes('invoice');
+}
+
 function setType(type) {
   if (docType === type) return;
   var dueArea = document.getElementById('dueDateArea');
@@ -131,6 +164,9 @@ function setType(type) {
   } else {
     savedDueDate = dueInput.value;
     dueArea.style.display = 'none';
+  }
+  if (isNotesUnedited()) {
+    document.getElementById('notes').value = buildDefaultNotes(type);
   }
   docType = type;
   document.getElementById('btnEstimate').className = type === 'estimate' ? 'active' : '';
@@ -218,6 +254,7 @@ function calculate() {
 function initForm() {
   document.getElementById('issueDate').value = getTodayValue();
   savedDueDate = getNextMonthEndValue();
+  document.getElementById('notes').value = buildDefaultNotes('estimate');
   addRow();
 }
 
