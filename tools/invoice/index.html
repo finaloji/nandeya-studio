@@ -83,6 +83,15 @@
   .print-area .summary-box td:last-child { text-align: right; }
   .print-area .summary-box tr.grand-total td { font-weight: bold; font-size: 15px; background: #d9d9d9; }
 
+  /* ===== パスコード認証ゲート ===== */
+  .auth-gate { position: fixed; inset: 0; background: #f0f2f5; display: flex; justify-content: center; align-items: flex-start; padding: 12px; z-index: 100; }
+  .auth-card { background: #fff; border-radius: 8px; padding: 24px 20px; margin-top: 18vh; width: 100%; max-width: 400px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .auth-card h1 { font-size: 18px; text-align: center; margin-bottom: 16px; }
+  .auth-note { font-size: 14px; color: #666; text-align: center; margin-bottom: 14px; }
+  .auth-card input { min-height: 44px; margin-bottom: 8px; }
+  .auth-error { font-size: 13px; color: #c0392b; min-height: 18px; margin-bottom: 8px; text-align: center; }
+  .btn-auth { width: 100%; min-height: 48px; padding: 12px; font-size: 16px; border: none; border-radius: 8px; background: #4a90d9; color: #fff; cursor: pointer; font-weight: bold; }
+
   /* ===== 印刷（PDF保存） ===== */
   @page { size: A4 portrait; margin: 10mm; }
   @media print {
@@ -111,7 +120,19 @@
 </head>
 <body>
 
-<div class="input-area">
+<!-- パスコード認証ゲート -->
+<div class="auth-gate" id="authGate" style="display:none;">
+  <div class="auth-card">
+    <h1>見積書・請求書作成ツール</h1>
+    <div class="auth-note">パスコードを入力してください</div>
+    <label>パスコード</label>
+    <input type="password" id="passcodeInput" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();submitPasscode();}">
+    <div class="auth-error" id="authError"></div>
+    <button type="button" class="btn-auth" onclick="submitPasscode()">決定</button>
+  </div>
+</div>
+
+<div class="input-area" id="inputArea" style="display:none;">
   <h1>見積書・請求書作成ツール</h1>
 
   <!-- 書類タイプ切り替え -->
@@ -578,6 +599,97 @@ function initForm() {
 }
 
 initForm();
+
+/* ===== パスコード認証（入場ゲート） ===== */
+var AUTH_HASH = '1d3ee602439afb94756b3a5c6b7eaef764009afd3f1f6f0141ee48a982835c18';
+var AUTH_KEY = 'nandeya_auth';
+
+function sha256Hex(str) {
+  var data = new TextEncoder().encode(str);
+  return crypto.subtle.digest('SHA-256', data).then(function (buf) {
+    var bytes = new Uint8Array(buf);
+    var hex = '';
+    for (var i = 0; i < bytes.length; i++) {
+      hex += ('0' + bytes[i].toString(16)).slice(-2);
+    }
+    return hex;
+  });
+}
+
+function showTool() {
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('inputArea').style.display = '';
+}
+
+function showGate() {
+  document.getElementById('authGate').style.display = '';
+  var input = document.getElementById('passcodeInput');
+  setTimeout(function () { input.focus(); }, 0);
+}
+
+function submitPasscode() {
+  var input = document.getElementById('passcodeInput');
+  var errorEl = document.getElementById('authError');
+  var value = input.value.trim();
+  if (value === '') {
+    errorEl.textContent = 'パスコードを入力してください';
+    input.focus();
+    return;
+  }
+  sha256Hex(value).then(function (hex) {
+    if (hex === AUTH_HASH) {
+      try {
+        localStorage.setItem(AUTH_KEY, hex);
+      } catch (e) {
+        // 保存に失敗してもこのセッション中は利用可能とする
+      }
+      errorEl.textContent = '';
+      showTool();
+    } else {
+      errorEl.textContent = 'パスコードが違います';
+      input.value = '';
+      input.focus();
+    }
+  });
+}
+
+function initAuth() {
+  var saved = null;
+  try {
+    saved = localStorage.getItem(AUTH_KEY);
+  } catch (e) {
+    // プライベートブラウズ等で読めない場合は未認証扱い
+  }
+  if (saved === AUTH_HASH) {
+    showTool();
+  } else {
+    showGate();
+  }
+}
+
+initAuth();
+</script>
+
+<!-- Firebase 初期化（後続スプリント用。失敗しても認証・本体には影響しない） -->
+<script type="module">
+try {
+  const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+  const { getFirestore } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+  const firebaseConfig = {
+    apiKey: "AIzaSyB_poTbSo_L3n4YoLpKPdEmvXCAfHAjL3U",
+    authDomain: "invoice-tool-1f049.firebaseapp.com",
+    projectId: "invoice-tool-1f049",
+    storageBucket: "invoice-tool-1f049.firebasestorage.app",
+    messagingSenderId: "70557750736",
+    appId: "1:70557750736:web:c65956292f9af0b6bf95d5"
+  };
+  const app = initializeApp(firebaseConfig);
+  window._fs = getFirestore(app);
+  window.dispatchEvent(new Event('_fsready'));
+} catch (e) {
+  // Firebase不通でもパスコード認証とツール本体は動作させる
+  console.warn('Firebase init failed:', e);
+}
 </script>
 </body>
 </html>
