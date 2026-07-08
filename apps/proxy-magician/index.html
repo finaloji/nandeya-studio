@@ -302,13 +302,17 @@
     });
   }
 
-  // 日本語音声を優先して選択（無ければnullを返し、lang指定のみでデフォルトに任せる）
+  // 日本語音声を優先して選択（Siriの声があれば最優先。無ければnullを返し、lang指定のみでデフォルトに任せる）
   function pickJaVoice() {
     var voices = speechSynthesis.getVoices();
+    var jaVoices = [];
     for (var i = 0; i < voices.length; i++) {
-      if (voices[i].lang && voices[i].lang.indexOf('ja') === 0) return voices[i];
+      if (voices[i].lang && voices[i].lang.indexOf('ja') === 0) jaVoices.push(voices[i]);
     }
-    return null;
+    for (var j = 0; j < jaVoices.length; j++) {
+      if (jaVoices[j].name && jaVoices[j].name.indexOf('Siri') !== -1) return jaVoices[j];
+    }
+    return jaVoices.length > 0 ? jaVoices[0] : null;
   }
 
   // WAITINGへの遷移（onend完走とタイムアウトの競合に備え、1回だけ実行）
