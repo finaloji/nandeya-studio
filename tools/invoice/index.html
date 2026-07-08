@@ -117,12 +117,19 @@
       padding: 0;
       box-shadow: none;
       transform: none !important;
-      /* スマホの印刷領域はPCよりやや狭く、原寸だとA4を数%超えて2ページ目にあふれるため
-         印刷時のみ全体を縮小して1枚に収める */
-      zoom: 0.88;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
+    /* iOS Safari では CSS zoom が印刷に反映されないため、zoom に頼らず
+       印刷時は帳票の縦方向を詰めて、原寸でも請求書がA4縦1枚に収まるようにする */
+    .print-area .doc-title { margin: 4px auto 14px; padding: 6px 0; font-size: 26px; }
+    .print-area .header-section { margin-bottom: 14px; }
+    .print-area .greeting { margin-top: 10px; }
+    .print-area .amount-box { margin-top: 10px; }
+    .print-area .company-info { line-height: 1.5; }
+    .print-area .detail-table { margin-bottom: 12px; }
+    .print-area .detail-table td { height: 24px; }
+    .print-area .detail-table th, .print-area .detail-table td { padding: 4px 8px; }
     .print-area .detail-table thead { display: table-header-group; }
     .print-area .detail-table tr { page-break-inside: avoid; break-inside: avoid; }
     .print-area .bottom-section { page-break-inside: avoid; break-inside: avoid; }
@@ -752,7 +759,8 @@ function initForm() {
   document.getElementById('issueDate').value = getTodayValue();
   savedDueDate = getNextMonthEndValue();
   document.getElementById('notes').value = buildDefaultNotes('estimate');
-  addRow();
+  // 初期の空明細行は作らない（かんたん入力で追加すると空行が邪魔になるため）。
+  // 手入力したい場合は「＋ 行を追加」で行を足す。
 }
 
 initForm();
@@ -884,8 +892,8 @@ try {
       { name: 'Junmaki', plans: [
         p('テーブル', 'テーブルマジックショー公演費（Junmaki）', 100000),
         p('サロン', 'サロンマジックショー公演費（Junmaki）', 120000),
-        p('和風', '和風マジックショー公演費（Junmaki）', 180000),
-        p('マジック＆バルーン', 'マジック＆バルーンショー公演費（Junmaki）', 150000),
+        p('和風', '和風サロンマジックショー公演費（Junmaki）', 180000),
+        p('マジック＆バルーン', 'サロンマジック＆バルーンショー公演費（Junmaki）', 150000),
         p('バルーングリーティング', 'バルーングリーティング公演費（Junmaki）', 100000),
         p('変面', '変面マジックショー公演費（Junmaki）', 210000),
         p('イリュージョン', 'イリュージョンマジックショー公演費（Junmaki）', 280000)
