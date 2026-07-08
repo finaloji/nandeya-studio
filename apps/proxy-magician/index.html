@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a14">
+<title>Magic Bar</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  html {
+    height: 100%;
+  }
+
+  body {
+    height: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 50% 30%, #14142a 0%, #0a0a14 60%, #050508 100%);
+    color: #e8e0cc;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* トランプケースの表示エリア（主役） */
+  .stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+    padding: 24px;
+  }
+
+  .card-case {
+    position: relative;
+    width: min(48vw, 200px);
+    aspect-ratio: 5 / 7;
+    border-radius: 10px;
+    background: linear-gradient(160deg, #2a1a3e 0%, #1a1030 45%, #120a22 100%);
+    border: 1px solid rgba(212, 175, 55, 0.55);
+    box-shadow:
+      0 0 40px rgba(120, 80, 200, 0.25),
+      0 0 90px rgba(120, 80, 200, 0.12),
+      inset 0 0 24px rgba(0, 0, 0, 0.5);
+    animation: breathe 5s ease-in-out infinite;
+  }
+
+  /* 呼吸のようなゆっくりした明滅 */
+  @keyframes breathe {
+    0%, 100% {
+      box-shadow:
+        0 0 40px rgba(120, 80, 200, 0.25),
+        0 0 90px rgba(120, 80, 200, 0.12),
+        inset 0 0 24px rgba(0, 0, 0, 0.5);
+    }
+    50% {
+      box-shadow:
+        0 0 55px rgba(120, 80, 200, 0.4),
+        0 0 120px rgba(120, 80, 200, 0.2),
+        inset 0 0 24px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  /* ケースの二重枠 */
+  .case-frame {
+    position: absolute;
+    inset: 8px;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 6px;
+    pointer-events: none;
+  }
+
+  /* ケースのフラップ（箱らしさの演出） */
+  .case-flap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 14%;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0));
+    border-radius: 10px 10px 0 0;
+    pointer-events: none;
+  }
+
+  /* 中央のスペードマーク */
+  .case-mark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    pointer-events: none;
+  }
+
+  .case-mark .suit {
+    font-size: min(16vw, 64px);
+    color: #d4af37;
+    text-shadow: 0 0 18px rgba(212, 175, 55, 0.5);
+    line-height: 1;
+  }
+
+  .case-mark .suit-row {
+    display: flex;
+    gap: 14px;
+    font-size: min(4.5vw, 18px);
+    color: rgba(212, 175, 55, 0.55);
+    letter-spacing: 2px;
+  }
+
+  /* コーナーの飾り */
+  .case-corner {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-color: rgba(212, 175, 55, 0.5);
+    border-style: solid;
+    border-width: 0;
+    pointer-events: none;
+  }
+  .case-corner.tl { top: 14px; left: 14px; border-top-width: 1px; border-left-width: 1px; }
+  .case-corner.tr { top: 14px; right: 14px; border-top-width: 1px; border-right-width: 1px; }
+  .case-corner.bl { bottom: 14px; left: 14px; border-bottom-width: 1px; border-left-width: 1px; }
+  .case-corner.br { bottom: 14px; right: 14px; border-bottom-width: 1px; border-right-width: 1px; }
+
+  /* スリープ中ステータス */
+  .status {
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 0.35em;
+    color: rgba(180, 160, 220, 0.75);
+    padding: 0 24px 36px;
+    animation: pulse 4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 0.95; }
+  }
+
+  /* ボタンエリア */
+  .btn-wrap {
+    width: 100%;
+    padding: 0 32px;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  }
+
+  .btn-start {
+    display: block;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+    padding: 18px 0;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    font-family: inherit;
+    color: #d4af37;
+    background: rgba(212, 175, 55, 0.08);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    border-radius: 14px;
+    cursor: pointer;
+  }
+
+  .btn-start:active {
+    background: rgba(212, 175, 55, 0.2);
+  }
+
+  /* STARTED状態: ステータスとボタンを隠す */
+  body.started .status,
+  body.started .btn-wrap {
+    display: none;
+  }
+
+  /* 開始済み表示（初期は非表示） */
+  .booting {
+    display: none;
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    color: rgba(180, 160, 220, 0.6);
+    padding: 0 24px calc(64px + env(safe-area-inset-bottom));
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  body.started .booting {
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+  <!-- トランプケース（主役） -->
+  <div class="stage">
+    <div class="card-case">
+      <div class="case-flap"></div>
+      <div class="case-frame"></div>
+      <div class="case-corner tl"></div>
+      <div class="case-corner tr"></div>
+      <div class="case-corner bl"></div>
+      <div class="case-corner br"></div>
+      <div class="case-mark">
+        <div class="suit">&#9824;</div>
+        <div class="suit-row">
+          <span>&#9829;</span><span>&#9827;</span><span>&#9830;</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- スリープ中ステータス -->
+  <div class="status">AI MAGICIAN &mdash; SLEEPING</div>
+
+  <!-- 開始済み表示 -->
+  <div class="booting">&hellip;</div>
+
+  <!-- スタートボタン -->
+  <div class="btn-wrap">
+    <button class="btn-start" type="button">START</button>
+  </div>
+
+<script>
+  // 状態: 0=IDLE(待機), 1=STARTED(開始済み)
+  var phase = 0;
+
+  var startBtn = document.querySelector('.btn-start');
+
+  // スタートボタン押下（連打は最初の1回のみ有効）
+  function onStart() {
+    if (phase !== 0) return;
+    phase = 1;
+    document.body.classList.add('started');
+  }
+
+  startBtn.addEventListener('click', onStart);
+
+  // ダブルタップ・ピンチによる拡大を抑止
+  document.addEventListener('gesturestart', function(e) {
+    e.preventDefault();
+  });
+  var lastTouch = 0;
+  document.addEventListener('touchend', function(e) {
+    var now = Date.now();
+    if (now - lastTouch < 300) e.preventDefault();
+    lastTouch = now;
+  }, { passive: false });
+</script>
+</body>
+</html>
