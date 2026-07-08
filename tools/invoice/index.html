@@ -84,7 +84,7 @@
   .print-area .summary-box tr.grand-total td { font-weight: bold; font-size: 15px; background: #d9d9d9; }
 
   /* ===== 印刷（PDF保存） ===== */
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 portrait; margin: 10mm; }
   @media print {
     body { background: #fff; }
     .input-area { display: none !important; }
@@ -97,6 +97,9 @@
       padding: 0;
       box-shadow: none;
       transform: none !important;
+      /* スマホの印刷領域はPCよりやや狭く、原寸だとA4を数%超えて2ページ目にあふれるため
+         印刷時のみ全体を縮小して1枚に収める */
+      zoom: 0.88;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
