@@ -40,6 +40,47 @@
 
   .section-note { font-size: 12px; color: #999; margin-bottom: 8px; }
   textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px; background: #fff; font-family: inherit; line-height: 1.5; min-height: 260px; resize: vertical; }
+
+  /* ===== プレビュー ===== */
+  .btn-preview { width: 100%; padding: 14px; font-size: 16px; border: none; border-radius: 8px; background: #4a90d9; color: #fff; cursor: pointer; font-weight: bold; }
+  .preview-area { max-width: 834px; margin: 0 auto; padding: 12px; }
+  .preview-toolbar { text-align: right; margin-bottom: 8px; }
+  .btn-close-preview { padding: 8px 16px; min-height: 40px; font-size: 14px; border: 1px solid #ccc; border-radius: 5px; background: #fff; color: #555; cursor: pointer; }
+  .preview-scale-outer { width: 100%; max-width: 794px; margin: 0 auto; overflow: hidden; }
+
+  .print-area { width: 794px; min-height: 1123px; background: #fff; color: #000; padding: 40px 36px; box-shadow: 0 2px 12px rgba(0,0,0,.25); transform-origin: top left; font-size: 13px; line-height: 1.5; }
+  .print-area .doc-date-area { text-align: right; font-size: 13px; min-height: 20px; }
+  .print-area .doc-due-date { text-align: right; font-size: 13px; }
+  .print-area .doc-title { width: 60%; margin: 10px auto 24px; border: 2px solid #000; text-align: center; font-size: 30px; font-weight: bold; padding: 8px 0; letter-spacing: 4px; }
+  .print-area .header-section { display: flex; gap: 24px; margin-bottom: 24px; }
+  .print-area .left-col { flex: 1; min-width: 0; }
+  .print-area .right-col { width: 280px; flex: none; }
+  .print-area .customer-name { font-size: 19px; border-bottom: 1px solid #000; padding: 4px 2px 6px; min-height: 34px; }
+  .print-area .contact-name { font-size: 14px; padding: 6px 2px 0; }
+  .print-area .greeting { border: 1px solid #000; padding: 8px 10px; margin-top: 14px; font-size: 13px; }
+  .print-area .amount-box { border: 2px solid #000; margin-top: 14px; padding: 10px 12px; display: flex; align-items: baseline; justify-content: space-between; }
+  .print-area .amount-box .amount-label { font-size: 15px; font-weight: bold; }
+  .print-area .amount-box .amount-value { font-size: 24px; font-weight: bold; }
+  .print-area .company-info { font-size: 12px; line-height: 1.7; white-space: nowrap; }
+  .print-area .company-info .company-name { font-size: 15px; font-weight: bold; }
+  .print-area .detail-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }
+  .print-area .detail-table th, .print-area .detail-table td { border: 1px solid #000; padding: 6px 8px; font-size: 13px; word-wrap: break-word; overflow-wrap: break-word; }
+  .print-area .detail-table th { background: #d9d9d9; font-weight: bold; text-align: center; }
+  .print-area .detail-table td { height: 30px; }
+  .print-area .detail-table tbody tr:nth-child(even) td { background: #f2f2f2; }
+  .print-area .detail-table .cell-name { text-align: left; }
+  .print-area .detail-table .cell-num { text-align: right; }
+  .print-area .col-w-qty { width: 12%; }
+  .print-area .col-w-price { width: 19%; }
+  .print-area .col-w-amt { width: 20%; }
+  .print-area .bottom-section { display: flex; gap: 24px; align-items: flex-start; }
+  .print-area .notes-box { flex: 1; min-width: 0; border: 1px solid #000; padding: 8px 10px; }
+  .print-area .notes-title { font-weight: bold; margin-bottom: 6px; }
+  .print-area .notes-body { white-space: pre-wrap; word-wrap: break-word; font-size: 12px; }
+  .print-area .summary-box { width: 280px; flex: none; border-collapse: collapse; }
+  .print-area .summary-box td { border: 1px solid #000; padding: 8px 10px; font-size: 13px; }
+  .print-area .summary-box td:last-child { text-align: right; }
+  .print-area .summary-box tr.grand-total td { font-weight: bold; font-size: 15px; background: #d9d9d9; }
 </style>
 </head>
 <body>
@@ -59,19 +100,19 @@
   <div class="section">
     <div class="section-title">宛先</div>
     <label>宛名（会社名または個人名）</label>
-    <input type="text" id="customerName" placeholder="株式会社◯◯">
+    <input type="text" id="customerName" placeholder="株式会社◯◯" oninput="updatePreview()">
     <label>担当者名</label>
-    <input type="text" id="contactName" placeholder="山田 太郎">
+    <input type="text" id="contactName" placeholder="山田 太郎" oninput="updatePreview()">
   </div>
 
   <!-- 日付 -->
   <div class="section">
     <div class="section-title">日付</div>
     <label>発行日</label>
-    <input type="date" id="issueDate">
+    <input type="date" id="issueDate" oninput="updatePreview()">
     <div id="dueDateArea" style="display:none;">
       <label>支払期限</label>
-      <input type="date" id="dueDate">
+      <input type="date" id="dueDate" oninput="updatePreview()">
     </div>
   </div>
 
@@ -104,7 +145,71 @@
   <div class="section">
     <div class="section-title">備考</div>
     <div class="section-note">帳票の［内容詳細］欄に印字されます</div>
-    <textarea id="notes"></textarea>
+    <textarea id="notes" oninput="updatePreview()"></textarea>
+  </div>
+
+  <!-- プレビュー表示ボタン -->
+  <div class="section">
+    <button type="button" class="btn-preview" id="btnPreview" onclick="togglePreview()">プレビューを表示</button>
+  </div>
+</div>
+
+<!-- 帳票プレビュー -->
+<div class="preview-area" id="previewArea" style="display:none;">
+  <div class="preview-toolbar">
+    <button type="button" class="btn-close-preview" onclick="togglePreview()">× 閉じる</button>
+  </div>
+  <div class="preview-scale-outer" id="previewScaleOuter">
+    <div class="print-area" id="printArea">
+      <div class="doc-date-area" id="printDate"></div>
+      <div class="doc-due-date" id="printDueDate" style="display:none;"></div>
+      <div class="doc-title" id="printTitle">見　積　書</div>
+      <div class="header-section">
+        <div class="left-col">
+          <div class="customer-name" id="printCustomer">&nbsp;</div>
+          <div class="contact-name" id="printContact" style="display:none;"></div>
+          <div class="greeting" id="printGreeting">下記の通り御見積申し上げます。</div>
+          <div class="amount-box">
+            <span class="amount-label" id="printAmountLabel">御見積金額</span>
+            <span class="amount-value" id="printAmountValue">0 円</span>
+          </div>
+        </div>
+        <div class="right-col">
+          <div class="company-info">
+            <div class="company-name">株式会社なんで屋</div>
+            <div>橋本　大輝</div>
+            <div>〒650-0011</div>
+            <div>兵庫県神戸市中央区下山手通 2丁目</div>
+            <div>17-10 ライオンビル 002</div>
+            <div>TEL: 078-945-8060</div>
+            <div>mail: nandeya.haken@gmail.com</div>
+            <div>登録番号 T2140001132396</div>
+          </div>
+        </div>
+      </div>
+      <table class="detail-table">
+        <thead>
+          <tr>
+            <th class="col-w-name">品　名</th>
+            <th class="col-w-qty">数　量</th>
+            <th class="col-w-price">単　価</th>
+            <th class="col-w-amt">金　額</th>
+          </tr>
+        </thead>
+        <tbody id="printDetailBody"></tbody>
+      </table>
+      <div class="bottom-section">
+        <div class="notes-box">
+          <div class="notes-title">［内容詳細］</div>
+          <div class="notes-body" id="printNotes"></div>
+        </div>
+        <table class="summary-box">
+          <tr><td>小　計</td><td id="printSubtotal">0</td></tr>
+          <tr><td>消費税（10%）</td><td id="printTax">0</td></tr>
+          <tr class="grand-total"><td>合　計</td><td id="printGrandTotal">0</td></tr>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -171,6 +276,7 @@ function setType(type) {
   docType = type;
   document.getElementById('btnEstimate').className = type === 'estimate' ? 'active' : '';
   document.getElementById('btnInvoice').className = type === 'invoice' ? 'active' : '';
+  updatePreview();
 }
 
 var rowId = 0;
@@ -196,7 +302,7 @@ function addRow() {
     '<div class="row">' +
       '<div class="col-name">' +
         '<label>項目名</label>' +
-        '<input type="text" class="item-name" placeholder="公演費">' +
+        '<input type="text" class="item-name" placeholder="公演費" oninput="calculate()">' +
       '</div>' +
       '<div class="col-del">' +
         '<label>&nbsp;</label>' +
@@ -249,7 +355,150 @@ function calculate() {
   document.getElementById('dispTransport').textContent = formatYen(transportation);
   document.getElementById('dispDiscount').textContent = discount > 0 ? '−' + formatYen(discount) : formatYen(discount);
   document.getElementById('dispTotal').textContent = formatYen(total);
+  updatePreview();
 }
+
+/* ===== 帳票プレビュー ===== */
+var previewVisible = false;
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatNum(n) {
+  return n.toLocaleString('ja-JP');
+}
+
+function formatDateSlash(v) {
+  return v ? v.replace(/-/g, '/') : '';
+}
+
+function togglePreview() {
+  previewVisible = !previewVisible;
+  var area = document.getElementById('previewArea');
+  var btn = document.getElementById('btnPreview');
+  if (previewVisible) {
+    area.style.display = '';
+    btn.textContent = 'プレビューを閉じる';
+    updatePreview();
+    area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else {
+    area.style.display = 'none';
+    btn.textContent = 'プレビューを表示';
+  }
+}
+
+function buildPrintRows() {
+  var items = [];
+  var rows = getRows();
+  for (var i = 0; i < rows.length; i++) {
+    var name = rows[i].getElementsByClassName('item-name')[0].value;
+    var qtyRaw = rows[i].getElementsByClassName('item-qty')[0].value;
+    var qty = toNum(qtyRaw);
+    var price = toNum(rows[i].getElementsByClassName('item-price')[0].value);
+    var amt = qty * price;
+    if (name === '' && amt === 0) continue; // 空行は印字しない
+    items.push({ name: name, qty: qtyRaw, price: formatNum(price), amt: formatNum(amt) });
+  }
+  var transportation = toNum(document.getElementById('transportation').value);
+  if (transportation > 0) {
+    items.push({ name: '交通費', qty: '1', price: formatNum(transportation), amt: formatNum(transportation) });
+  }
+  var discount = toNum(document.getElementById('discount').value);
+  if (discount > 0) {
+    items.push({ name: '値引き', qty: '', price: '', amt: '-' + formatNum(discount) });
+  }
+  return items;
+}
+
+function updatePreview() {
+  if (!previewVisible) return;
+  var isInvoice = docType === 'invoice';
+
+  // タイトル・挨拶文・金額ラベル
+  document.getElementById('printTitle').textContent = isInvoice ? '請　求　書' : '見　積　書';
+  document.getElementById('printGreeting').textContent = isInvoice ?
+    '下記の通り御請求申し上げます。' : '下記の通り御見積申し上げます。';
+  document.getElementById('printAmountLabel').textContent = isInvoice ? '御請求金額' : '御見積金額';
+
+  // 発行日・支払期限
+  document.getElementById('printDate').textContent = formatDateSlash(document.getElementById('issueDate').value);
+  var dueEl = document.getElementById('printDueDate');
+  var dueVal = document.getElementById('dueDate').value;
+  if (isInvoice && dueVal) {
+    dueEl.textContent = 'お支払期限: ' + formatDateSlash(dueVal);
+    dueEl.style.display = '';
+  } else {
+    dueEl.style.display = 'none';
+  }
+
+  // 宛名・担当者
+  var customer = document.getElementById('customerName').value;
+  document.getElementById('printCustomer').innerHTML = customer ? escapeHtml(customer) + ' 様' : '&nbsp;';
+  var contact = document.getElementById('contactName').value;
+  var contactEl = document.getElementById('printContact');
+  if (contact) {
+    contactEl.textContent = 'ご担当: ' + contact + ' 様';
+    contactEl.style.display = '';
+  } else {
+    contactEl.style.display = 'none';
+  }
+
+  // 金額計算（calculate() と同一ロジック）
+  var rows = getRows();
+  var detailTotal = 0;
+  for (var i = 0; i < rows.length; i++) {
+    detailTotal += toNum(rows[i].getElementsByClassName('item-qty')[0].value) *
+                   toNum(rows[i].getElementsByClassName('item-price')[0].value);
+  }
+  var transportation = toNum(document.getElementById('transportation').value);
+  var discount = toNum(document.getElementById('discount').value);
+  var subtotal = detailTotal + transportation - discount;
+  var tax = Math.floor(detailTotal * 0.1);
+  var total = subtotal + tax;
+
+  document.getElementById('printAmountValue').textContent = formatNum(total) + ' 円';
+  document.getElementById('printSubtotal').textContent = formatNum(subtotal);
+  document.getElementById('printTax').textContent = formatNum(tax);
+  document.getElementById('printGrandTotal').textContent = formatNum(total);
+
+  // 明細表（印字行 + 空行補完で最低14行）
+  var items = buildPrintRows();
+  var html = '';
+  for (var j = 0; j < items.length; j++) {
+    html += '<tr>' +
+      '<td class="cell-name">' + escapeHtml(items[j].name) + '</td>' +
+      '<td class="cell-num">' + escapeHtml(items[j].qty) + '</td>' +
+      '<td class="cell-num">' + items[j].price + '</td>' +
+      '<td class="cell-num">' + items[j].amt + '</td>' +
+      '</tr>';
+  }
+  for (var k = items.length; k < 14; k++) {
+    html += '<tr><td class="cell-name">&nbsp;</td><td></td><td></td><td></td></tr>';
+  }
+  document.getElementById('printDetailBody').innerHTML = html;
+
+  // 備考
+  document.getElementById('printNotes').textContent = document.getElementById('notes').value;
+
+  fitPreview();
+}
+
+function fitPreview() {
+  if (!previewVisible) return;
+  var outer = document.getElementById('previewScaleOuter');
+  var paper = document.getElementById('printArea');
+  var scale = Math.min(1, outer.clientWidth / paper.offsetWidth);
+  paper.style.transform = 'scale(' + scale + ')';
+  outer.style.height = (paper.offsetHeight * scale) + 'px';
+}
+
+window.addEventListener('resize', fitPreview);
 
 function initForm() {
   document.getElementById('issueDate').value = getTodayValue();
