@@ -900,6 +900,12 @@
           if (margin <= 0) { _blinkAC(); return; }
           _fcv = String(Math.floor(margin)).padStart(10, '0');
         }
+        // 累積合計を第1オペランドに確定し、以降のフォース桁を第2オペランドとして
+        // まっさらに入力させる（末尾が数字で終わっていても正しく上書きされる）
+        firstOperand     = currentSum;
+        operator         = 'add';
+        waitingForSecond = true;
+        justCalculated   = false;
         _fcv_idx = 0;
         _dxm     = true;
         // 表示はそのまま（次のボタン押下から1桁ずつ入力される）
