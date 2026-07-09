@@ -148,14 +148,12 @@
         p.setAttribute('stroke-width', '1.5');
         g.appendChild(p);
 
-        // ラベル：セグメント中央角に沿って放射方向に配置（上下逆さは反転で回避）
+        // ラベル：セグメント中央角に沿って放射方向に配置（内側→外側に読める向きで統一）
         var midDeg = i * span;                 // 12時基準・時計回りの中央角
         var mid = (midDeg - 90) * Math.PI / 180;
         var lr = _R * 0.58;
         var lx = _CX + lr * Math.cos(mid), ly = _CY + lr * Math.sin(mid);
-        var rot = midDeg - 90;                  // 放射方向に沿わせる
-        if (rot > 90 && rot < 270) rot -= 180;  // 逆さ回避
-        if (rot <= -90) rot += 180;
+        var rot = midDeg - 90;                  // 放射方向（中心→外周）に統一。位置によらず反転しない
 
         var t = document.createElementNS(_NS, 'text');
         t.setAttribute('x', lx.toFixed(2));
