@@ -125,9 +125,16 @@
   .ci-customer { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
   .ci-magician { font-size: 12px; color: #888; margin-bottom: 6px; }
   .ci-total { font-size: 17px; font-weight: bold; color: #333; margin-bottom: 8px; }
+  .case-filter { margin-bottom: 12px; }
+  .case-filter label { font-size: 13px; color: #666; margin-bottom: 4px; }
+  .case-filter select { width: 100%; padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 5px; background: #fff; min-height: 44px; color: #333; }
+  .ci-status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .ci-status-label { font-size: 12px; color: #888; flex: none; }
+  .ci-status-select { flex: 1; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 5px; background: #fff; min-height: 40px; color: #333; }
   .ci-actions { display: flex; gap: 8px; }
   .btn-ci { flex: 1; padding: 9px; font-size: 13px; border-radius: 6px; cursor: pointer; font-weight: bold; border: 1px solid #4a90d9; background: #fff; color: #4a90d9; }
   .btn-ci.danger { border-color: #c0392b; color: #c0392b; }
+  .btn-convert { width: 100%; margin-top: 8px; padding: 10px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; border: 1px solid #e07b39; background: #fff; color: #e07b39; }
   /* ネイティブconfirm()はページ内で連発すると「今後表示しない」で無効化され
      再読み込みしないと復活しないため、削除確認はアプリ内UIで行う */
   .confirm-box { display: none; background: #fdf2f2; border: 1px solid #f0b8b8; border-radius: 6px; padding: 10px; margin-top: 8px; }
@@ -364,6 +371,18 @@
   <div class="case-topbar">
     <h1>案件一覧</h1>
     <button type="button" class="btn-case-close" onclick="closeCaseList()">× 閉じる</button>
+  </div>
+  <div class="case-filter">
+    <label>表示するステータス</label>
+    <select id="caseFilterSelect" onchange="onCaseFilterChange()">
+      <option value="all">すべて</option>
+      <option value="見積中">見積中</option>
+      <option value="受注">受注</option>
+      <option value="請求済">請求済</option>
+      <option value="入金済み">入金済み</option>
+      <option value="失注">失注</option>
+      <option value="キャンセル">キャンセル</option>
+    </select>
   </div>
   <div class="case-status" id="caseListStatus"></div>
   <div id="caseListBody"></div>
@@ -1228,7 +1247,9 @@ function saveMaster() {
 }
 
 /* ===== 案件の保存（Firestore） ===== */
-var currentCaseId = null; // 編集中の既存案件ID（新規はnull。再編集は4-2で実装）
+var currentCaseId = null; // 編集中の既存案件ID（新規はnull）
+var currentCaseStatus = '見積中'; // 編集中の案件のステータス（保存時に維持する）
+var STATUS_LIST = ['見積中', '受注', '請求済', '入金済み', '失注', 'キャンセル'];
 
 // 明細名からマジシャンを推定（一覧表示用。手入力で一致しなければ空）
 function guessMagicianName(items) {
@@ -1274,7 +1295,7 @@ function collectCaseData() {
     tax: t.tax,
     total: t.total,
     magicianName: guessMagicianName(items),
-    status: '見積中'
+    status: currentCaseStatus || '見積中'
   };
   return data;
 }
@@ -1318,14 +1339,50 @@ function setSaveButtonLabel() {
   document.getElementById('btnSaveCase').textContent = currentCaseId ? '更新を保存する' : 'この内容を保存する';
 }
 
-/* ===== 案件一覧（表示・再編集・複製・削除） ===== */
+/* ===== 案件一覧（表示・再編集・複製・削除・ステータス・変換） ===== */
 var caseListCache = [];
 var caseListState = 'idle'; // idle / loading / loaded / failed
+var caseFilter = 'all'; // 表示するステータスの絞り込み
 
 function setCaseListStatus(msg, type) {
   var el = document.getElementById('caseListStatus');
   el.textContent = msg || '';
   el.className = 'case-status' + (type ? ' ' + type : '');
+}
+
+// Firestore由来のメタ情報を除いた保存用のコピーを作る（複製・変換で使用）
+function stripCaseMeta(item) {
+  var clone = JSON.parse(JSON.stringify(item));
+  delete clone.id;
+  delete clone.createdAt;
+  delete clone.updatedAt;
+  return clone;
+}
+
+// confirm() に頼らないインライン確認ボックスを作る（削除・変換で共用）
+function makeConfirmBox(message, yesLabel, onYes) {
+  var box = elMaker('div', 'confirm-box');
+  var text = elMaker('div', 'confirm-text');
+  text.textContent = message;
+  var acts = elMaker('div', 'confirm-actions');
+  var yes = elMaker('button', 'btn-confirm-yes');
+  yes.type = 'button';
+  yes.textContent = yesLabel;
+  yes.onclick = function () { onYes(); };
+  var no = elMaker('button', 'btn-confirm-no');
+  no.type = 'button';
+  no.textContent = 'やめる';
+  no.onclick = function () { box.className = 'confirm-box'; };
+  acts.appendChild(yes);
+  acts.appendChild(no);
+  box.appendChild(text);
+  box.appendChild(acts);
+  return box;
+}
+
+function onCaseFilterChange() {
+  caseFilter = document.getElementById('caseFilterSelect').value;
+  renderCaseList();
 }
 
 function openCaseList() {
@@ -1372,27 +1429,37 @@ function renderCaseList() {
   setCaseListStatus('');
   var body = document.getElementById('caseListBody');
   body.innerHTML = '';
+
+  // フィルタ適用
+  var shown = [];
+  for (var f = 0; f < caseListCache.length; f++) {
+    var st = caseListCache[f].status || '見積中';
+    if (caseFilter === 'all' || st === caseFilter) shown.push(caseListCache[f]);
+  }
+
   if (caseListCache.length === 0) {
     var empty = elMaker('div', 'case-empty');
     empty.textContent = 'まだ保存された案件がありません。';
     body.appendChild(empty);
     return;
   }
-  for (var i = 0; i < caseListCache.length; i++) {
+  if (shown.length === 0) {
+    var none = elMaker('div', 'case-empty');
+    none.textContent = 'この条件に合う案件はありません。';
+    body.appendChild(none);
+    return;
+  }
+
+  for (var i = 0; i < shown.length; i++) {
     (function (item) {
       var card = elMaker('div', 'case-item');
 
       var top = elMaker('div', 'ci-top');
       var badge = elMaker('span', 'ci-badge ' + (item.docType === 'invoice' ? 'invoice' : 'estimate'));
       badge.textContent = item.docType === 'invoice' ? '請求書' : '見積書';
-      var status = elMaker('span', 'ci-status');
-      status.textContent = item.status || '見積中';
       var dateEl = elMaker('span', '');
       dateEl.textContent = formatCaseDate(item.issueDate);
-      var leftWrap = document.createElement('span');
-      leftWrap.appendChild(badge);
-      leftWrap.appendChild(status);
-      top.appendChild(leftWrap);
+      top.appendChild(badge);
       top.appendChild(dateEl);
 
       var customer = elMaker('div', 'ci-customer');
@@ -1404,6 +1471,23 @@ function renderCaseList() {
       var total = elMaker('div', 'ci-total');
       total.textContent = formatYen(toNum(item.total));
 
+      // ステータス変更（select）
+      var statusRow = elMaker('div', 'ci-status-row');
+      var statusLabel = elMaker('span', 'ci-status-label');
+      statusLabel.textContent = 'ステータス';
+      var statusSelect = elMaker('select', 'ci-status-select');
+      for (var s = 0; s < STATUS_LIST.length; s++) {
+        var opt = document.createElement('option');
+        opt.value = STATUS_LIST[s];
+        opt.textContent = STATUS_LIST[s];
+        if ((item.status || '見積中') === STATUS_LIST[s]) opt.selected = true;
+        statusSelect.appendChild(opt);
+      }
+      statusSelect.onchange = function () { changeCaseStatus(item.id, statusSelect.value); };
+      statusRow.appendChild(statusLabel);
+      statusRow.appendChild(statusSelect);
+
+      // 操作ボタン
       var actions = elMaker('div', 'ci-actions');
       var openBtn = elMaker('button', 'btn-ci');
       openBtn.type = 'button';
@@ -1413,40 +1497,95 @@ function renderCaseList() {
       dupBtn.type = 'button';
       dupBtn.textContent = '複製';
       dupBtn.onclick = function () { duplicateCase(item.id); };
-      var confirmWrap = elMaker('div', 'confirm-box');
-      var confirmText = elMaker('div', 'confirm-text');
-      confirmText.textContent = '本当に削除しますか？この操作は元に戻せません。';
-      var confirmActions = elMaker('div', 'confirm-actions');
-      var yesBtn = elMaker('button', 'btn-confirm-yes');
-      yesBtn.type = 'button';
-      yesBtn.textContent = '削除する';
-      yesBtn.onclick = function () { performDeleteCase(item.id); };
-      var noBtn = elMaker('button', 'btn-confirm-no');
-      noBtn.type = 'button';
-      noBtn.textContent = 'やめる';
-      noBtn.onclick = function () { confirmWrap.className = 'confirm-box'; };
-      confirmActions.appendChild(yesBtn);
-      confirmActions.appendChild(noBtn);
-      confirmWrap.appendChild(confirmText);
-      confirmWrap.appendChild(confirmActions);
-
       var delBtn = elMaker('button', 'btn-ci danger');
       delBtn.type = 'button';
       delBtn.textContent = '削除';
-      delBtn.onclick = function () { confirmWrap.className = 'confirm-box show'; };
       actions.appendChild(openBtn);
       actions.appendChild(dupBtn);
       actions.appendChild(delBtn);
+
+      // 見積書 → 請求書 変換ボタン（見積書のときだけ）
+      var convertBtn = null;
+      var convertConfirm = null;
+      if (item.docType === 'estimate') {
+        convertBtn = elMaker('button', 'btn-convert');
+        convertBtn.type = 'button';
+        convertBtn.textContent = '請求書に変換';
+        convertConfirm = makeConfirmBox(
+          'この見積書を請求書に変換し、ステータスを「請求済」にします。よろしいですか？',
+          '変換する',
+          function () { convertToInvoice(item.id); }
+        );
+        convertBtn.onclick = function () { convertConfirm.className = 'confirm-box show'; };
+      }
+
+      // 削除確認（インライン）
+      var delConfirm = makeConfirmBox(
+        '本当に削除しますか？この操作は元に戻せません。',
+        '削除する',
+        function () { performDeleteCase(item.id); }
+      );
+      delBtn.onclick = function () { delConfirm.className = 'confirm-box show'; };
 
       card.appendChild(top);
       card.appendChild(customer);
       if (magician.textContent) card.appendChild(magician);
       card.appendChild(total);
+      card.appendChild(statusRow);
       card.appendChild(actions);
-      card.appendChild(confirmWrap);
+      if (convertBtn) card.appendChild(convertBtn);
+      if (convertConfirm) card.appendChild(convertConfirm);
+      card.appendChild(delConfirm);
       body.appendChild(card);
-    })(caseListCache[i]);
+    })(shown[i]);
   }
+}
+
+function changeCaseStatus(id, status) {
+  var item = findCaseById(id);
+  if (!item) return;
+  if (!window._patchCase) {
+    setCaseListStatus('Firebaseに接続できないため変更できません。', 'err');
+    return;
+  }
+  var prev = item.status;
+  item.status = status; // 楽観的更新
+  if (currentCaseId === id) currentCaseStatus = status;
+  setCaseListStatus('ステータスを更新しています…');
+  window._patchCase(id, { status: status }).then(function () {
+    setCaseListStatus('');
+    // フィルタ表示中で条件から外れたら一覧を再描画して反映
+    if (caseFilter !== 'all' && status !== caseFilter) renderCaseList();
+  }).catch(function (e) {
+    console.warn('status update failed:', e);
+    item.status = prev; // 失敗したら戻す
+    if (currentCaseId === id) currentCaseStatus = prev;
+    setCaseListStatus('ステータスの更新に失敗しました。通信状況を確認してください。', 'err');
+    renderCaseList();
+  });
+}
+
+function convertToInvoice(id) {
+  var item = findCaseById(id);
+  if (!item) return;
+  if (!window._saveCase) {
+    setCaseListStatus('Firebaseに接続できないため変換できません。', 'err');
+    return;
+  }
+  var data = stripCaseMeta(item);
+  data.docType = 'invoice';
+  data.issueDate = getTodayValue();
+  data.dueDate = getNextMonthEndValue();
+  data.status = '請求済';
+  setCaseListStatus('請求書に変換しています…');
+  // 同じ案件を請求書へ変換（上書き）
+  window._saveCase(id, data).then(function () {
+    loadCaseIntoForm(data, id);
+    closeCaseList();
+  }).catch(function (e) {
+    console.warn('convert failed:', e);
+    setCaseListStatus('変換に失敗しました。通信状況を確認してください。', 'err');
+  });
 }
 
 function findCaseById(id) {
@@ -1485,6 +1624,7 @@ function loadCaseIntoForm(data, id) {
   }
   calculate();
   currentCaseId = id;
+  currentCaseStatus = data.status || '見積中';
   setSaveButtonLabel();
   setSaveStatus('');
 }
@@ -1503,8 +1643,7 @@ function duplicateCase(id) {
     setCaseListStatus('Firebaseに接続できないため複製できません。', 'err');
     return;
   }
-  var clone = JSON.parse(JSON.stringify(item));
-  delete clone.id;
+  var clone = stripCaseMeta(item);
   clone.issueDate = getTodayValue();
   clone.dueDate = clone.docType === 'invoice' ? getNextMonthEndValue() : '';
   clone.status = '見積中';
@@ -1541,6 +1680,7 @@ function performDeleteCase(id) {
 // 入力内容をすべてクリアして新しい案件の作成を開始する
 function startNewCase() {
   currentCaseId = null;
+  currentCaseStatus = '見積中';
   document.getElementById('detailRows').innerHTML = '';
   document.getElementById('customerName').value = '';
   document.getElementById('contactName').value = '';
@@ -1777,6 +1917,12 @@ try {
   // 案件の削除
   window._deleteCase = async function (id) {
     await deleteDoc(doc(window._fs, 'cases', id));
+  };
+
+  // 案件の一部フィールドだけ更新（ステータス変更などに使用）
+  window._patchCase = async function (id, fields) {
+    const ref = doc(window._fs, 'cases', id);
+    await updateDoc(ref, Object.assign({}, fields, { updatedAt: serverTimestamp() }));
   };
 
   window.dispatchEvent(new Event('_fsready'));
