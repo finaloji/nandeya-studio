@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>見積書・請求書作成ツール</title>
+<meta name="theme-color" content="#4a90d9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="請求ツール">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; background: #f0f2f5; color: #333; }
@@ -125,7 +130,8 @@
   .ci-customer { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
   .ci-magician { font-size: 12px; color: #888; margin-bottom: 6px; }
   .ci-total { font-size: 17px; font-weight: bold; color: #333; margin-bottom: 8px; }
-  .case-filter { margin-bottom: 12px; }
+  .case-controls { display: flex; gap: 8px; margin-bottom: 12px; }
+  .case-filter { flex: 1; }
   .case-filter label { font-size: 13px; color: #666; margin-bottom: 4px; }
   .case-filter select { width: 100%; padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 5px; background: #fff; min-height: 44px; color: #333; }
   .ci-status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -372,17 +378,30 @@
     <h1>案件一覧</h1>
     <button type="button" class="btn-case-close" onclick="closeCaseList()">× 閉じる</button>
   </div>
-  <div class="case-filter">
-    <label>表示するステータス</label>
-    <select id="caseFilterSelect" onchange="onCaseFilterChange()">
-      <option value="all">すべて</option>
-      <option value="見積中">見積中</option>
-      <option value="受注">受注</option>
-      <option value="請求済">請求済</option>
-      <option value="入金済み">入金済み</option>
-      <option value="失注">失注</option>
-      <option value="キャンセル">キャンセル</option>
-    </select>
+  <div class="case-controls">
+    <div class="case-filter">
+      <label>表示するステータス</label>
+      <select id="caseFilterSelect" onchange="onCaseFilterChange()">
+        <option value="all">すべて</option>
+        <option value="見積中">見積中</option>
+        <option value="受注">受注</option>
+        <option value="請求済">請求済</option>
+        <option value="入金済み">入金済み</option>
+        <option value="失注">失注</option>
+        <option value="キャンセル">キャンセル</option>
+      </select>
+    </div>
+    <div class="case-filter">
+      <label>並び順</label>
+      <select id="caseSortSelect" onchange="onCaseSortChange()">
+        <option value="created_desc">保存が新しい順</option>
+        <option value="created_asc">保存が古い順</option>
+        <option value="issue_desc">発行日が新しい順</option>
+        <option value="issue_asc">発行日が古い順</option>
+        <option value="total_desc">金額が高い順</option>
+        <option value="total_asc">金額が低い順</option>
+      </select>
+    </div>
   </div>
   <div class="case-status" id="caseListStatus"></div>
   <div id="caseListBody"></div>
@@ -605,6 +624,7 @@ function calculate() {
   document.getElementById('dispDiscount').textContent = t.discount > 0 ? '−' + formatYen(t.discount) : formatYen(t.discount);
   document.getElementById('dispTotal').textContent = formatYen(t.total);
   updatePreview();
+  if (typeof scheduleDraftSave === 'function') scheduleDraftSave();
 }
 
 /* ===== 帳票プレビュー ===== */
@@ -1343,6 +1363,7 @@ function setSaveButtonLabel() {
 var caseListCache = [];
 var caseListState = 'idle'; // idle / loading / loaded / failed
 var caseFilter = 'all'; // 表示するステータスの絞り込み
+var caseSort = 'created_desc'; // 並び順
 
 function setCaseListStatus(msg, type) {
   var el = document.getElementById('caseListStatus');
@@ -1383,6 +1404,35 @@ function makeConfirmBox(message, yesLabel, onYes) {
 function onCaseFilterChange() {
   caseFilter = document.getElementById('caseFilterSelect').value;
   renderCaseList();
+}
+
+function onCaseSortChange() {
+  caseSort = document.getElementById('caseSortSelect').value;
+  renderCaseList();
+}
+
+function caseCreatedSeconds(item) {
+  return (item.createdAt && item.createdAt.seconds) ? item.createdAt.seconds : 0;
+}
+
+// 表示中リストを並び替える
+function sortCaseArray(arr) {
+  var a = arr.slice();
+  switch (caseSort) {
+    case 'created_asc':
+      a.sort(function (x, y) { return caseCreatedSeconds(x) - caseCreatedSeconds(y); }); break;
+    case 'issue_desc':
+      a.sort(function (x, y) { return (y.issueDate || '').localeCompare(x.issueDate || ''); }); break;
+    case 'issue_asc':
+      a.sort(function (x, y) { return (x.issueDate || '').localeCompare(y.issueDate || ''); }); break;
+    case 'total_desc':
+      a.sort(function (x, y) { return toNum(y.total) - toNum(x.total); }); break;
+    case 'total_asc':
+      a.sort(function (x, y) { return toNum(x.total) - toNum(y.total); }); break;
+    default: // created_desc
+      a.sort(function (x, y) { return caseCreatedSeconds(y) - caseCreatedSeconds(x); });
+  }
+  return a;
 }
 
 function openCaseList() {
@@ -1449,6 +1499,8 @@ function renderCaseList() {
     body.appendChild(none);
     return;
   }
+
+  shown = sortCaseArray(shown);
 
   for (var i = 0; i < shown.length; i++) {
     (function (item) {
@@ -1698,6 +1750,42 @@ function startNewCase() {
   calculate();
 }
 
+/* ===== 下書き自動保存（localStorage） ===== */
+var DRAFT_KEY = 'nandeya_invoice_draft';
+var draftTimer = null;
+
+// 入力のたびに呼ぶ（500ms待って保存＝連続入力でも書き込みすぎない）
+function scheduleDraftSave() {
+  if (draftTimer) clearTimeout(draftTimer);
+  draftTimer = setTimeout(saveDraft, 500);
+}
+
+function saveDraft() {
+  try {
+    var data = collectCaseData();
+    data._caseId = currentCaseId;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+  } catch (e) {
+    // localStorageが使えない環境（プライベートブラウズ等）では何もしない
+  }
+}
+
+// 次回起動時に入力途中の内容を復元する（意味のある入力があるときだけ）
+function restoreDraftIfAny() {
+  var raw = null;
+  try { raw = localStorage.getItem(DRAFT_KEY); } catch (e) { return; }
+  if (!raw) return;
+  var d;
+  try { d = JSON.parse(raw); } catch (e) { return; }
+  var hasContent = (d.customerName && d.customerName !== '') ||
+                   (d.contactName && d.contactName !== '') ||
+                   (Array.isArray(d.items) && d.items.some(function (it) {
+                     return (it.name && it.name !== '') || toNum(it.price) > 0;
+                   }));
+  if (!hasContent) return;
+  loadCaseIntoForm(d, d._caseId || null);
+}
+
 function initForm() {
   document.getElementById('issueDate').value = getTodayValue();
   savedDueDate = getNextMonthEndValue();
@@ -1730,6 +1818,12 @@ function showTool() {
   // 認証通過後に料金マスタの読み込みを開始する（未認証ではFirestoreへアクセスしない）
   authPassed = true;
   maybeLoadMaster();
+  // 入力途中の下書きがあれば復元する
+  restoreDraftIfAny();
+  // 入力のたびに下書きを保存する（テキスト・日付・数値すべて拾う）
+  var area = document.getElementById('inputArea');
+  area.addEventListener('input', scheduleDraftSave);
+  area.addEventListener('change', scheduleDraftSave);
 }
 
 function showGate() {
