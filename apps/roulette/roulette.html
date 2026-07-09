@@ -52,10 +52,20 @@
       aspect-ratio: 1 / 1;
       flex: 0 1 auto;
     }
+    /* 矢印専用のタップ領域（見た目より一回り広く、円盤本体の判定とは別領域として扱う） */
+    .arrow-hit {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 46px;
+      z-index: 6;
+    }
     /* 上部の固定矢印（12時方向を指す下向き三角） */
     .arrow {
       position: absolute;
-      top: -4px;
+      top: 10px;
       left: 50%;
       transform: translateX(-50%);
       width: 0;
@@ -65,6 +75,10 @@
       border-top: 26px solid #ffd23f;
       filter: drop-shadow(0 2px 2px rgba(0,0,0,0.6));
       z-index: 5;
+    }
+    /* 補正モードON時の表示微調整（矢印の色味をごくわずかに変えるだけ） */
+    .arrow.on {
+      border-top-color: #ffdc6b;
     }
     svg.wheel {
       display: block;
@@ -96,7 +110,9 @@
     <div class="title">ルーレット</div>
 
     <div class="wheel-wrap">
-      <div class="arrow"></div>
+      <div class="arrow-hit" id="arrowHit">
+        <div class="arrow" id="arrow"></div>
+      </div>
       <svg class="wheel" id="wheel" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
     </div>
 
@@ -226,6 +242,14 @@
     var _ft = 0;       // 等速回転ループの直前フレーム時刻(ms)
     var _AFTERGLOW = 1000; // 着地後、次の操作を受け付けるまでの静止時間(ms)
 
+    // ---- 補正モードの切替判定（矢印3連打） ----
+    var _am = false; // 補正モードの有効・無効
+    var _ak = 0;     // 連続タップのカウント
+    var _at = 0;     // 直前タップの時刻(ms)
+    var _ac = 0;     // クールダウン解除時刻(ms)
+    var _AK_GAP = 600;   // 連続とみなすタップ間隔の上限(ms)
+    var _AK_COOL = 900;  // 成立直後のクールダウン(ms)
+
     function _ease(t) {
       return 1 - Math.pow(1 - t, 5);
     }
@@ -256,6 +280,7 @@
     function _go() {
       if (_spin || _land) return;
       _spin = true;
+      _ak = 0; // 状態が変わるのでカウントは破棄
       _setBtn('STOP');
       _ft = performance.now();
       _raf = requestAnimationFrame(_spinTick);
@@ -302,6 +327,7 @@
       _spin = false;
       if (_raf) cancelAnimationFrame(_raf);
       _land = true;
+      _ak = 0; // 状態が変わるのでカウントは破棄
       _pickLanding();
       _t0 = performance.now();
       _raf = requestAnimationFrame(_landTick);
@@ -323,6 +349,56 @@
       }
     }
 
+    // 補正確認用の表示微調整（矢印の見た目をわずかに変えるだけ）
+    function _usg() {
+      var el = document.getElementById('arrow');
+      if (!el) return;
+      if (_am) {
+        el.classList.add('on');
+      } else {
+        el.classList.remove('on');
+      }
+    }
+
+    // 矢印専用領域タップ時の分岐（3連打での補正モード切替判定・回転中は従来通り停止トリガー）
+    function _arm() {
+      if (_land) {
+        // 減速中・余韻中はあらゆる操作を無視
+        _ak = 0;
+        return;
+      }
+      if (_spin) {
+        // 回転中は従来通り円盤停止のトリガーとしてのみ機能し、カウントは行わない
+        _ak = 0;
+        _stop();
+        return;
+      }
+
+      var now = performance.now();
+
+      if (now < _ac) {
+        // 成立直後のクールダウン中は次のカウントの起点にしない
+        _ak = 0;
+        _at = 0;
+        return;
+      }
+
+      if (_ak > 0 && (now - _at) > _AK_GAP) {
+        // 間隔が空いたのでそれまでのカウントは破棄（このタップを新規1回目として数え直す）
+        _ak = 0;
+      }
+
+      _ak++;
+      _at = now;
+
+      if (_ak >= 3) {
+        _am = !_am;
+        _usg();
+        _ak = 0;
+        _ac = now + _AK_COOL;
+      }
+    }
+
     // タップ・クリックの二重発火を避けつつ反応させる共通バインダー
     function bindBtn(el, action) {
       el.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
@@ -330,8 +406,16 @@
       el.addEventListener('click', function () { action(); });
     }
 
+    // 矢印専用領域用バインダー（円盤側のタップ判定へは伝播させない）
+    function bindArrowHit(el, action) {
+      el.addEventListener('touchstart', function (e) { e.preventDefault(); e.stopPropagation(); }, { passive: false });
+      el.addEventListener('touchend', function (e) { e.preventDefault(); e.stopPropagation(); action(); }, { passive: false });
+      el.addEventListener('click', function (e) { e.stopPropagation(); action(); });
+    }
+
     bindBtn(document.getElementById('action'), _onAction);
     bindBtn(document.querySelector('.wheel-wrap'), _onWheelTap);
+    bindArrowHit(document.getElementById('arrowHit'), _arm);
   </script>
 </body>
 </html>
