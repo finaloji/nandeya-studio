@@ -237,11 +237,12 @@
       opacity: 0.45;
       transition-duration: 0s;
     }
-    .edge-l { grid-column: 1; }
+    /* 左ラベルは既定でわずかにくすませる（ONとの濃淡差の基準） */
+    .edge-l { grid-column: 1; color: rgba(255, 255, 255, 0.62); }
     .edge-r { grid-column: 3; }
 
-    /* 描画較正中の字形補正 */
-    .edge-l.cw { font-weight: 500; }
+    /* 描画較正中の字形補正: 太く＋明るく（術者が判別しやすいよう濃淡＋太さの合わせ技） */
+    .edge-l.cw { font-weight: 700; color: #fff; }
 
     /* ------------------------------------------------------------
        診断表示（較正一覧）: 下部シート
