@@ -652,7 +652,8 @@
 
     // --- 小数点 ---
     function pressDot() {
-      if (_dxm || _flk) return;
+      if (_dxm) return;   // 桁出し中のみ無効
+      _flk = false;       // 出し切った後は解除
       if (displayValue === 'Error') return;
       if (displayValue.indexOf('.') !== -1) return;
       if (waitingForSecond) {
@@ -667,7 +668,8 @@
 
     // --- 演算子 ---
     function pressOperator(op) {
-      if (_dxm || _flk) return;   // フォース中は演算子を無効化
+      if (_dxm) return;   // 桁出し中は演算子を無効化
+      _flk = false;       // 出し切った後は解除
       if (displayValue === 'Error') return;
 
       // 式文字列を更新（計算前に displayValue が変わるため先に処理）
@@ -730,7 +732,8 @@
 
     // --- AC / C ---
     function pressAC() {
-      if (_dxm || _flk) return;   // フォース中はAC/Cを無効化
+      if (_dxm) return;   // 桁出し中はAC/Cを無効化
+      _flk = false;       // 出し切った後は解除
       if (justCalculated || displayValue === '0') {
         // AC：全リセット
         firstOperand     = null;
@@ -755,7 +758,8 @@
 
     // --- バックスペース ---
     function pressBS() {
-      if (_dxm || _flk) return;
+      if (_dxm) return;   // 桁出し中は無効
+      _flk = false;       // 出し切った後は解除
       if (justCalculated) return;
       if (displayValue === 'Error') return;
 
@@ -797,7 +801,8 @@
 
     // --- +/− ---
     function pressSign() {
-      if (_dxm || _flk) return;
+      if (_dxm) return;   // 桁出し中は無効
+      _flk = false;       // 出し切った後は解除
       if (displayValue === '0' || displayValue === 'Error') return;
       if (displayValue.charAt(0) === '-') {
         displayValue = displayValue.slice(1);
@@ -809,7 +814,8 @@
 
     // --- % ---
     function pressPct() {
-      if (_dxm || _flk) return;
+      if (_dxm) return;   // 桁出し中は無効
+      _flk = false;       // 出し切った後は解除
       if (displayValue === 'Error') return;
       var val = parseFloat(displayValue);
       var result;
