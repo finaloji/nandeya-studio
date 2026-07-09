@@ -835,6 +835,65 @@ function preparePrint() {
     document.getElementById('previewArea').style.display = '';
   }
   updatePreview();
+  handlePrintSideEffects();
+}
+
+// PDF保存（印刷）のタイミングで行う自動処理：顧客の自動登録・請求書の請求済化
+// 顧客IDの確定を待ってから案件を保存する（案件にcustomerIdを正しく紐付けるため）
+function handlePrintSideEffects() {
+  autoRegisterCustomerOnPrint().then(function () {
+    if (docType === 'invoice') {
+      markCaseAsBilled();
+    }
+  });
+}
+
+// 宛名が入力されていて、まだ顧客マスタに存在しなければ自動登録する（同名は追加しない）
+function autoRegisterCustomerOnPrint() {
+  var name = document.getElementById('customerName').value.trim();
+  if (name === '' || !window._saveCustomer) return Promise.resolve();
+  if (currentCustomerId && findCustomerById(currentCustomerId)) return Promise.resolve(); // 既存顧客を選択済み
+  var dup = null;
+  for (var i = 0; i < customerListCache.length; i++) {
+    if ((customerListCache[i].name || '').trim() === name) { dup = customerListCache[i]; break; }
+  }
+  if (dup) {
+    currentCustomerId = dup.id;
+    return Promise.resolve();
+  }
+  var contactName = document.getElementById('contactName').value.trim();
+  return window._saveCustomer(null, { name: name, contactName: contactName, phone: '', email: '', address: '', notes: '' })
+    .then(function (id) {
+      currentCustomerId = id;
+      customerListCache.push({ id: id, name: name, contactName: contactName });
+      populateCustomerSelect();
+      document.getElementById('customerSelect').value = id;
+    })
+    .catch(function (e) {
+      console.warn('auto customer register failed:', e);
+    });
+}
+
+// 請求書のPDFを作成したら、案件を「請求済」として保存する
+function markCaseAsBilled() {
+  var data = collectCaseData();
+  var hasItem = false;
+  for (var i = 0; i < data.items.length; i++) {
+    if (data.items[i].name !== '' || data.items[i].price > 0) { hasItem = true; break; }
+  }
+  if (data.customerName === '' && !hasItem) return; // 空の状態では何もしない
+  if (!window._saveCase) return;
+  data.status = '請求済';
+  window._saveCase(currentCaseId, data).then(function (id) {
+    currentCaseId = id;
+    currentCaseStatus = '請求済';
+    setSaveButtonLabel();
+    setSaveStatus('保存しました。', 'ok');
+    var cached = findCaseById(id);
+    if (cached) cached.status = '請求済';
+  }).catch(function (e) {
+    console.warn('auto status update failed:', e);
+  });
 }
 
 function restoreAfterPrint() {
