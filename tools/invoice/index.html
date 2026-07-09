@@ -103,6 +103,32 @@
   .auth-error { font-size: 13px; color: #c0392b; min-height: 18px; margin-bottom: 8px; text-align: center; }
   .btn-auth { width: 100%; min-height: 48px; padding: 12px; font-size: 16px; border: none; border-radius: 8px; background: #4a90d9; color: #fff; cursor: pointer; font-weight: bold; }
 
+  /* ===== 上部ナビ ===== */
+  .top-nav { display: flex; gap: 8px; margin-bottom: 12px; }
+  .btn-case-list, .btn-new-case { flex: 1; padding: 12px; font-size: 14px; border: 1px solid #4a90d9; border-radius: 8px; background: #fff; color: #4a90d9; font-weight: bold; cursor: pointer; }
+
+  /* ===== 案件一覧 ===== */
+  .case-area { max-width: 600px; margin: 0 auto; padding: 12px; }
+  .case-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .case-topbar h1 { font-size: 18px; }
+  .btn-case-close { padding: 8px 14px; min-height: 40px; font-size: 14px; border: 1px solid #ccc; border-radius: 5px; background: #fff; color: #555; cursor: pointer; }
+  .case-status { font-size: 13px; padding: 6px 0; min-height: 22px; color: #999; }
+  .case-status.err { color: #c0392b; }
+  .case-empty { font-size: 14px; color: #999; text-align: center; padding: 30px 0; }
+
+  .case-item { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .ci-top { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #888; margin-bottom: 6px; }
+  .ci-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; color: #fff; margin-right: 6px; }
+  .ci-badge.estimate { background: #4a90d9; }
+  .ci-badge.invoice { background: #e07b39; }
+  .ci-status { font-size: 12px; color: #555; }
+  .ci-customer { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
+  .ci-magician { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .ci-total { font-size: 17px; font-weight: bold; color: #333; margin-bottom: 8px; }
+  .ci-actions { display: flex; gap: 8px; }
+  .btn-ci { flex: 1; padding: 9px; font-size: 13px; border-radius: 6px; cursor: pointer; font-weight: bold; border: 1px solid #4a90d9; background: #fff; color: #4a90d9; }
+  .btn-ci.danger { border-color: #c0392b; color: #c0392b; }
+
   /* ===== 案件の保存 ===== */
   .btn-save-case { width: 100%; padding: 14px; font-size: 16px; border: none; border-radius: 8px; background: #2e7d32; color: #fff; cursor: pointer; font-weight: bold; }
   .btn-save-case:disabled { opacity: .5; cursor: default; }
@@ -150,6 +176,7 @@
     body { background: #fff; }
     .input-area { display: none !important; }
     .master-area { display: none !important; }
+    .case-area { display: none !important; }
     .preview-area { display: block !important; max-width: none; margin: 0; padding: 0; }
     .preview-toolbar { display: none !important; }
     .preview-scale-outer { max-width: none; height: auto !important; overflow: visible !important; }
@@ -194,6 +221,11 @@
 
 <div class="input-area" id="inputArea" style="display:none;">
   <h1>見積書・請求書作成ツール</h1>
+
+  <div class="top-nav">
+    <button type="button" class="btn-case-list" onclick="openCaseList()">案件一覧</button>
+    <button type="button" class="btn-new-case" onclick="startNewCase()">新規作成</button>
+  </div>
 
   <!-- 書類タイプ切り替え -->
   <div class="section">
@@ -317,6 +349,16 @@
   <div class="master-footer">
     <button type="button" class="btn-master-save" id="btnMasterSave" onclick="saveMaster()">保存する</button>
   </div>
+</div>
+
+<!-- 案件一覧 -->
+<div class="case-area" id="caseArea" style="display:none;">
+  <div class="case-topbar">
+    <h1>案件一覧</h1>
+    <button type="button" class="btn-case-close" onclick="closeCaseList()">× 閉じる</button>
+  </div>
+  <div class="case-status" id="caseListStatus"></div>
+  <div id="caseListBody"></div>
 </div>
 
 <!-- 帳票プレビュー -->
@@ -1239,6 +1281,7 @@ function saveCase() {
   setSaveStatus('保存しています…', '');
   window._saveCase(currentCaseId, data).then(function (id) {
     currentCaseId = id;
+    setSaveButtonLabel();
     setSaveStatus('保存しました。', 'ok');
     btn.disabled = false;
   }).catch(function (e) {
@@ -1246,6 +1289,234 @@ function saveCase() {
     setSaveStatus('保存に失敗しました。通信状況を確認して、もう一度お試しください。', 'err');
     btn.disabled = false;
   });
+}
+
+function setSaveButtonLabel() {
+  document.getElementById('btnSaveCase').textContent = currentCaseId ? '更新を保存する' : 'この内容を保存する';
+}
+
+/* ===== 案件一覧（表示・再編集・複製・削除） ===== */
+var caseListCache = [];
+var caseListState = 'idle'; // idle / loading / loaded / failed
+
+function setCaseListStatus(msg, type) {
+  var el = document.getElementById('caseListStatus');
+  el.textContent = msg || '';
+  el.className = 'case-status' + (type ? ' ' + type : '');
+}
+
+function openCaseList() {
+  document.getElementById('inputArea').style.display = 'none';
+  document.getElementById('previewArea').style.display = 'none';
+  document.getElementById('caseArea').style.display = '';
+  window.scrollTo(0, 0);
+  loadCaseList();
+}
+
+function closeCaseList() {
+  document.getElementById('caseArea').style.display = 'none';
+  document.getElementById('inputArea').style.display = '';
+  window.scrollTo(0, 0);
+}
+
+function loadCaseList() {
+  if (!window._loadCases) {
+    caseListState = 'failed';
+    setCaseListStatus('Firebaseに接続できないため一覧を取得できません。', 'err');
+    document.getElementById('caseListBody').innerHTML = '';
+    return;
+  }
+  caseListState = 'loading';
+  setCaseListStatus('読み込んでいます…');
+  document.getElementById('caseListBody').innerHTML = '';
+  window._loadCases().then(function (list) {
+    caseListCache = list;
+    caseListState = 'loaded';
+    renderCaseList();
+  }).catch(function (e) {
+    console.warn('case list load failed:', e);
+    caseListState = 'failed';
+    setCaseListStatus('一覧の取得に失敗しました。通信状況を確認してください。', 'err');
+  });
+}
+
+function formatCaseDate(v) {
+  if (!v) return '';
+  return v.replace(/-/g, '/');
+}
+
+function renderCaseList() {
+  setCaseListStatus('');
+  var body = document.getElementById('caseListBody');
+  body.innerHTML = '';
+  if (caseListCache.length === 0) {
+    var empty = elMaker('div', 'case-empty');
+    empty.textContent = 'まだ保存された案件がありません。';
+    body.appendChild(empty);
+    return;
+  }
+  for (var i = 0; i < caseListCache.length; i++) {
+    (function (item) {
+      var card = elMaker('div', 'case-item');
+
+      var top = elMaker('div', 'ci-top');
+      var badge = elMaker('span', 'ci-badge ' + (item.docType === 'invoice' ? 'invoice' : 'estimate'));
+      badge.textContent = item.docType === 'invoice' ? '請求書' : '見積書';
+      var status = elMaker('span', 'ci-status');
+      status.textContent = item.status || '見積中';
+      var dateEl = elMaker('span', '');
+      dateEl.textContent = formatCaseDate(item.issueDate);
+      var leftWrap = document.createElement('span');
+      leftWrap.appendChild(badge);
+      leftWrap.appendChild(status);
+      top.appendChild(leftWrap);
+      top.appendChild(dateEl);
+
+      var customer = elMaker('div', 'ci-customer');
+      customer.textContent = item.customerName || '（宛名未入力）';
+
+      var magician = elMaker('div', 'ci-magician');
+      magician.textContent = item.magicianName ? '担当: ' + item.magicianName : '';
+
+      var total = elMaker('div', 'ci-total');
+      total.textContent = formatYen(toNum(item.total));
+
+      var actions = elMaker('div', 'ci-actions');
+      var openBtn = elMaker('button', 'btn-ci');
+      openBtn.type = 'button';
+      openBtn.textContent = '開く';
+      openBtn.onclick = function () { openCase(item.id); };
+      var dupBtn = elMaker('button', 'btn-ci');
+      dupBtn.type = 'button';
+      dupBtn.textContent = '複製';
+      dupBtn.onclick = function () { duplicateCase(item.id); };
+      var delBtn = elMaker('button', 'btn-ci danger');
+      delBtn.type = 'button';
+      delBtn.textContent = '削除';
+      delBtn.onclick = function () { deleteCase(item.id); };
+      actions.appendChild(openBtn);
+      actions.appendChild(dupBtn);
+      actions.appendChild(delBtn);
+
+      card.appendChild(top);
+      card.appendChild(customer);
+      if (magician.textContent) card.appendChild(magician);
+      card.appendChild(total);
+      card.appendChild(actions);
+      body.appendChild(card);
+    })(caseListCache[i]);
+  }
+}
+
+function findCaseById(id) {
+  for (var i = 0; i < caseListCache.length; i++) {
+    if (caseListCache[i].id === id) return caseListCache[i];
+  }
+  return null;
+}
+
+// 保存済みデータを入力フォームへ読み込む（再編集・複製の共通処理）
+function loadCaseIntoForm(data, id) {
+  document.getElementById('detailRows').innerHTML = '';
+  docType = data.docType === 'invoice' ? 'invoice' : 'estimate';
+  document.getElementById('btnEstimate').className = docType === 'estimate' ? 'active' : '';
+  document.getElementById('btnInvoice').className = docType === 'invoice' ? 'active' : '';
+  document.getElementById('dueDateArea').style.display = docType === 'invoice' ? '' : 'none';
+  document.getElementById('customerName').value = data.customerName || '';
+  document.getElementById('contactName').value = data.contactName || '';
+  document.getElementById('issueDate').value = data.issueDate || getTodayValue();
+  if (docType === 'invoice') {
+    document.getElementById('dueDate').value = data.dueDate || getNextMonthEndValue();
+  } else {
+    savedDueDate = data.dueDate || getNextMonthEndValue();
+  }
+  document.getElementById('transportation').value = data.transportation > 0 ? data.transportation : '';
+  document.getElementById('discount').value = data.discount > 0 ? data.discount : '';
+  document.getElementById('notes').value = data.notes || '';
+  var items = Array.isArray(data.items) ? data.items : [];
+  for (var i = 0; i < items.length; i++) {
+    addRow();
+    var rows = getRows();
+    var row = rows[rows.length - 1];
+    row.getElementsByClassName('item-name')[0].value = items[i].name || '';
+    row.getElementsByClassName('item-qty')[0].value = items[i].qty != null ? items[i].qty : 1;
+    row.getElementsByClassName('item-price')[0].value = items[i].price != null ? items[i].price : '';
+  }
+  calculate();
+  currentCaseId = id;
+  setSaveButtonLabel();
+  setSaveStatus('');
+}
+
+function openCase(id) {
+  var item = findCaseById(id);
+  if (!item) return;
+  loadCaseIntoForm(item, id);
+  closeCaseList();
+}
+
+function duplicateCase(id) {
+  var item = findCaseById(id);
+  if (!item) return;
+  if (!window._saveCase) {
+    setCaseListStatus('Firebaseに接続できないため複製できません。', 'err');
+    return;
+  }
+  var clone = JSON.parse(JSON.stringify(item));
+  delete clone.id;
+  clone.issueDate = getTodayValue();
+  clone.dueDate = clone.docType === 'invoice' ? getNextMonthEndValue() : '';
+  clone.status = '見積中';
+  setCaseListStatus('複製しています…');
+  window._saveCase(null, clone).then(function (newId) {
+    loadCaseIntoForm(clone, newId);
+    closeCaseList();
+  }).catch(function (e) {
+    console.warn('case duplicate failed:', e);
+    setCaseListStatus('複製に失敗しました。通信状況を確認してください。', 'err');
+  });
+}
+
+function deleteCase(id) {
+  var item = findCaseById(id);
+  if (!item) return;
+  var label = item.customerName || '（宛名未入力）';
+  if (!confirm(label + 'の案件を削除しますか？この操作は元に戻せません。')) return;
+  if (!window._deleteCase) {
+    setCaseListStatus('Firebaseに接続できないため削除できません。', 'err');
+    return;
+  }
+  setCaseListStatus('削除しています…');
+  window._deleteCase(id).then(function () {
+    if (currentCaseId === id) {
+      currentCaseId = null;
+      setSaveButtonLabel();
+    }
+    loadCaseList();
+  }).catch(function (e) {
+    console.warn('case delete failed:', e);
+    setCaseListStatus('削除に失敗しました。通信状況を確認してください。', 'err');
+  });
+}
+
+// 入力内容をすべてクリアして新しい案件の作成を開始する
+function startNewCase() {
+  currentCaseId = null;
+  document.getElementById('detailRows').innerHTML = '';
+  document.getElementById('customerName').value = '';
+  document.getElementById('contactName').value = '';
+  document.getElementById('transportation').value = '';
+  document.getElementById('discount').value = '';
+  docType = 'estimate';
+  document.getElementById('btnEstimate').className = 'active';
+  document.getElementById('btnInvoice').className = '';
+  document.getElementById('dueDateArea').style.display = 'none';
+  document.getElementById('issueDate').value = getTodayValue();
+  savedDueDate = getNextMonthEndValue();
+  document.getElementById('notes').value = buildDefaultNotes('estimate');
+  setSaveButtonLabel();
+  setSaveStatus('');
+  calculate();
 }
 
 function initForm() {
@@ -1335,7 +1606,7 @@ initAuth();
 <script type="module">
 try {
   const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-  const { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection, serverTimestamp } =
+  const { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, collection, query, orderBy, limit, getDocs, serverTimestamp } =
     await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
   const firebaseConfig = {
     apiKey: "AIzaSyB_poTbSo_L3n4YoLpKPdEmvXCAfHAjL3U",
@@ -1453,6 +1724,20 @@ try {
       updatedAt: serverTimestamp()
     }));
     return ref.id;
+  };
+
+  // 案件一覧の取得（新しい順、最大200件）
+  window._loadCases = async function () {
+    const q = query(collection(window._fs, 'cases'), orderBy('createdAt', 'desc'), limit(200));
+    const snap = await getDocs(q);
+    const list = [];
+    snap.forEach(function (d) { list.push(Object.assign({ id: d.id }, d.data())); });
+    return list;
+  };
+
+  // 案件の削除
+  window._deleteCase = async function (id) {
+    await deleteDoc(doc(window._fs, 'cases', id));
   };
 
   window.dispatchEvent(new Event('_fsready'));
