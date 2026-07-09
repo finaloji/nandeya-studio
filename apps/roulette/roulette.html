@@ -103,6 +103,176 @@
       border-radius: 999px;
       box-shadow: 0 6px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.4);
     }
+
+    /* 設定パネル（表示調整用の隠しパネル） */
+    .panel-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 50;
+    }
+    .panel-overlay.open {
+      display: flex;
+    }
+    .panel-sheet {
+      width: 100%;
+      max-width: 480px;
+      max-height: 86dvh;
+      background: #16161a;
+      border-top: 1px solid #2c2c31;
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #26262b;
+      flex: 0 0 auto;
+    }
+    .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #f0f0f2;
+    }
+    .panel-close {
+      appearance: none;
+      border: none;
+      background: #232328;
+      color: #cfcfd2;
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .panel-body {
+      overflow-y: auto;
+      padding: 4px 16px 24px;
+    }
+    .panel-sec {
+      padding: 14px 0;
+      border-bottom: 1px solid #232328;
+    }
+    .panel-sec:last-child {
+      border-bottom: none;
+    }
+    .panel-sec h3 {
+      font-size: 12.5px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: #b7b7bd;
+      margin-bottom: 10px;
+    }
+    .panel-hint {
+      font-size: 12px;
+      color: #85858c;
+      line-height: 1.5;
+    }
+    .item-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .item-row input[type="radio"] {
+      flex: 0 0 auto;
+      width: 16px;
+      height: 16px;
+      accent-color: #f4c150;
+    }
+    .item-label {
+      flex: 1 1 auto;
+      min-width: 0;
+      background: #0e0e10;
+      border: 1px solid #2c2c31;
+      color: #fff;
+      font-family: inherit;
+      font-size: 13.5px;
+      padding: 9px 10px;
+      border-radius: 8px;
+    }
+    .item-del {
+      flex: 0 0 auto;
+      appearance: none;
+      border: none;
+      background: #2a1417;
+      color: #e5a3ab;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+    .item-del:disabled {
+      opacity: 0.35;
+    }
+    .panel-add {
+      appearance: none;
+      border: 1px dashed #3a3a41;
+      background: transparent;
+      color: #cfcfd2;
+      font-size: 12.5px;
+      font-family: inherit;
+      padding: 9px 12px;
+      border-radius: 8px;
+      width: 100%;
+      margin-top: 2px;
+    }
+    .panel-add:disabled {
+      opacity: 0.35;
+    }
+    .ti-notice {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #ffd23f;
+      min-height: 16px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .ti-notice.show {
+      opacity: 1;
+    }
+    .theme-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .theme-item {
+      appearance: none;
+      border: 2px solid #2c2c31;
+      background: #0e0e10;
+      border-radius: 10px;
+      padding: 8px;
+      display: flex;
+      gap: 3px;
+    }
+    .theme-item.selected {
+      border-color: #f4c150;
+    }
+    .theme-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+    }
+    .range-row {
+      margin-bottom: 12px;
+    }
+    .range-row .range-label {
+      font-size: 12px;
+      color: #b7b7bd;
+      margin-bottom: 4px;
+    }
+    .range-row input[type="range"] {
+      width: 100%;
+      accent-color: #f4c150;
+    }
   </style>
 </head>
 <body>
@@ -119,18 +289,65 @@
     <button class="action" id="action" type="button">START</button>
   </div>
 
+  <div class="panel-overlay" id="panelOverlay">
+    <div class="panel-sheet" id="panelSheet">
+      <div class="panel-head">
+        <div class="panel-title">設定</div>
+        <button type="button" class="panel-close" id="panelClose" aria-label="閉じる">×</button>
+      </div>
+      <div class="panel-body">
+        <section class="panel-sec">
+          <h3>表示項目</h3>
+          <div class="item-list" id="itemList"></div>
+          <button type="button" class="panel-add" id="itemAdd">追加</button>
+        </section>
+        <section class="panel-sec">
+          <h3>基準項目</h3>
+          <p class="panel-hint">上の一覧のラジオボタンで、基準にする項目を選べます。</p>
+          <div class="ti-notice" id="tiNotice"></div>
+        </section>
+        <section class="panel-sec">
+          <h3>テーマ</h3>
+          <div class="theme-list" id="themeList"></div>
+        </section>
+        <section class="panel-sec">
+          <h3>範囲</h3>
+          <div class="range-list" id="rangeList"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // 表示項目（後続で編集・保存対応）
+    // 表示項目（設定パネルで追加・編集・削除可能。localStorageに保存）
     var _sg = ['ドンペリ', 'ビール', 'ハイボール', 'ワイン', 'カクテル', 'ソフトドリンク'];
-    // 配色パレット（後続で複数プリセットから選択）
-    var _pl = ['#C1121F', '#1B9AAA', '#2A6F97', '#E07A1F', '#6A4C93', '#118A50'];
-    // 各項目の重み（現時点ではすべて均等。後続で個別調整に対応）
+    // 配色パレットのプリセット一式（設定パネルの「テーマ」から選択）
+    var _plSet = [
+      ['#C1121F', '#1B9AAA', '#2A6F97', '#E07A1F', '#6A4C93', '#118A50'],
+      ['#8E2DE2', '#4A00E0', '#00B4D8', '#F72585', '#3A0CA3', '#4361EE'],
+      ['#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51', '#606C38'],
+      ['#5A5A5A', '#7A7A7A', '#9A9A9A', '#3A3A3A', '#8C8C8C', '#4E4E4E']
+    ];
+    // 選択中の配色プリセットのインデックス
+    var _pi = 0;
+    // 選択中の配色パレット（色配列）
+    var _pl = _plSet[_pi];
+    // 各項目の重み（設定パネルの「範囲」で個別調整可能）
     var _wt = [];
     (function () {
       for (var i = 0; i < _sg.length; i++) _wt.push(1);
     })();
-    // 基準項目のインデックス（暫定固定。後日の設定画面で差し替え予定）
+    // 基準項目のインデックス（設定パネルの「基準項目」で選択）
     var _ti = 0;
+
+    // 表示項目数の下限・上限
+    var _MIN_N = 2;
+    var _MAX_N = 12;
+    // ラベル文字数の上限
+    var _MAX_LEN = 20;
+    // 範囲（重み）の調整可能な最小・最大値
+    var _WT_MIN = 0.15;
+    var _WT_MAX = 3.0;
 
     var _NS = 'http://www.w3.org/2000/svg';
     var _CX = 150, _CY = 150, _R = 140;
@@ -231,6 +448,65 @@
       svg.appendChild(g);
     }
 
+    // ---- 設定の保存・復元 ----
+    var _zk1 = 'rls_a1'; // 項目リスト
+    var _zk2 = 'rls_a2'; // 基準項目インデックス
+    var _zk3 = 'rls_a3'; // 配色テーマの選択
+    var _zk4 = 'rls_a4'; // セグメント幅の重み
+
+    // localStorage からの読み込み（壊れた値・型不一致は既定値のまま無視する）
+    function _rl() {
+      try {
+        var s1 = localStorage.getItem(_zk1);
+        if (s1) {
+          var arr = JSON.parse(s1);
+          if (Array.isArray(arr) && arr.length >= _MIN_N) _sg = arr;
+        }
+      } catch (e) {}
+
+      try {
+        var s4 = localStorage.getItem(_zk4);
+        if (s4) {
+          var w = JSON.parse(s4);
+          if (Array.isArray(w) && w.length === _sg.length) _wt = w;
+        }
+      } catch (e) {}
+      if (_wt.length !== _sg.length) {
+        _wt = [];
+        for (var i = 0; i < _sg.length; i++) _wt.push(1);
+      }
+
+      try {
+        var s2 = localStorage.getItem(_zk2);
+        if (s2 !== null) {
+          var ti = parseInt(s2, 10);
+          if (!isNaN(ti) && ti >= 0 && ti < _sg.length) _ti = ti;
+        }
+      } catch (e) {}
+      if (_ti >= _sg.length || _ti < 0) _ti = 0;
+
+      try {
+        var s3 = localStorage.getItem(_zk3);
+        if (s3 !== null) {
+          var pi = parseInt(s3, 10);
+          if (!isNaN(pi) && pi >= 0 && pi < _plSet.length) _pi = pi;
+        }
+      } catch (e) {}
+      _pl = _plSet[_pi];
+    }
+
+    // localStorage への書き込み
+    function _wl() {
+      try {
+        localStorage.setItem(_zk1, JSON.stringify(_sg));
+        localStorage.setItem(_zk2, String(_ti));
+        localStorage.setItem(_zk3, String(_pi));
+        localStorage.setItem(_zk4, JSON.stringify(_wt));
+      } catch (e) {}
+    }
+
+    _rl();
+    _bd = _buildBd();
     _draw();
 
     // ---- 回転・停止まわり ----
@@ -338,6 +614,7 @@
 
     // ボタンの押下時の分岐（アイドルなら開始、回転中なら停止、それ以外は無視）
     function _onAction() {
+      if (_sp) return;
       if (!_spin && !_land) {
         _go();
       } else if (_spin && !_land) {
@@ -347,6 +624,7 @@
 
     // 円盤タップ時の分岐（回転中のみ停止として有効）
     function _onWheelTap() {
+      if (_sp) return;
       if (_spin && !_land) {
         _stop();
       }
@@ -365,6 +643,7 @@
 
     // 矢印専用領域タップ時の分岐（3連打での補正モード切替判定・回転中は従来通り停止トリガー）
     function _arm() {
+      if (_sp) return;
       if (_land) {
         // 減速中・余韻中はあらゆる操作を無視
         _ak = 0;
@@ -402,6 +681,271 @@
       }
     }
 
+    // ---- 設定パネル（タイトル3連打で開閉） ----
+    var _sp = false; // 設定パネルの表示中フラグ
+    var _tk = 0;     // タイトル連続タップのカウント
+    var _tt = 0;     // 直前タップの時刻(ms)
+    var _tc = 0;     // クールダウン解除時刻(ms)
+    var _tiNoticeTimer = null;
+
+    // 設定パネルを開く
+    function _so() {
+      if (_spin || _land || _sp) return;
+      _sp = true;
+      _renderPanelAll();
+      var ov = document.getElementById('panelOverlay');
+      ov.classList.add('open');
+    }
+
+    // 設定パネルを閉じる
+    function _sc() {
+      _sp = false;
+      var ov = document.getElementById('panelOverlay');
+      ov.classList.remove('open');
+    }
+
+    // タイトル文字タップ時の分岐（3連打での設定パネル開閉判定。矢印用カウンターとは別実体）
+    function _stl() {
+      if (_sp) return;
+      if (_spin || _land) {
+        // 回転中・減速中はあらゆる操作を無視し、カウントにも加算しない
+        _tk = 0;
+        return;
+      }
+
+      var now = performance.now();
+
+      if (now < _tc) {
+        _tk = 0;
+        _tt = 0;
+        return;
+      }
+
+      if (_tk > 0 && (now - _tt) > _AK_GAP) {
+        _tk = 0;
+      }
+
+      _tk++;
+      _tt = now;
+
+      if (_tk >= 3) {
+        _tk = 0;
+        _tc = now + _AK_COOL;
+        _so();
+      }
+    }
+
+    // 基準項目が自動的に変わったときの一時的な通知表示
+    function _tiNotice() {
+      var el = document.getElementById('tiNotice');
+      if (!el) return;
+      el.textContent = '基準項目が変わりました';
+      el.classList.add('show');
+      clearTimeout(_tiNoticeTimer);
+      _tiNoticeTimer = setTimeout(function () {
+        el.classList.remove('show');
+        el.textContent = '';
+      }, 3000);
+    }
+
+    // 表示項目一覧（表示項目・基準項目セクション共用）の描画
+    function _renderItemList() {
+      var wrap = document.getElementById('itemList');
+      wrap.innerHTML = '';
+      var canDelete = _sg.length > _MIN_N;
+
+      for (var i = 0; i < _sg.length; i++) {
+        (function (idx) {
+          var row = document.createElement('div');
+          row.className = 'item-row';
+
+          var radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'tiRadio';
+          radio.checked = (idx === _ti);
+          radio.addEventListener('change', function () { _onTiPick(idx); });
+          row.appendChild(radio);
+
+          var label = document.createElement('input');
+          label.type = 'text';
+          label.className = 'item-label';
+          label.maxLength = _MAX_LEN;
+          label.value = _sg[idx];
+          label.addEventListener('blur', function () { _onLabelBlur(idx, label); });
+          row.appendChild(label);
+
+          var del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'item-del';
+          del.textContent = '削除';
+          del.disabled = !canDelete;
+          del.addEventListener('click', function () { _onDeleteItem(idx); });
+          row.appendChild(del);
+
+          wrap.appendChild(row);
+        })(i);
+      }
+
+      var addBtn = document.getElementById('itemAdd');
+      addBtn.disabled = _sg.length >= _MAX_N;
+    }
+
+    // 範囲（重み）調整セクションの描画
+    function _renderRangeList() {
+      var wrap = document.getElementById('rangeList');
+      wrap.innerHTML = '';
+
+      for (var i = 0; i < _sg.length; i++) {
+        (function (idx) {
+          var row = document.createElement('div');
+          row.className = 'range-row';
+
+          var lab = document.createElement('div');
+          lab.className = 'range-label';
+          lab.textContent = _sg[idx];
+          row.appendChild(lab);
+
+          var input = document.createElement('input');
+          input.type = 'range';
+          input.min = String(_WT_MIN);
+          input.max = String(_WT_MAX);
+          input.step = '0.05';
+          input.value = String(_wt[idx]);
+          input.addEventListener('input', function () { _onRangeInput(idx, input.value); });
+          row.appendChild(input);
+
+          wrap.appendChild(row);
+        })(i);
+      }
+    }
+
+    // テーマ（配色プリセット）セクションの描画
+    function _renderThemeList() {
+      var wrap = document.getElementById('themeList');
+      wrap.innerHTML = '';
+
+      for (var i = 0; i < _plSet.length; i++) {
+        (function (idx) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'theme-item' + (idx === _pi ? ' selected' : '');
+
+          var palette = _plSet[idx];
+          for (var c = 0; c < palette.length; c++) {
+            var dot = document.createElement('span');
+            dot.className = 'theme-dot';
+            dot.style.background = palette[c];
+            btn.appendChild(dot);
+          }
+
+          btn.addEventListener('click', function () { _onThemePick(idx); });
+          wrap.appendChild(btn);
+        })(i);
+      }
+    }
+
+    // パネル全体（表示項目・範囲・テーマ）を再構築
+    function _renderPanelAll() {
+      _renderItemList();
+      _renderRangeList();
+      _renderThemeList();
+    }
+
+    // 基準項目のラジオボタン選択時
+    function _onTiPick(i) {
+      _ti = i;
+      _wl();
+      _draw();
+    }
+
+    // ラベル入力欄のフォーカスが外れたとき（この瞬間だけ反映・保存する）
+    function _onLabelBlur(i, el) {
+      var v = el.value.trim();
+      if (!v) {
+        el.value = _sg[i];
+        return;
+      }
+      _sg[i] = v.slice(0, _MAX_LEN);
+      el.value = _sg[i];
+      _wl();
+      _draw();
+      _renderRangeList();
+    }
+
+    // 削除ボタン押下時
+    function _onDeleteItem(i) {
+      if (_sg.length <= _MIN_N) return;
+      if (!confirm('この項目を削除しますか？')) return;
+
+      _sg.splice(i, 1);
+      _wt.splice(i, 1);
+
+      var tiChanged = false;
+      if (_ti === i) {
+        _ti = 0;
+        tiChanged = true;
+      } else if (_ti > i) {
+        _ti -= 1;
+      }
+
+      _bd = _buildBd();
+      _draw();
+      _wl();
+      _renderItemList();
+      _renderRangeList();
+
+      if (tiChanged) _tiNotice();
+    }
+
+    // 追加ボタン押下時
+    function _onAddItem() {
+      if (_sg.length >= _MAX_N) return;
+
+      _sg.push('項目' + (_sg.length + 1));
+
+      var avg = 1;
+      if (_wt.length) {
+        var sum = 0;
+        for (var k = 0; k < _wt.length; k++) sum += _wt[k];
+        avg = sum / _wt.length;
+      }
+      _wt.push(avg);
+
+      _bd = _buildBd();
+      _draw();
+      _wl();
+      _renderItemList();
+      _renderRangeList();
+
+      var inputs = document.querySelectorAll('#itemList .item-label');
+      if (inputs.length) {
+        var last = inputs[inputs.length - 1];
+        last.focus();
+        last.select();
+      }
+    }
+
+    // テーマ（配色プリセット）選択時
+    function _onThemePick(i) {
+      _pi = i;
+      _pl = _plSet[_pi];
+      _wl();
+      _draw();
+      _renderThemeList();
+    }
+
+    // 範囲スライダー操作時
+    function _onRangeInput(i, val) {
+      var v = parseFloat(val);
+      if (isNaN(v)) return;
+      if (v < _WT_MIN) v = _WT_MIN;
+      if (v > _WT_MAX) v = _WT_MAX;
+      _wt[i] = v;
+      _bd = _buildBd();
+      _draw();
+      _wl();
+    }
+
     // タップ・クリックの二重発火を避けつつ反応させる共通バインダー
     function bindBtn(el, action) {
       el.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
@@ -419,6 +963,13 @@
     bindBtn(document.getElementById('action'), _onAction);
     bindBtn(document.querySelector('.wheel-wrap'), _onWheelTap);
     bindArrowHit(document.getElementById('arrowHit'), _arm);
+    bindBtn(document.querySelector('.title'), _stl);
+
+    document.getElementById('panelClose').addEventListener('click', _sc);
+    document.getElementById('itemAdd').addEventListener('click', _onAddItem);
+    document.getElementById('panelOverlay').addEventListener('click', function (e) {
+      if (e.target === this) _sc();
+    });
   </script>
 </body>
 </html>
