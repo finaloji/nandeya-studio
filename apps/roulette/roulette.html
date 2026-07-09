@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>Roulette</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      height: 100%;
+    }
+    body {
+      background: radial-gradient(circle at 50% 30%, #1a1a1c 0%, #050506 70%);
+      color: #fff;
+      font-family: -apple-system, 'SF Pro Display', system-ui, 'Hiragino Sans', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      overflow: hidden;
+    }
+    .stage {
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: max(env(safe-area-inset-top), 18px) 16px max(env(safe-area-inset-bottom), 24px);
+    }
+
+    /* タイトル（控えめ・上部中央） */
+    .title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      color: #cfcfd2;
+      text-align: center;
+      flex: 0 0 auto;
+    }
+
+    /* 円盤エリア（主役） */
+    .wheel-wrap {
+      position: relative;
+      width: min(86vw, 360px);
+      aspect-ratio: 1 / 1;
+      flex: 0 1 auto;
+    }
+    /* 上部の固定矢印（12時方向を指す下向き三角） */
+    .arrow {
+      position: absolute;
+      top: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 15px solid transparent;
+      border-right: 15px solid transparent;
+      border-top: 26px solid #ffd23f;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.6));
+      z-index: 5;
+    }
+    svg.wheel {
+      display: block;
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 6px 16px rgba(0,0,0,0.55));
+    }
+
+    /* START/STOP ボタン（下部中央） */
+    .action {
+      flex: 0 0 auto;
+      appearance: none;
+      border: none;
+      background: linear-gradient(180deg, #f4c150 0%, #e0a52c 100%);
+      color: #1a1205;
+      font-family: inherit;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      min-width: 168px;
+      padding: 15px 44px;
+      border-radius: 999px;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="title">ルーレット</div>
+
+    <div class="wheel-wrap">
+      <div class="arrow"></div>
+      <svg class="wheel" id="wheel" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+    </div>
+
+    <button class="action" id="action" type="button">START</button>
+  </div>
+
+  <script>
+    // 表示項目（後続で編集・保存対応）
+    var _sg = ['ドンペリ', 'ビール', 'ハイボール', 'ワイン', 'カクテル', 'ソフトドリンク'];
+    // 配色パレット（後続で複数プリセットから選択）
+    var _pl = ['#C1121F', '#1B9AAA', '#2A6F97', '#E07A1F', '#6A4C93', '#118A50'];
+
+    var _NS = 'http://www.w3.org/2000/svg';
+    var _CX = 150, _CY = 150, _R = 140;
+
+    // ラベル長に応じた表示サイズ（自動縮小）
+    function _fs(s) {
+      var n = s.length;
+      if (n <= 4) return 15;
+      if (n <= 5) return 13.5;
+      if (n <= 6) return 12;
+      if (n <= 7) return 10.5;
+      return 9.5;
+    }
+
+    // 円盤の描画（_sg と _pl から組み立てる）
+    function _draw() {
+      var svg = document.getElementById('wheel');
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+      var n = _sg.length;
+      var span = 360 / n;
+      var g = document.createElementNS(_NS, 'g');
+      g.setAttribute('id', 'disc');
+
+      for (var i = 0; i < n; i++) {
+        // セグメント0の中心が12時に来るよう -90 と半セグ分ずらす
+        var a0 = (i * span - span / 2 - 90) * Math.PI / 180;
+        var a1 = ((i + 1) * span - span / 2 - 90) * Math.PI / 180;
+        var x0 = _CX + _R * Math.cos(a0), y0 = _CY + _R * Math.sin(a0);
+        var x1 = _CX + _R * Math.cos(a1), y1 = _CY + _R * Math.sin(a1);
+        var large = span > 180 ? 1 : 0;
+
+        var p = document.createElementNS(_NS, 'path');
+        p.setAttribute('d', 'M' + _CX + ' ' + _CY + ' L' + x0.toFixed(2) + ' ' + y0.toFixed(2) +
+          ' A' + _R + ' ' + _R + ' 0 ' + large + ' 1 ' + x1.toFixed(2) + ' ' + y1.toFixed(2) + ' Z');
+        p.setAttribute('fill', _pl[i % _pl.length]);
+        p.setAttribute('stroke', '#0b0b0c');
+        p.setAttribute('stroke-width', '1.5');
+        g.appendChild(p);
+
+        // ラベル：セグメント中央角に沿って放射方向に配置（上下逆さは反転で回避）
+        var midDeg = i * span;                 // 12時基準・時計回りの中央角
+        var mid = (midDeg - 90) * Math.PI / 180;
+        var lr = _R * 0.58;
+        var lx = _CX + lr * Math.cos(mid), ly = _CY + lr * Math.sin(mid);
+        var rot = midDeg - 90;                  // 放射方向に沿わせる
+        if (rot > 90 && rot < 270) rot -= 180;  // 逆さ回避
+        if (rot <= -90) rot += 180;
+
+        var t = document.createElementNS(_NS, 'text');
+        t.setAttribute('x', lx.toFixed(2));
+        t.setAttribute('y', ly.toFixed(2));
+        t.setAttribute('fill', '#ffffff');
+        t.setAttribute('font-size', _fs(_sg[i]));
+        t.setAttribute('font-weight', '700');
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('dominant-baseline', 'central');
+        t.setAttribute('transform', 'rotate(' + rot.toFixed(2) + ' ' + lx.toFixed(2) + ' ' + ly.toFixed(2) + ')');
+        t.textContent = _sg[i];
+        g.appendChild(t);
+      }
+
+      // 外周リングと中心ハブ
+      var ring = document.createElementNS(_NS, 'circle');
+      ring.setAttribute('cx', _CX); ring.setAttribute('cy', _CY); ring.setAttribute('r', _R);
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', '#f4c150');
+      ring.setAttribute('stroke-width', '4');
+      g.appendChild(ring);
+
+      var hub = document.createElementNS(_NS, 'circle');
+      hub.setAttribute('cx', _CX); hub.setAttribute('cy', _CY); hub.setAttribute('r', '15');
+      hub.setAttribute('fill', '#111114');
+      hub.setAttribute('stroke', '#f4c150');
+      hub.setAttribute('stroke-width', '3');
+      g.appendChild(hub);
+
+      svg.appendChild(g);
+    }
+
+    _draw();
+  </script>
+</body>
+</html>
