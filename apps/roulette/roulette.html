@@ -108,6 +108,11 @@
     var _sg = ['ドンペリ', 'ビール', 'ハイボール', 'ワイン', 'カクテル', 'ソフトドリンク'];
     // 配色パレット（後続で複数プリセットから選択）
     var _pl = ['#C1121F', '#1B9AAA', '#2A6F97', '#E07A1F', '#6A4C93', '#118A50'];
+    // 各項目の重み（現時点ではすべて均等。後続で個別調整に対応）
+    var _wt = [];
+    (function () {
+      for (var i = 0; i < _sg.length; i++) _wt.push(1);
+    })();
 
     var _NS = 'http://www.w3.org/2000/svg';
     var _CX = 150, _CY = 150, _R = 140;
@@ -122,23 +127,45 @@
       return 9.5;
     }
 
-    // 円盤の描画（_sg と _pl から組み立てる）
+    // 境界角の配列を組み立てる（_wt の重み比から各項目の開始角・終了角を算出。
+    // 「360を項目数で割る」決め打ちにはせず、重みの正規化で範囲を求める）
+    function _buildBd() {
+      var total = 0;
+      for (var i = 0; i < _wt.length; i++) total += _wt[i];
+
+      var raw = [0];
+      var cum = 0;
+      for (i = 0; i < _wt.length; i++) {
+        cum += 360 * _wt[i] / total;
+        raw.push(cum);
+      }
+      // 項目0の範囲中央が12時に来るよう全体をオフセット
+      var offset = -(360 * _wt[0] / total) / 2;
+
+      var bd = [];
+      for (i = 0; i < _wt.length; i++) {
+        bd.push({ a0: raw[i] + offset, a1: raw[i + 1] + offset });
+      }
+      return bd;
+    }
+    var _bd = _buildBd();
+
+    // 円盤の描画（_sg と _pl と _bd から組み立てる）
     function _draw() {
       var svg = document.getElementById('wheel');
       while (svg.firstChild) svg.removeChild(svg.firstChild);
 
       var n = _sg.length;
-      var span = 360 / n;
       var g = document.createElementNS(_NS, 'g');
       g.setAttribute('id', 'disc');
 
       for (var i = 0; i < n; i++) {
-        // セグメント0の中心が12時に来るよう -90 と半セグ分ずらす
-        var a0 = (i * span - span / 2 - 90) * Math.PI / 180;
-        var a1 = ((i + 1) * span - span / 2 - 90) * Math.PI / 180;
+        var seg = _bd[i];
+        var a0 = (seg.a0 - 90) * Math.PI / 180;
+        var a1 = (seg.a1 - 90) * Math.PI / 180;
         var x0 = _CX + _R * Math.cos(a0), y0 = _CY + _R * Math.sin(a0);
         var x1 = _CX + _R * Math.cos(a1), y1 = _CY + _R * Math.sin(a1);
-        var large = span > 180 ? 1 : 0;
+        var large = (seg.a1 - seg.a0) > 180 ? 1 : 0;
 
         var p = document.createElementNS(_NS, 'path');
         p.setAttribute('d', 'M' + _CX + ' ' + _CY + ' L' + x0.toFixed(2) + ' ' + y0.toFixed(2) +
@@ -148,8 +175,8 @@
         p.setAttribute('stroke-width', '1.5');
         g.appendChild(p);
 
-        // ラベル：セグメント中央角に沿って放射方向に配置（内側→外側に読める向きで統一）
-        var midDeg = i * span;                 // 12時基準・時計回りの中央角
+        // ラベル：範囲の中央角に沿って放射方向に配置（内側→外側に読める向きで統一）
+        var midDeg = (seg.a0 + seg.a1) / 2;    // 12時基準・時計回りの中央角
         var mid = (midDeg - 90) * Math.PI / 180;
         var lr = _R * 0.58;
         var lx = _CX + lr * Math.cos(mid), ly = _CY + lr * Math.sin(mid);
@@ -187,6 +214,124 @@
     }
 
     _draw();
+
+    // ---- 回転・停止まわり ----
+
+    var _ang = 0;      // 円盤の現在回転角（度）
+    var _spin = false; // 回転中フラグ
+    var _land = false; // 減速中（着地の余韻を含む）フラグ
+    var _a0 = 0, _a1 = 0, _t0 = 0, _dur = 0; // 減速開始時の起点角/到達角/開始時刻(ms)/所要時間(ms)
+    var _spd = 320;    // 等速回転の角速度（度/秒）
+    var _raf = null;   // requestAnimationFrame のID
+    var _ft = 0;       // 等速回転ループの直前フレーム時刻(ms)
+    var _AFTERGLOW = 1000; // 着地後、次の操作を受け付けるまでの静止時間(ms)
+
+    function _ease(t) {
+      return 1 - Math.pow(1 - t, 4);
+    }
+
+    // 円盤の見た目の回転角を反映
+    function _applyAngle() {
+      var g = document.getElementById('disc');
+      if (g) g.setAttribute('transform', 'rotate(' + _ang.toFixed(3) + ' ' + _CX + ' ' + _CY + ')');
+    }
+
+    // ボタン表示の更新
+    function _setBtn(text) {
+      var btn = document.getElementById('action');
+      btn.textContent = text;
+    }
+
+    // 等速回転ループ
+    function _spinTick(now) {
+      if (!_spin) return;
+      var dt = (now - _ft) / 1000;
+      _ft = now;
+      _ang += _spd * dt;
+      _applyAngle();
+      _raf = requestAnimationFrame(_spinTick);
+    }
+
+    // 回転開始処理
+    function _go() {
+      if (_spin || _land) return;
+      _spin = true;
+      _setBtn('STOP');
+      _ft = performance.now();
+      _raf = requestAnimationFrame(_spinTick);
+    }
+
+    // 到達角・着地項目の決定（起点角から、ランダムに選んだ項目の範囲内のどこかへの到達角と所要時間を算出）
+    function _pickLanding() {
+      var r = Math.floor(Math.random() * _bd.length);
+      var seg = _bd[r];
+      var p = seg.a0 + Math.random() * (seg.a1 - seg.a0);
+
+      // 矢印（画面上部固定）の下に p の位置が来るために必要な円盤回転角(mod 360)
+      var target = ((-p % 360) + 360) % 360;
+      var curMod = ((_ang % 360) + 360) % 360;
+      var diff = ((target - curMod) % 360 + 360) % 360;
+      var extraTurns = 2 + Math.floor(Math.random() * 3); // 追加2〜4周ぶん
+
+      _a0 = _ang;
+      _a1 = _ang + diff + extraTurns * 360;
+      _dur = 2500 + Math.random() * 1500; // 2.5〜4秒
+    }
+
+    // 減速アニメーションの実行（rAFループ）
+    function _landTick(now) {
+      var t = (now - _t0) / _dur;
+      if (t >= 1) t = 1;
+      _ang = _a0 + (_a1 - _a0) * _ease(t);
+      _applyAngle();
+
+      if (t < 1) {
+        _raf = requestAnimationFrame(_landTick);
+      } else {
+        // 着地。余韻の間は次の操作を受け付けない
+        setTimeout(function () {
+          _land = false;
+          _setBtn('START');
+        }, _AFTERGLOW);
+      }
+    }
+
+    // 停止トリガー処理（STOPボタン・円盤タップ共通の入口）
+    function _stop() {
+      if (!_spin || _land) return;
+      _spin = false;
+      if (_raf) cancelAnimationFrame(_raf);
+      _land = true;
+      _pickLanding();
+      _t0 = performance.now();
+      _raf = requestAnimationFrame(_landTick);
+    }
+
+    // ボタンの押下時の分岐（アイドルなら開始、回転中なら停止、それ以外は無視）
+    function _onAction() {
+      if (!_spin && !_land) {
+        _go();
+      } else if (_spin && !_land) {
+        _stop();
+      }
+    }
+
+    // 円盤タップ時の分岐（回転中のみ停止として有効）
+    function _onWheelTap() {
+      if (_spin && !_land) {
+        _stop();
+      }
+    }
+
+    // タップ・クリックの二重発火を避けつつ反応させる共通バインダー
+    function bindBtn(el, action) {
+      el.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+      el.addEventListener('touchend', function (e) { e.preventDefault(); action(); }, { passive: false });
+      el.addEventListener('click', function () { action(); });
+    }
+
+    bindBtn(document.getElementById('action'), _onAction);
+    bindBtn(document.querySelector('.wheel-wrap'), _onWheelTap);
   </script>
 </body>
 </html>
