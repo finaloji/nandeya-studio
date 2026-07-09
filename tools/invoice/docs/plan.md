@@ -22,6 +22,8 @@
 | 仕上げ | 5-1 | 下書き自動保存（localStorage） | 完了 |
 | 仕上げ | 5-2 | PWA対応（manifest・アイコン） | 完了 |
 | 追加 | 6-1 | 案件一覧の並び替え（保存日・発行日・金額） | 完了 |
+| 追加 | 6-2 | 顧客管理（顧客マスタ＋案件作成時の選択） | 完了（要ルール更新） |
+| 追加 | 6-3 | 売上ダッシュボード（月別・マジシャン別・ステータス別・顧客別） | 完了 |
 
 ## 人間側のタスク
 
@@ -29,6 +31,7 @@
 - [x] 共通パスコードの値を決める（決定済み。コードにはSHA-256ハッシュのみ記載）
 - [x] Firestoreセキュリティルールの設定（`invoice/master` の読み書きを許可済み）
 - [x] Firestoreセキュリティルールに `cases` コレクションを追加済み
+- [ ] Firestoreセキュリティルールに `customers` コレクションを追加（6-2 の顧客管理に必要。下記ルールを貼り付け）
 
 ```
 rules_version = '2';
@@ -38,6 +41,9 @@ service cloud.firestore {
       allow read, write: if true;
     }
     match /cases/{caseId} {
+      allow read, write: if true;
+    }
+    match /customers/{customerId} {
       allow read, write: if true;
     }
   }

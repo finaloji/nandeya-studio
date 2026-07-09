@@ -109,8 +109,8 @@
   .btn-auth { width: 100%; min-height: 48px; padding: 12px; font-size: 16px; border: none; border-radius: 8px; background: #4a90d9; color: #fff; cursor: pointer; font-weight: bold; }
 
   /* ===== 上部ナビ ===== */
-  .top-nav { display: flex; gap: 8px; margin-bottom: 12px; }
-  .btn-case-list, .btn-new-case { flex: 1; padding: 12px; font-size: 14px; border: 1px solid #4a90d9; border-radius: 8px; background: #fff; color: #4a90d9; font-weight: bold; cursor: pointer; }
+  .top-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .btn-case-list, .btn-new-case { flex: 1 1 45%; padding: 12px; font-size: 14px; border: 1px solid #4a90d9; border-radius: 8px; background: #fff; color: #4a90d9; font-weight: bold; cursor: pointer; }
 
   /* ===== 案件一覧 ===== */
   .case-area { max-width: 600px; margin: 0 auto; padding: 12px; }
@@ -141,6 +141,33 @@
   .btn-ci { flex: 1; padding: 9px; font-size: 13px; border-radius: 6px; cursor: pointer; font-weight: bold; border: 1px solid #4a90d9; background: #fff; color: #4a90d9; }
   .btn-ci.danger { border-color: #c0392b; color: #c0392b; }
   .btn-convert { width: 100%; margin-top: 8px; padding: 10px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; border: 1px solid #e07b39; background: #fff; color: #e07b39; }
+
+  /* ===== 顧客管理 ===== */
+  .customer-card { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .cu-view-name { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
+  .cu-view-sub { font-size: 13px; color: #888; margin-bottom: 8px; }
+  .cu-view-actions { display: flex; gap: 8px; }
+  .btn-cu { flex: 1; padding: 9px; font-size: 13px; border-radius: 6px; cursor: pointer; font-weight: bold; border: 1px solid #4a90d9; background: #fff; color: #4a90d9; }
+  .btn-cu.danger { border-color: #c0392b; color: #c0392b; }
+  .cu-edit-form input, .cu-edit-form textarea { margin-bottom: 8px; }
+  .cu-edit-form textarea { min-height: 60px; }
+  .cu-edit-actions { display: flex; gap: 8px; }
+  .btn-cu-save { flex: 1; padding: 10px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; border: none; background: #4a90d9; color: #fff; }
+  .btn-cu-cancel { flex: 1; padding: 10px; font-size: 14px; border-radius: 6px; cursor: pointer; font-weight: bold; border: 1px solid #ccc; background: #fff; color: #555; }
+
+  /* ===== 売上ダッシュボード ===== */
+  .sales-tiles { display: flex; gap: 8px; margin-bottom: 14px; }
+  .sales-tile { flex: 1; background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); text-align: center; }
+  .sales-tile-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+  .sales-tile-value { font-size: 18px; font-weight: bold; color: #4a90d9; }
+  .sales-section { background: #fff; border-radius: 8px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .sales-section-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; color: #555; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+  .sales-bar-row { margin-bottom: 10px; }
+  .sales-bar-row:last-child { margin-bottom: 0; }
+  .sales-bar-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .sales-bar-track { background: #eef2f6; border-radius: 4px; height: 10px; overflow: hidden; }
+  .sales-bar-fill { background: #4a90d9; height: 100%; border-radius: 4px; }
+  .sales-empty { font-size: 14px; color: #999; text-align: center; padding: 20px 0; }
   /* ネイティブconfirm()はページ内で連発すると「今後表示しない」で無効化され
      再読み込みしないと復活しないため、削除確認はアプリ内UIで行う */
   .confirm-box { display: none; background: #fdf2f2; border: 1px solid #f0b8b8; border-radius: 6px; padding: 10px; margin-top: 8px; }
@@ -246,6 +273,8 @@
   <div class="top-nav">
     <button type="button" class="btn-case-list" onclick="openCaseList()">案件一覧</button>
     <button type="button" class="btn-new-case" onclick="startNewCase()">新規作成</button>
+    <button type="button" class="btn-case-list" onclick="openCustomers()">顧客管理</button>
+    <button type="button" class="btn-new-case" onclick="openSales()">売上ダッシュボード</button>
   </div>
 
   <!-- 書類タイプ切り替え -->
@@ -259,6 +288,10 @@
   <!-- 宛先 -->
   <div class="section">
     <div class="section-title">宛先</div>
+    <label>顧客から選択</label>
+    <select id="customerSelect" onchange="onCustomerSelectChange()">
+      <option value="">（選択せず自由入力）</option>
+    </select>
     <label>宛名（会社名または個人名）</label>
     <input type="text" id="customerName" placeholder="株式会社◯◯" oninput="updatePreview()">
     <label>担当者名</label>
@@ -405,6 +438,28 @@
   </div>
   <div class="case-status" id="caseListStatus"></div>
   <div id="caseListBody"></div>
+</div>
+
+<!-- 顧客管理 -->
+<div class="case-area" id="customerArea" style="display:none;">
+  <div class="case-topbar">
+    <h1>顧客管理</h1>
+    <button type="button" class="btn-case-close" onclick="closeCustomers()">× 閉じる</button>
+  </div>
+  <div class="case-status" id="customerListStatus"></div>
+  <div id="customerListBody"></div>
+  <button type="button" class="btn-add-magician" onclick="addNewCustomerCard()">＋ 顧客を追加</button>
+</div>
+
+<!-- 売上ダッシュボード -->
+<div class="case-area" id="salesArea" style="display:none;">
+  <div class="case-topbar">
+    <h1>売上ダッシュボード</h1>
+    <button type="button" class="btn-case-close" onclick="closeSales()">× 閉じる</button>
+  </div>
+  <div class="section-note">対象：請求書（ステータスが「請求済」「入金済み」の案件）</div>
+  <div class="case-status" id="salesStatus"></div>
+  <div id="salesBody"></div>
 </div>
 
 <!-- 帳票プレビュー -->
@@ -849,6 +904,70 @@ function retryMaster() {
 
 window.addEventListener('_fsready', maybeLoadMaster);
 
+/* ===== 顧客マスタの自動読み込み（宛先の「顧客から選択」用） ===== */
+var customerListCache = [];
+var customerLoadState = 'idle'; // idle | loading | loaded | failed
+
+function populateCustomerSelect() {
+  var sel = document.getElementById('customerSelect');
+  var prevValue = sel.value;
+  sel.innerHTML = '';
+  var def = document.createElement('option');
+  def.value = '';
+  def.textContent = '（選択せず自由入力）';
+  sel.appendChild(def);
+  var sorted = customerListCache.slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'ja'); });
+  for (var i = 0; i < sorted.length; i++) {
+    var c = sorted[i];
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name + (c.contactName ? '（' + c.contactName + '）' : '');
+    sel.appendChild(opt);
+  }
+  if (prevValue) sel.value = prevValue;
+}
+
+function findCustomerById(id) {
+  for (var i = 0; i < customerListCache.length; i++) {
+    if (customerListCache[i].id === id) return customerListCache[i];
+  }
+  return null;
+}
+
+function maybeLoadCustomers() {
+  if (!authPassed) return;
+  if (customerLoadState === 'loading' || customerLoadState === 'loaded') return;
+  if (window._fsFailed) { customerLoadState = 'failed'; return; }
+  if (window._fs && window._loadCustomers) {
+    customerLoadState = 'loading';
+    window._loadCustomers().then(function (list) {
+      customerListCache = list;
+      customerLoadState = 'loaded';
+      populateCustomerSelect();
+    }).catch(function (e) {
+      console.warn('customers load failed:', e);
+      customerLoadState = 'failed';
+    });
+  }
+}
+
+window.addEventListener('_fsready', maybeLoadCustomers);
+
+function onCustomerSelectChange() {
+  var sel = document.getElementById('customerSelect');
+  var id = sel.value;
+  currentCustomerId = id || null;
+  if (id) {
+    var cust = findCustomerById(id);
+    if (cust) {
+      document.getElementById('customerName').value = cust.name || '';
+      document.getElementById('contactName').value = cust.contactName || '';
+      updatePreview();
+      scheduleDraftSave();
+    }
+  }
+}
+
 // module script から呼ばれる（マスタ読み込み成功）
 function onMasterLoaded(data) {
   masterLoadState = 'loaded';
@@ -1269,6 +1388,7 @@ function saveMaster() {
 /* ===== 案件の保存（Firestore） ===== */
 var currentCaseId = null; // 編集中の既存案件ID（新規はnull）
 var currentCaseStatus = '見積中'; // 編集中の案件のステータス（保存時に維持する）
+var currentCustomerId = null; // 「顧客から選択」で選ばれている顧客ID（未選択はnull）
 var STATUS_LIST = ['見積中', '受注', '請求済', '入金済み', '失注', 'キャンセル'];
 
 // 明細名からマジシャンを推定（一覧表示用。手入力で一致しなければ空）
@@ -1315,7 +1435,8 @@ function collectCaseData() {
     tax: t.tax,
     total: t.total,
     magicianName: guessMagicianName(items),
-    status: currentCaseStatus || '見積中'
+    status: currentCaseStatus || '見積中',
+    customerId: currentCustomerId || ''
   };
   return data;
 }
@@ -1677,6 +1798,8 @@ function loadCaseIntoForm(data, id) {
   calculate();
   currentCaseId = id;
   currentCaseStatus = data.status || '見積中';
+  currentCustomerId = data.customerId || null;
+  document.getElementById('customerSelect').value = data.customerId || '';
   setSaveButtonLabel();
   setSaveStatus('');
 }
@@ -1729,10 +1852,357 @@ function performDeleteCase(id) {
   });
 }
 
+/* ===== 顧客管理 ===== */
+var customerEditingId = null; // 編集中の顧客ID（'NEW'は新規追加中、nullは編集なし）
+var newCustomerDraft = null;
+
+function setCustomerListStatus(msg, type) {
+  var el = document.getElementById('customerListStatus');
+  el.textContent = msg || '';
+  el.className = 'case-status' + (type ? ' ' + type : '');
+}
+
+function openCustomers() {
+  document.getElementById('inputArea').style.display = 'none';
+  document.getElementById('previewArea').style.display = 'none';
+  document.getElementById('customerArea').style.display = '';
+  window.scrollTo(0, 0);
+  loadCustomersScreen();
+}
+
+function closeCustomers() {
+  document.getElementById('customerArea').style.display = 'none';
+  document.getElementById('inputArea').style.display = '';
+  customerEditingId = null;
+  newCustomerDraft = null;
+  window.scrollTo(0, 0);
+}
+
+function loadCustomersScreen() {
+  if (!window._loadCustomers) {
+    setCustomerListStatus('Firebaseに接続できないため一覧を取得できません。', 'err');
+    document.getElementById('customerListBody').innerHTML = '';
+    return;
+  }
+  setCustomerListStatus('読み込んでいます…');
+  document.getElementById('customerListBody').innerHTML = '';
+  window._loadCustomers().then(function (list) {
+    customerListCache = list;
+    customerLoadState = 'loaded';
+    populateCustomerSelect();
+    renderCustomers();
+  }).catch(function (e) {
+    console.warn('customer list load failed:', e);
+    setCustomerListStatus('一覧の取得に失敗しました。通信状況を確認してください。', 'err');
+  });
+}
+
+function renderCustomers() {
+  setCustomerListStatus('');
+  var body = document.getElementById('customerListBody');
+  body.innerHTML = '';
+  if (customerListCache.length === 0 && customerEditingId !== 'NEW') {
+    var empty = elMaker('div', 'case-empty');
+    empty.textContent = 'まだ顧客が登録されていません。';
+    body.appendChild(empty);
+    return;
+  }
+  var sorted = customerListCache.slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'ja'); });
+  for (var i = 0; i < sorted.length; i++) {
+    (function (item) {
+      if (customerEditingId === item.id) {
+        body.appendChild(buildCustomerEditCard(item, item.id));
+      } else {
+        body.appendChild(buildCustomerViewCard(item));
+      }
+    })(sorted[i]);
+  }
+  if (customerEditingId === 'NEW') {
+    body.appendChild(buildCustomerEditCard(newCustomerDraft || {}, null));
+  }
+}
+
+function buildCustomerViewCard(item) {
+  var card = elMaker('div', 'customer-card');
+  var name = elMaker('div', 'cu-view-name');
+  name.textContent = item.name || '（名前未設定）';
+  var parts = [];
+  if (item.contactName) parts.push('担当: ' + item.contactName);
+  if (item.phone) parts.push(item.phone);
+  var sub = elMaker('div', 'cu-view-sub');
+  sub.textContent = parts.join(' / ');
+
+  var actions = elMaker('div', 'cu-view-actions');
+  var editBtn = elMaker('button', 'btn-cu');
+  editBtn.type = 'button';
+  editBtn.textContent = '編集';
+  editBtn.onclick = function () { customerEditingId = item.id; renderCustomers(); };
+  var delBtn = elMaker('button', 'btn-cu danger');
+  delBtn.type = 'button';
+  delBtn.textContent = '削除';
+  var confirmBox = makeConfirmBox(
+    (item.name || 'この顧客') + 'を削除しますか？',
+    '削除する',
+    function () { performDeleteCustomer(item.id); }
+  );
+  delBtn.onclick = function () { confirmBox.className = 'confirm-box show'; };
+  actions.appendChild(editBtn);
+  actions.appendChild(delBtn);
+
+  card.appendChild(name);
+  if (sub.textContent) card.appendChild(sub);
+  card.appendChild(actions);
+  card.appendChild(confirmBox);
+  return card;
+}
+
+function buildCustomerEditCard(item, id) {
+  var card = elMaker('div', 'customer-card');
+  var form = elMaker('div', 'cu-edit-form');
+
+  function field(labelText, key, type) {
+    var label = document.createElement('label');
+    label.textContent = labelText;
+    var input = type === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+    if (type !== 'textarea') input.type = 'text';
+    input.value = item[key] || '';
+    input.dataset.field = key;
+    form.appendChild(label);
+    form.appendChild(input);
+  }
+  field('会社名・氏名', 'name');
+  field('担当者名', 'contactName');
+  field('電話番号', 'phone');
+  field('メール', 'email');
+  field('住所', 'address');
+  field('備考', 'notes', 'textarea');
+
+  var actions = elMaker('div', 'cu-edit-actions');
+  var saveBtn = elMaker('button', 'btn-cu-save');
+  saveBtn.type = 'button';
+  saveBtn.textContent = '保存';
+  saveBtn.onclick = function () { saveCustomerCard(form, id); };
+  var cancelBtn = elMaker('button', 'btn-cu-cancel');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'キャンセル';
+  cancelBtn.onclick = function () { customerEditingId = null; newCustomerDraft = null; renderCustomers(); };
+  actions.appendChild(saveBtn);
+  actions.appendChild(cancelBtn);
+
+  card.appendChild(form);
+  card.appendChild(actions);
+  return card;
+}
+
+function collectCustomerForm(form) {
+  var data = {};
+  var inputs = form.querySelectorAll('[data-field]');
+  for (var i = 0; i < inputs.length; i++) {
+    data[inputs[i].dataset.field] = inputs[i].value.trim();
+  }
+  return data;
+}
+
+function saveCustomerCard(form, id) {
+  var data = collectCustomerForm(form);
+  if (!data.name) {
+    setCustomerListStatus('会社名・氏名を入力してください。', 'err');
+    return;
+  }
+  if (!window._saveCustomer) {
+    setCustomerListStatus('Firebaseに接続できないため保存できません。', 'err');
+    return;
+  }
+  setCustomerListStatus('保存しています…');
+  window._saveCustomer(id, data).then(function () {
+    customerEditingId = null;
+    newCustomerDraft = null;
+    loadCustomersScreen();
+  }).catch(function (e) {
+    console.warn('customer save failed:', e);
+    setCustomerListStatus('保存に失敗しました。通信状況を確認してください。', 'err');
+  });
+}
+
+function performDeleteCustomer(id) {
+  if (!window._deleteCustomer) {
+    setCustomerListStatus('Firebaseに接続できないため削除できません。', 'err');
+    return;
+  }
+  setCustomerListStatus('削除しています…');
+  window._deleteCustomer(id).then(function () {
+    if (currentCustomerId === id) {
+      currentCustomerId = null;
+      document.getElementById('customerSelect').value = '';
+    }
+    loadCustomersScreen();
+  }).catch(function (e) {
+    console.warn('customer delete failed:', e);
+    setCustomerListStatus('削除に失敗しました。通信状況を確認してください。', 'err');
+  });
+}
+
+function addNewCustomerCard() {
+  customerEditingId = 'NEW';
+  newCustomerDraft = {};
+  renderCustomers();
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+/* ===== 売上ダッシュボード ===== */
+function setSalesStatus(msg, type) {
+  var el = document.getElementById('salesStatus');
+  el.textContent = msg || '';
+  el.className = 'case-status' + (type ? ' ' + type : '');
+}
+
+function openSales() {
+  document.getElementById('inputArea').style.display = 'none';
+  document.getElementById('previewArea').style.display = 'none';
+  document.getElementById('salesArea').style.display = '';
+  window.scrollTo(0, 0);
+  loadSalesScreen();
+}
+
+function closeSales() {
+  document.getElementById('salesArea').style.display = 'none';
+  document.getElementById('inputArea').style.display = '';
+  window.scrollTo(0, 0);
+}
+
+function loadSalesScreen() {
+  if (!window._loadCases) {
+    setSalesStatus('Firebaseに接続できないため集計できません。', 'err');
+    document.getElementById('salesBody').innerHTML = '';
+    return;
+  }
+  setSalesStatus('集計しています…');
+  document.getElementById('salesBody').innerHTML = '';
+  window._loadCases().then(function (list) {
+    setSalesStatus('');
+    renderSales(list);
+  }).catch(function (e) {
+    console.warn('sales load failed:', e);
+    setSalesStatus('集計データの取得に失敗しました。通信状況を確認してください。', 'err');
+  });
+}
+
+function salesMonthKey(issueDate) {
+  if (!issueDate || issueDate.length < 7) return '不明';
+  return issueDate.slice(0, 7).replace('-', '/');
+}
+
+// list を keyFn でグルーピングし、金額の大きい順に集計結果を返す
+function aggregateBy(list, keyFn, labelFn) {
+  var map = {};
+  for (var i = 0; i < list.length; i++) {
+    var key = keyFn(list[i]);
+    if (!map[key]) map[key] = { key: key, label: labelFn ? labelFn(list[i]) : key, total: 0, count: 0 };
+    map[key].total += toNum(list[i].total);
+    map[key].count += 1;
+  }
+  var arr = [];
+  for (var k in map) { if (map.hasOwnProperty(k)) arr.push(map[k]); }
+  arr.sort(function (a, b) { return b.total - a.total; });
+  return arr;
+}
+
+function makeSalesTile(label, value) {
+  var tile = elMaker('div', 'sales-tile');
+  var l = elMaker('div', 'sales-tile-label');
+  l.textContent = label;
+  var v = elMaker('div', 'sales-tile-value');
+  v.textContent = value;
+  tile.appendChild(l);
+  tile.appendChild(v);
+  return tile;
+}
+
+function buildSalesSection(title, rows, maxBase) {
+  var section = elMaker('div', 'sales-section');
+  var t = elMaker('div', 'sales-section-title');
+  t.textContent = title;
+  section.appendChild(t);
+  if (rows.length === 0) {
+    var e = elMaker('div', 'sales-empty');
+    e.textContent = 'データがありません。';
+    section.appendChild(e);
+    return section;
+  }
+  var max = maxBase;
+  if (!max) {
+    max = 0;
+    for (var i = 0; i < rows.length; i++) { if (rows[i].total > max) max = rows[i].total; }
+  }
+  for (var j = 0; j < rows.length; j++) {
+    var row = rows[j];
+    var rowEl = elMaker('div', 'sales-bar-row');
+    var labelRow = elMaker('div', 'sales-bar-label');
+    var labelText = elMaker('span', '');
+    labelText.textContent = row.label + '（' + row.count + '件）';
+    var amtText = elMaker('span', '');
+    amtText.textContent = formatYen(row.total);
+    labelRow.appendChild(labelText);
+    labelRow.appendChild(amtText);
+    var track = elMaker('div', 'sales-bar-track');
+    var fill = elMaker('div', 'sales-bar-fill');
+    var pct = max > 0 ? Math.max(2, Math.round(row.total / max * 100)) : 0;
+    fill.style.width = pct + '%';
+    track.appendChild(fill);
+    rowEl.appendChild(labelRow);
+    rowEl.appendChild(track);
+    section.appendChild(rowEl);
+  }
+  return section;
+}
+
+function renderSales(allCases) {
+  var body = document.getElementById('salesBody');
+  body.innerHTML = '';
+  var target = [];
+  for (var i = 0; i < allCases.length; i++) {
+    var c = allCases[i];
+    if (c.docType === 'invoice' && (c.status === '請求済' || c.status === '入金済み')) target.push(c);
+  }
+  if (target.length === 0) {
+    var empty = elMaker('div', 'sales-empty');
+    empty.textContent = '集計対象の請求書（請求済・入金済み）がまだありません。';
+    body.appendChild(empty);
+    return;
+  }
+
+  var grandTotal = 0;
+  for (var g = 0; g < target.length; g++) grandTotal += toNum(target[g].total);
+
+  var tiles = elMaker('div', 'sales-tiles');
+  tiles.appendChild(makeSalesTile('合計売上', formatYen(grandTotal)));
+  tiles.appendChild(makeSalesTile('件数', target.length + '件'));
+  body.appendChild(tiles);
+
+  var byStatus = aggregateBy(target, function (c) { return c.status; });
+  body.appendChild(buildSalesSection('ステータス別', byStatus, grandTotal));
+
+  var byMonth = aggregateBy(target, function (c) { return salesMonthKey(c.issueDate); });
+  byMonth.sort(function (a, b) { return b.key.localeCompare(a.key); });
+  body.appendChild(buildSalesSection('月別売上', byMonth, null));
+
+  var byMagician = aggregateBy(target, function (c) { return c.magicianName || '未設定'; });
+  body.appendChild(buildSalesSection('マジシャン別売上', byMagician, grandTotal));
+
+  var byCustomer = aggregateBy(
+    target,
+    function (c) { return c.customerId ? ('id:' + c.customerId) : ('name:' + (c.customerName || '')); },
+    function (c) { return c.customerName || '（宛名未入力）'; }
+  );
+  body.appendChild(buildSalesSection('顧客別売上', byCustomer, grandTotal));
+}
+
 // 入力内容をすべてクリアして新しい案件の作成を開始する
 function startNewCase() {
   currentCaseId = null;
   currentCaseStatus = '見積中';
+  currentCustomerId = null;
+  document.getElementById('customerSelect').value = '';
   document.getElementById('detailRows').innerHTML = '';
   document.getElementById('customerName').value = '';
   document.getElementById('contactName').value = '';
@@ -1818,6 +2288,7 @@ function showTool() {
   // 認証通過後に料金マスタの読み込みを開始する（未認証ではFirestoreへアクセスしない）
   authPassed = true;
   maybeLoadMaster();
+  maybeLoadCustomers();
   // 入力途中の下書きがあれば復元する
   restoreDraftIfAny();
   // 入力のたびに下書きを保存する（テキスト・日付・数値すべて拾う）
@@ -2017,6 +2488,33 @@ try {
   window._patchCase = async function (id, fields) {
     const ref = doc(window._fs, 'cases', id);
     await updateDoc(ref, Object.assign({}, fields, { updatedAt: serverTimestamp() }));
+  };
+
+  // 顧客マスタの取得
+  window._loadCustomers = async function () {
+    const snap = await getDocs(collection(window._fs, 'customers'));
+    const list = [];
+    snap.forEach(function (d) { list.push(Object.assign({ id: d.id }, d.data())); });
+    return list;
+  };
+
+  // 顧客の保存。id が null なら新規作成し、新しいIDを返す。既存IDなら更新する
+  window._saveCustomer = async function (id, data) {
+    if (id) {
+      const ref = doc(window._fs, 'customers', id);
+      await updateDoc(ref, Object.assign({}, data, { updatedAt: serverTimestamp() }));
+      return id;
+    }
+    const ref = await addDoc(collection(window._fs, 'customers'), Object.assign({}, data, {
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }));
+    return ref.id;
+  };
+
+  // 顧客の削除
+  window._deleteCustomer = async function (id) {
+    await deleteDoc(doc(window._fs, 'customers', id));
   };
 
   window.dispatchEvent(new Event('_fsready'));
