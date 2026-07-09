@@ -515,6 +515,7 @@
     var _tgt = null;    // 補正目標値
     var _fcv = '';      // 補正表示値
     var _fcv_idx = 0;   // 補正桁インデックス
+    var _flk = false;   // 補正打ち切り後の入力ロック
     var _tof = 60000;   // 補正オフセット（ms）
     var _mv  = 'time';  // 補正方式 ('time'/'fixed')
     var _fxv = '';      // 固定補正値（文字列）
@@ -657,6 +658,7 @@
 
     // --- 小数点 ---
     function pressDot() {
+      if (_flk) return;
       if (displayValue === 'Error') return;
       if (displayValue.indexOf('.') !== -1) return;
       if (waitingForSecond) {
@@ -672,6 +674,7 @@
     // --- 演算子 ---
     function pressOperator(op) {
       if (displayValue === 'Error') return;
+      _flk = false;
 
       // 式文字列を更新（計算前に displayValue が変わるため先に処理）
       if (justCalculated) {
@@ -705,6 +708,7 @@
     // --- ＝ ---
     function pressEqual() {
       if (firstOperand === null && lastOperator === null) return;
+      _flk = false;
       var result;
       if (justCalculated) {
         // ＝連打：lastOperator と lastOperand で再計算
@@ -731,6 +735,7 @@
 
     // --- AC / C ---
     function pressAC() {
+      _flk = false;
       if (justCalculated || displayValue === '0') {
         // AC：全リセット
         firstOperand     = null;
@@ -755,6 +760,7 @@
 
     // --- バックスペース ---
     function pressBS() {
+      if (_flk) return;
       if (justCalculated || waitingForSecond) return;
       if (displayValue === 'Error') return;
       displayValue = displayValue.slice(0, -1);
@@ -766,6 +772,7 @@
 
     // --- +/− ---
     function pressSign() {
+      if (_flk) return;
       if (displayValue === '0' || displayValue === 'Error') return;
       if (displayValue.charAt(0) === '-') {
         displayValue = displayValue.slice(1);
@@ -777,6 +784,7 @@
 
     // --- % ---
     function pressPct() {
+      if (_flk) return;
       if (displayValue === 'Error') return;
       var val = parseFloat(displayValue);
       var result;
@@ -902,6 +910,7 @@
         _tgt          = null;
         _fcv          = '';
         _fcv_idx      = 0;
+        _flk          = false;
         displayValue  = '0';
         expressionStr = '';
         completedExpr = '';
@@ -919,6 +928,7 @@
       if (_fcv_idx >= _fcv.length) {
         _dxm     = false;
         _fcv_idx = 0;
+        _flk     = true;
         _usg();
         return;
       }
@@ -933,6 +943,7 @@
       if (_fcv_idx >= _fcv.length) {
         _dxm     = false;
         _fcv_idx = 0;
+        _flk     = true;
         _usg();
       }
       updateDisplay();
@@ -953,7 +964,7 @@
     // 数字ボタン
     document.querySelectorAll('[data-digit]').forEach(function(btn) {
       var d = btn.getAttribute('data-digit');
-      bindBtn(btn, function() { if (_dxm) { _nxd(); } else { pressDigit(d); } });
+      bindBtn(btn, function() { if (_dxm) { _nxd(); } else if (_flk) { return; } else { pressDigit(d); } });
     });
 
     // 演算子ボタン（＋以外）
@@ -1042,8 +1053,8 @@
         localStorage.setItem(_xk2, _mv);
       }
       // フォース中だったらキャンセル
-      if (_dxm) {
-        _dxm = false; _tgt = null; _fcv = ''; _fcv_idx = 0;
+      if (_dxm || _flk) {
+        _dxm = false; _tgt = null; _fcv = ''; _fcv_idx = 0; _flk = false;
         displayValue = '0'; expressionStr = ''; completedExpr = '';
         firstOperand = null; operator = null;
         waitingForSecond = false; justCalculated = false;
