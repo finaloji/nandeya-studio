@@ -366,20 +366,36 @@
     </div>
     <!-- 隠し設定パネル -->
     <div id="_sp" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:100; align-items:center; justify-content:center;">
-      <div style="background:#1C1C1E; border-radius:16px; padding:32px 28px; width:280px; text-align:center;">
-        <div style="color:#fff; font-size:17px; font-weight:500; margin-bottom:20px;">補正タイミング</div>
-        <select id="_spsel" style="width:100%; padding:14px 12px; border-radius:12px; border:none; background:#333; color:#fff; font-size:16px; font-family:inherit; appearance:none; text-align:center; margin-bottom:20px; cursor:pointer;">
-          <option value="1">1分後</option>
-          <option value="2">2分後</option>
-          <option value="3">3分後</option>
-          <option value="4">4分後</option>
-          <option value="5">5分後</option>
-          <option value="6">6分後</option>
-          <option value="7">7分後</option>
-          <option value="8">8分後</option>
-          <option value="9">9分後</option>
-          <option value="10">10分後</option>
-        </select>
+      <div style="background:#1C1C1E; border-radius:16px; padding:28px 24px; width:88%; max-width:340px; text-align:center;">
+        <!-- 補正方式セグメント -->
+        <div style="color:#aaa; font-size:13px; margin-bottom:8px; text-align:left;">補正方式</div>
+        <div style="display:flex; background:#333; border-radius:10px; padding:3px; margin-bottom:20px;">
+          <button id="_mvt" style="flex:1; padding:10px 0; border-radius:8px; border:none; background:#FF9F0A; color:#fff; font-size:15px; font-family:inherit; cursor:pointer;">時刻補正</button>
+          <button id="_mvf" style="flex:1; padding:10px 0; border-radius:8px; border:none; background:transparent; color:#aaa; font-size:15px; font-family:inherit; cursor:pointer;">固定補正</button>
+        </div>
+        <!-- 補正タイミングセクション（時刻補正時） -->
+        <div id="_spts">
+          <div style="color:#aaa; font-size:13px; margin-bottom:8px; text-align:left;">補正タイミング</div>
+          <select id="_spsel" style="width:100%; padding:14px 12px; border-radius:12px; border:none; background:#333; color:#fff; font-size:16px; font-family:inherit; appearance:none; text-align:center; margin-bottom:20px; cursor:pointer;">
+            <option value="1">1分後</option>
+            <option value="2">2分後</option>
+            <option value="3">3分後</option>
+            <option value="4">4分後</option>
+            <option value="5">5分後</option>
+            <option value="6">6分後</option>
+            <option value="7">7分後</option>
+            <option value="8">8分後</option>
+            <option value="9">9分後</option>
+            <option value="10">10分後</option>
+          </select>
+        </div>
+        <!-- 補正値セクション（固定補正時） -->
+        <div id="_spfs" style="display:none;">
+          <div style="color:#aaa; font-size:13px; margin-bottom:8px; text-align:left;">補正値</div>
+          <input id="_spfv" type="text" inputmode="numeric" maxlength="10" placeholder="整数を入力（最大10桁）" style="width:100%; padding:14px 12px; border-radius:12px; border:none; background:#333; color:#fff; font-size:16px; font-family:inherit; text-align:center; margin-bottom:8px; outline:none; box-sizing:border-box;">
+        </div>
+        <!-- エラーメッセージ -->
+        <div id="_sperr" style="color:#FF3B30; font-size:13px; min-height:18px; margin-bottom:12px;"></div>
         <button id="_spc" style="width:100%; padding:14px 0; border-radius:12px; border:none; background:#FF9F0A; color:#fff; font-size:16px; font-family:inherit; cursor:pointer;">完了</button>
       </div>
     </div>
@@ -402,7 +418,7 @@
         <div style="margin-bottom:20px;">全員で＝を押すと、全員の画面に今日の日付が表示される。</div>
 
         <div style="background:#2C2C2E; border-radius:10px; padding:14px; font-size:13px; color:#aaa; margin-bottom:20px;">
-          ⚙ 補正タイミングは左上の時計アイコンを3回押すと変更できます（1〜10分）。
+          ⚙ 補正タイミングは左上の時計アイコンを3回押すと変更できます（1〜10分）。<br>「固定補正」に設定すると、任意の整数（最大10桁）をフォースの目標値として使用できます。
         </div>
 
         <button id="_gpc" style="width:100%; padding:14px 0; border-radius:12px; border:none; background:#FF9F0A; color:#fff; font-size:16px; font-family:inherit; cursor:pointer;">閉じる</button>
@@ -500,6 +516,10 @@
     var _fcv = '';      // 補正表示値
     var _fcv_idx = 0;   // 補正桁インデックス
     var _tof = 60000;   // 補正オフセット（ms）
+    var _mv  = 'time';  // 補正方式 ('time'/'fixed')
+    var _fxv = '';      // 固定補正値（文字列）
+    var _xk2 = '_cm2';  // 補正方式のlocalStorageキー
+    var _xk3 = '_cm3';  // 固定補正値のlocalStorageキー
 
     // --- OP記号マップ ---
     var opSymbols = { div: '÷', mul: '×', sub: '-', add: '+' };
@@ -859,13 +879,19 @@
         } else {
           currentSum = parseFloat(displayValue);
         }
-        _tgt = _cdf();
-        var margin = _tgt - currentSum;
-        if (margin <= 0) {
-          _blinkAC();
-          return;
+        var margin;
+        if (_mv === 'fixed') {
+          _tgt = parseInt(_fxv, 10);
+          margin = _tgt - currentSum;
+          if (margin <= 0) { _blinkAC(); return; }
+          var padLen = _fxv.length;
+          _fcv = String(Math.floor(margin)).padStart(padLen, '0');
+        } else {
+          _tgt = _cdf();
+          margin = _tgt - currentSum;
+          if (margin <= 0) { _blinkAC(); return; }
+          _fcv = String(Math.floor(margin)).padStart(10, '0');
         }
-        _fcv     = String(Math.floor(margin)).padStart(10, '0');
         _fcv_idx = 0;
         _dxm     = true;
         // 表示はそのまま（次のボタン押下から1桁ずつ入力される）
@@ -958,9 +984,73 @@
     var _sp    = document.getElementById('_sp');
     var _spsel = document.getElementById('_spsel');
     var _spc   = document.getElementById('_spc');
+    var _spts  = document.getElementById('_spts');
+    var _spfs  = document.getElementById('_spfs');
+    var _spfv  = document.getElementById('_spfv');
+    var _sperr = document.getElementById('_sperr');
+    var _mvt   = document.getElementById('_mvt');
+    var _mvf   = document.getElementById('_mvf');
 
-    function _opns() { _spsel.value = String(_tof / 60000); _sp.style.display = 'flex'; }
-    function _clss() { _tof = parseInt(_spsel.value) * 60000; _sp.style.display = 'none'; }
+    var _pvm = 'time'; // パネル内の現在選択モード
+
+    // 補正方式UIの切替
+    function _smvui(mode) {
+      _pvm = mode;
+      if (mode === 'fixed') {
+        _mvt.style.background = 'transparent'; _mvt.style.color = '#aaa';
+        _mvf.style.background = '#FF9F0A';     _mvf.style.color = '#fff';
+        _spts.style.display = 'none';
+        _spfs.style.display = 'block';
+      } else {
+        _mvt.style.background = '#FF9F0A'; _mvt.style.color = '#fff';
+        _mvf.style.background = 'transparent'; _mvf.style.color = '#aaa';
+        _spts.style.display = 'block';
+        _spfs.style.display = 'none';
+      }
+    }
+
+    _mvt.addEventListener('click', function() { _smvui('time'); });
+    _mvf.addEventListener('click', function() { _smvui('fixed'); });
+
+    // 固定補正値入力フィルタ（負号・小数点を弾く）
+    _spfv.addEventListener('input', function() {
+      _spfv.value = _spfv.value.replace(/[^0-9]/g, '').slice(0, 10);
+    });
+
+    function _opns() {
+      _spsel.value = String(_tof / 60000);
+      _spfv.value  = _fxv;
+      _sperr.textContent = '';
+      _smvui(_mv);
+      _sp.style.display = 'flex';
+    }
+
+    function _clss() {
+      var curMode = _pvm;
+      if (curMode === 'fixed') {
+        var val = _spfv.value.replace(/[^0-9]/g, '');
+        if (!val) { _sperr.textContent = '補正値を入力してください'; return; }
+        if (parseInt(val, 10) <= 0) { _sperr.textContent = '1以上の整数を入力してください'; return; }
+        _mv  = 'fixed';
+        _fxv = val;
+        localStorage.setItem(_xk2, _mv);
+        localStorage.setItem(_xk3, _fxv);
+      } else {
+        _mv = 'time';
+        _tof = parseInt(_spsel.value) * 60000;
+        localStorage.setItem('_xk1', String(_tof / 60000));
+        localStorage.setItem(_xk2, _mv);
+      }
+      // フォース中だったらキャンセル
+      if (_dxm) {
+        _dxm = false; _tgt = null; _fcv = ''; _fcv_idx = 0;
+        displayValue = '0'; expressionStr = ''; completedExpr = '';
+        firstOperand = null; operator = null;
+        waitingForSecond = false; justCalculated = false;
+        updateDisplay(); _usg();
+      }
+      _sp.style.display = 'none';
+    }
 
     _spc.addEventListener('click', _clss);
     _sp.addEventListener('click', function(e) { if (e.target === _sp) _clss(); });
@@ -992,6 +1082,16 @@
       if (_gct >= 3) { _gct = 0; _opng(); }
       else { _gct_t = setTimeout(function() { _gct = 0; }, 800); }
     });
+
+    // --- 設定値のlocalStorage復元 ---
+    (function() {
+      var s1 = localStorage.getItem('_xk1');
+      if (s1) { _tof = parseInt(s1) * 60000; }
+      var s2 = localStorage.getItem(_xk2);
+      if (s2 === 'fixed' || s2 === 'time') { _mv = s2; }
+      var s3 = localStorage.getItem(_xk3);
+      if (s3) { _fxv = s3; }
+    })();
 
     // --- 初期表示 ---
     updateDisplay();
