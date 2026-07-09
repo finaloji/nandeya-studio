@@ -129,6 +129,8 @@
     (function () {
       for (var i = 0; i < _sg.length; i++) _wt.push(1);
     })();
+    // 基準項目のインデックス（暫定固定。後日の設定画面で差し替え予定）
+    var _ti = 0;
 
     var _NS = 'http://www.w3.org/2000/svg';
     var _CX = 150, _CY = 150, _R = 140;
@@ -286,9 +288,10 @@
       _raf = requestAnimationFrame(_spinTick);
     }
 
-    // 到達角・着地項目の決定（起点角から、ランダムに選んだ項目の範囲内のどこかへの到達角と所要時間を算出）
+    // 到達角・着地項目の決定（起点角から、選ばれた項目の範囲内のどこかへの到達角と所要時間を算出。
+    // 補正モードONのときは基準項目、OFFのときは従来通りランダムに項目を選ぶ）
     function _pickLanding() {
-      var r = Math.floor(Math.random() * _bd.length);
+      var r = _am ? _ti : Math.floor(Math.random() * _bd.length);
       var seg = _bd[r];
       var p = seg.a0 + Math.random() * (seg.a1 - seg.a0);
 
