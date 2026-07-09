@@ -194,13 +194,7 @@
     }
 
     #display-preview {
-      color: rgba(255, 255, 255, 0.5);
-      font-size: 24px;
-      font-weight: 300;
-      height: 30px;
-      line-height: 30px;
-      text-align: right;
-      width: 100%;
+      display: none;
     }
 
     #display-number {
@@ -658,7 +652,7 @@
 
     // --- 小数点 ---
     function pressDot() {
-      if (_flk) return;
+      if (_dxm || _flk) return;
       if (displayValue === 'Error') return;
       if (displayValue.indexOf('.') !== -1) return;
       if (waitingForSecond) {
@@ -673,8 +667,8 @@
 
     // --- 演算子 ---
     function pressOperator(op) {
+      if (_dxm || _flk) return;   // フォース中は演算子を無効化
       if (displayValue === 'Error') return;
-      _flk = false;
 
       // 式文字列を更新（計算前に displayValue が変わるため先に処理）
       if (justCalculated) {
@@ -707,6 +701,7 @@
 
     // --- ＝ ---
     function pressEqual() {
+      if (_dxm) return;   // フォースの桁を出し切る前は＝を無効化
       if (firstOperand === null && lastOperator === null) return;
       _flk = false;
       var result;
@@ -735,7 +730,7 @@
 
     // --- AC / C ---
     function pressAC() {
-      _flk = false;
+      if (_dxm || _flk) return;   // フォース中はAC/Cを無効化
       if (justCalculated || displayValue === '0') {
         // AC：全リセット
         firstOperand     = null;
@@ -760,9 +755,39 @@
 
     // --- バックスペース ---
     function pressBS() {
-      if (_flk) return;
-      if (justCalculated || waitingForSecond) return;
+      if (_dxm || _flk) return;
+      if (justCalculated) return;
       if (displayValue === 'Error') return;
+
+      // 演算子を押した直後（第2オペランド未入力）→ 演算子ごと取り消して第1オペランドを編集
+      if (waitingForSecond) {
+        if (operator !== null && firstOperand !== null) {
+          displayValue     = String(firstOperand);
+          firstOperand     = null;
+          operator         = null;
+          waitingForSecond = false;
+          expressionStr    = '';
+          completedExpr    = '';
+          updateDisplay();
+          updateOperatorHighlight();
+        }
+        return;
+      }
+
+      // 第2オペランドが 0 まで消えていて、まだ演算子が残っている
+      // → 演算子ごと取り消して第1オペランドを編集できるようにする
+      if (displayValue === '0' && operator !== null && firstOperand !== null) {
+        displayValue     = String(firstOperand);
+        firstOperand     = null;
+        operator         = null;
+        expressionStr    = '';
+        completedExpr    = '';
+        updateDisplay();
+        updateOperatorHighlight();
+        return;
+      }
+
+      // 通常の1桁削除
       displayValue = displayValue.slice(0, -1);
       if (displayValue === '' || displayValue === '-') {
         displayValue = '0';
@@ -772,7 +797,7 @@
 
     // --- +/− ---
     function pressSign() {
-      if (_flk) return;
+      if (_dxm || _flk) return;
       if (displayValue === '0' || displayValue === 'Error') return;
       if (displayValue.charAt(0) === '-') {
         displayValue = displayValue.slice(1);
@@ -784,7 +809,7 @@
 
     // --- % ---
     function pressPct() {
-      if (_flk) return;
+      if (_dxm || _flk) return;
       if (displayValue === 'Error') return;
       var val = parseFloat(displayValue);
       var result;
@@ -877,7 +902,7 @@
 
     // --- 補正処理 ---
     function _txm() {
-      if (!_dxm) {
+      if (!_dxm && !_flk) {
         // 補正モード起動
         var currentSum;
         if (waitingForSecond) {
