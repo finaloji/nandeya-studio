@@ -680,10 +680,6 @@
       </div>
       <div class="login-error" id="_xmsg"></div>
       <button class="login-btn" id="_xlb">ログイン</button>
-      <div class="login-device-change">
-        この端末を新しく登録したい場合<br>
-        <a href="#" id="_xdr">端末変更をリクエスト</a>
-      </div>
     </div>
   </div>
 
@@ -1476,6 +1472,22 @@
       document.getElementById('_xag').classList.remove('hidden');
     }
 
+    // 端末ロック（同時に使えるのは _xmax 台まで。超過時は最古を自動的に外す）
+    var _xmax = 2;
+    function _xgdv(data) {
+      if (Array.isArray(data.devices)) return data.devices.slice();
+      if (data.deviceId) return [data.deviceId];
+      return [];
+    }
+    function _xadv(list, dev) {
+      var i = list.indexOf(dev);
+      if (i !== -1 && i === list.length - 1) return null;
+      if (i !== -1) list.splice(i, 1);
+      list.push(dev);
+      while (list.length > _xmax) list.shift();
+      return list;
+    }
+
     // ログイン処理
     function _xlogin(id, pass) {
       var fns = window.__xfns;
@@ -1484,13 +1496,10 @@
         if (!snap.exists()) return { ok: false, reason: 'invalid' };
         var data = snap.data();
         if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
-        var myDev = _xdev();
-        if (!data.deviceId) {
-          return fns.updateDoc(fns.doc(db, 'cipher_licenses', id), { deviceId: myDev })
-            .then(function () { return { ok: true }; });
-        }
-        if (data.deviceId === myDev) return { ok: true };
-        return { ok: false, reason: 'device' };
+        var next = _xadv(_xgdv(data), _xdev());
+        if (next === null) return { ok: true };
+        return fns.updateDoc(fns.doc(db, 'cipher_licenses', id), { devices: next })
+          .then(function () { return { ok: true }; });
       });
     }
 
@@ -1508,7 +1517,7 @@
           return false;
         }
         var data = snap.data();
-        if (data.deviceId === _xdev()) {
+        if (_xgdv(data).indexOf(_xdev()) !== -1) {
           _xhide();
           return true;
         }
@@ -1519,46 +1528,6 @@
       }).catch(function () {
         // 通信エラー: 何もしない（ログイン維持・オフライン許容）
         return false;
-      });
-    }
-
-    // 端末変更リクエスト送信
-    function _xreq() {
-      var id   = document.getElementById('_xid').value.trim();
-      var pass = document.getElementById('_xpc').value;
-      if (!id || !pass) { _xshe('IDとパスコードを入力してください'); return; }
-      if (!window.__xdb) { _xshe('接続中です。しばらくお待ちください'); return; }
-      _xslb(true);
-      var fns = window.__xfns;
-      var db  = window.__xdb;
-      fns.getDoc(fns.doc(db, 'cipher_licenses', id)).then(function (snap) {
-        if (!snap.exists() || snap.data().passcode !== pass) {
-          _xshe('IDまたはパスコードが正しくありません');
-          _xslb(false);
-          return;
-        }
-        var q = fns.query(
-          fns.collection(db, 'cipher_deviceRequests'),
-          fns.where('licenseId', '==', id),
-          fns.where('status', '==', 'pending')
-        );
-        return fns.getDocs(q).then(function (qs) {
-          if (!qs.empty) {
-            _xshi('すでに申請済みです。承認をお待ちください');
-          } else {
-            return fns.addDoc(fns.collection(db, 'cipher_deviceRequests'), {
-              licenseId: id,
-              requestedAt: Date.now(),
-              status: 'pending'
-            }).then(function () {
-              _xshi('申請を送信しました。承認をお待ちください');
-            });
-          }
-        });
-      }).catch(function () {
-        _xshe('エラーが発生しました。再度お試しください');
-      }).finally(function () {
-        _xslb(false);
       });
     }
 
@@ -1574,8 +1543,6 @@
         if (res.ok) {
           localStorage.setItem('_qd2', id);
           _xhide();
-        } else if (res.reason === 'device') {
-          _xshe('別の端末で登録済みです');
         } else {
           _xshe('IDまたはパスコードが正しくありません');
         }
@@ -1584,12 +1551,6 @@
       }).finally(function () {
         _xslb(false);
       });
-    });
-
-    // 端末変更リンク
-    document.getElementById('_xdr').addEventListener('click', function (e) {
-      e.preventDefault();
-      _xreq();
     });
 
     // ページ読み込み時: 保存済みなら即座に隠す（Firestore応答を待たない）

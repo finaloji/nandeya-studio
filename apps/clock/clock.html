@@ -429,10 +429,6 @@
       </div>
       <div class="lg-msg" id="_rmsg"></div>
       <button class="lg-btn" id="_rlb">ログイン</button>
-      <div class="lg-dc">
-        この端末を新しく登録したい場合<br>
-        <a href="#" id="_rdr">端末変更をリクエスト</a>
-      </div>
     </div>
   </div>
 
@@ -1043,6 +1039,22 @@
       if (window._rtApplyBg) window._rtApplyBg();
     }
 
+    // 端末ロック（同時に使えるのは _rmax 台まで。超過時は最古を自動的に外す）
+    var _rmax = 2;
+    function _rgdv(data) {
+      if (Array.isArray(data.devices)) return data.devices.slice();
+      if (data.deviceId) return [data.deviceId];
+      return [];
+    }
+    function _radv(list, dev) {
+      var i = list.indexOf(dev);
+      if (i !== -1 && i === list.length - 1) return null;
+      if (i !== -1) list.splice(i, 1);
+      list.push(dev);
+      while (list.length > _rmax) list.shift();
+      return list;
+    }
+
     // ログイン処理
     function _ratl(id, pass) {
       var fns = window.__rfns, db = window.__rdb;
@@ -1050,13 +1062,10 @@
         if (!snap.exists()) return { ok: false, reason: 'invalid' };
         var data = snap.data();
         if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
-        var myDev = _grdi();
-        if (!data.deviceId) {
-          return fns.updateDoc(fns.doc(db, 'clock_licenses', id), { deviceId: myDev })
-            .then(function () { return { ok: true }; });
-        }
-        if (data.deviceId === myDev) return { ok: true };
-        return { ok: false, reason: 'device' };
+        var next = _radv(_rgdv(data), _grdi());
+        if (next === null) return { ok: true };
+        return fns.updateDoc(fns.doc(db, 'clock_licenses', id), { devices: next })
+          .then(function () { return { ok: true }; });
       });
     }
 
@@ -1067,41 +1076,10 @@
       var fns = window.__rfns, db = window.__rdb;
       return fns.getDoc(fns.doc(db, 'clock_licenses', lid)).then(function (snap) {
         if (!snap.exists()) { localStorage.removeItem('_rtlic'); return false; }
-        if (snap.data().deviceId === _grdi()) { _rhga(); return true; }
+        if (_rgdv(snap.data()).indexOf(_grdi()) !== -1) { _rhga(); return true; }
         localStorage.removeItem('_rtlic');
         return false;
       }).catch(function () { return false; });
-    }
-
-    // 端末変更リクエスト
-    function _rdcr() {
-      var id   = document.getElementById('_rid').value.trim();
-      var pass = document.getElementById('_rpc').value;
-      if (!id || !pass) { _rshe('IDとパスコードを入力してください'); return; }
-      if (!window.__rdb) { _rshe('接続中です。しばらくお待ちください'); return; }
-      _rslb(true);
-      var fns = window.__rfns, db = window.__rdb;
-      fns.getDoc(fns.doc(db, 'clock_licenses', id)).then(function (snap) {
-        if (!snap.exists() || snap.data().passcode !== pass) {
-          _rshe('IDまたはパスコードが正しくありません'); _rslb(false); return;
-        }
-        var q = fns.query(
-          fns.collection(db, 'clock_deviceRequests'),
-          fns.where('licenseId', '==', id),
-          fns.where('status', '==', 'pending')
-        );
-        return fns.getDocs(q).then(function (qs) {
-          if (!qs.empty) {
-            _rshi('すでに申請済みです。承認をお待ちください');
-          } else {
-            return fns.addDoc(fns.collection(db, 'clock_deviceRequests'), {
-              licenseId: id, requestedAt: Date.now(), status: 'pending'
-            }).then(function () { _rshi('申請を送信しました。承認をお待ちください'); });
-          }
-        });
-      }).catch(function () {
-        _rshe('エラーが発生しました。再度お試しください');
-      }).finally(function () { _rslb(false); });
     }
 
     // ログインボタン
@@ -1116,20 +1094,12 @@
         if (res.ok) {
           localStorage.setItem('_rtlic', id);
           _rhga();
-        } else if (res.reason === 'device') {
-          _rshe('別の端末で登録済みです');
         } else {
           _rshe('IDまたはパスコードが正しくありません');
         }
       }).catch(function () {
         _rshe('エラーが発生しました。再度お試しください');
       }).finally(function () { _rslb(false); });
-    });
-
-    // 端末変更リンク
-    document.getElementById('_rdr').addEventListener('click', function (e) {
-      e.preventDefault();
-      _rdcr();
     });
 
     // Firebase 準備完了後に自動ログイン試行（順序保険つき）

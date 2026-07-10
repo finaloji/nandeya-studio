@@ -323,10 +323,6 @@
       </div>
       <div class="login-error" id="_cmsg"></div>
       <button class="login-btn" id="_clb">ログイン</button>
-      <div class="login-device-change">
-        この端末を新しく登録したい場合<br>
-        <a href="#" id="_cdr">端末変更をリクエスト</a>
-      </div>
     </div>
   </div>
 
@@ -1183,6 +1179,22 @@
       document.getElementById('_cag').classList.add('hidden');
     }
 
+    // 端末ロック（同時に使えるのは _cmax 台まで。超過時は最古を自動的に外す）
+    var _cmax = 2;
+    function _cgdv(data) {
+      if (Array.isArray(data.devices)) return data.devices.slice();
+      if (data.deviceId) return [data.deviceId];
+      return [];
+    }
+    function _cadv(list, dev) {
+      var i = list.indexOf(dev);
+      if (i !== -1 && i === list.length - 1) return null;
+      if (i !== -1) list.splice(i, 1);
+      list.push(dev);
+      while (list.length > _cmax) list.shift();
+      return list;
+    }
+
     // ログイン処理
     function _catl(id, pass) {
       var fns = window.__cfns;
@@ -1191,13 +1203,10 @@
         if (!snap.exists()) return { ok: false, reason: 'invalid' };
         var data = snap.data();
         if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
-        var myDev = _gcdi();
-        if (!data.deviceId) {
-          return fns.updateDoc(fns.doc(db, 'calc_licenses', id), { deviceId: myDev })
-            .then(function() { return { ok: true }; });
-        }
-        if (data.deviceId === myDev) return { ok: true };
-        return { ok: false, reason: 'device' };
+        var next = _cadv(_cgdv(data), _gcdi());
+        if (next === null) return { ok: true };
+        return fns.updateDoc(fns.doc(db, 'calc_licenses', id), { devices: next })
+          .then(function() { return { ok: true }; });
       });
     }
 
@@ -1210,49 +1219,10 @@
       return fns.getDoc(fns.doc(db, 'calc_licenses', lid)).then(function(snap) {
         if (!snap.exists()) { localStorage.removeItem('_clicid'); return false; }
         var data = snap.data();
-        if (data.deviceId === _gcdi()) { _chga(); return true; }
+        if (_cgdv(data).indexOf(_gcdi()) !== -1) { _chga(); return true; }
         localStorage.removeItem('_clicid');
         return false;
       }).catch(function() { return false; });
-    }
-
-    // 端末変更リクエスト送信
-    function _cdcr() {
-      var id   = document.getElementById('_cid').value.trim();
-      var pass = document.getElementById('_cpc').value;
-      if (!id || !pass) { _cshe('IDとパスコードを入力してください'); return; }
-      _cslb(true);
-      var fns = window.__cfns;
-      var db  = window.__cdb;
-      fns.getDoc(fns.doc(db, 'calc_licenses', id)).then(function(snap) {
-        if (!snap.exists() || snap.data().passcode !== pass) {
-          _cshe('IDまたはパスコードが正しくありません');
-          _cslb(false);
-          return;
-        }
-        var q = fns.query(
-          fns.collection(db, 'calc_deviceRequests'),
-          fns.where('licenseId', '==', id),
-          fns.where('status', '==', 'pending')
-        );
-        return fns.getDocs(q).then(function(qs) {
-          if (!qs.empty) {
-            _cshi('すでに申請済みです。承認をお待ちください');
-          } else {
-            return fns.addDoc(fns.collection(db, 'calc_deviceRequests'), {
-              licenseId: id,
-              requestedAt: Date.now(),
-              status: 'pending'
-            }).then(function() {
-              _cshi('申請を送信しました。承認をお待ちください');
-            });
-          }
-        });
-      }).catch(function() {
-        _cshe('エラーが発生しました。再度お試しください');
-      }).finally(function() {
-        _cslb(false);
-      });
     }
 
     // 認証ボタン
@@ -1267,8 +1237,6 @@
         if (res.ok) {
           localStorage.setItem('_clicid', id);
           _chga();
-        } else if (res.reason === 'device') {
-          _cshe('別の端末で登録済みです');
         } else {
           _cshe('IDまたはパスコードが正しくありません');
         }
@@ -1279,11 +1247,6 @@
       });
     });
 
-    // 端末変更リンク
-    document.getElementById('_cdr').addEventListener('click', function(e) {
-      e.preventDefault();
-      _cdcr();
-    });
 
     // Firebase 準備完了後に自動ログイン試行
     window.addEventListener('_cfsready', function() {

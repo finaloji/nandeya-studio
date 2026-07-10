@@ -492,10 +492,6 @@
     </div>
     <div class="login-error" id="loginError"></div>
     <button type="button" class="login-btn" id="loginBtn">ログイン</button>
-    <div class="login-device-change">
-      この端末を新しく登録したい場合<br>
-      <a href="#" id="deviceChangeLink">端末変更をリクエスト</a>
-    </div>
   </div>
 </div>
 <!-- Sprint A2 ここまで -->
@@ -1057,7 +1053,6 @@
   var loginIdInput = document.getElementById('loginIdInput');
   var loginPassInput = document.getElementById('loginPassInput');
   var loginError = document.getElementById('loginError');
-  var deviceChangeLink = document.getElementById('deviceChangeLink');
 
   function getDeviceId() {
     var id = localStorage.getItem('_devid');
@@ -1083,6 +1078,24 @@
     loginBtn.textContent = isLoading ? '確認中...' : 'ログイン';
   }
 
+  // 同時に使える端末数の上限（超過ログイン時は最古の端末から自動的に外れる）
+  var MAX_DEVICES = 2;
+  // 許可端末リストの取得（旧 deviceId 形式も吸収）
+  function getDevices(data) {
+    if (Array.isArray(data.devices)) return data.devices.slice();
+    if (data.deviceId) return [data.deviceId];
+    return [];
+  }
+  // この端末を許可リストへ（末尾＝最新。上限超過は先頭＝最古から削除）。変更後配列を返す。既に最新なら null。
+  function addDevice(list, dev) {
+    var i = list.indexOf(dev);
+    if (i !== -1 && i === list.length - 1) return null;
+    if (i !== -1) list.splice(i, 1);
+    list.push(dev);
+    while (list.length > MAX_DEVICES) list.shift();
+    return list;
+  }
+
   async function attemptLogin(licenseId, passcode) {
     var db = window.__db;
     var fns = window.__fsFns;
@@ -1095,15 +1108,10 @@
     if (data.passcode !== passcode) {
       return { ok: false, reason: 'invalid' };
     }
-    var myDevice = getDeviceId();
-    if (!data.deviceId) {
-      await fns.updateDoc(ref, { deviceId: myDevice });
-      return { ok: true };
-    }
-    if (data.deviceId === myDevice) {
-      return { ok: true };
-    }
-    return { ok: false, reason: 'device' };
+    var next = addDevice(getDevices(data), getDeviceId());
+    if (next === null) return { ok: true };
+    await fns.updateDoc(ref, { devices: next });
+    return { ok: true };
   }
 
   async function tryAutoLogin() {
@@ -1119,8 +1127,7 @@
         return false;
       }
       var data = snap.data();
-      var myDevice = getDeviceId();
-      if (data.deviceId === myDevice) {
+      if (getDevices(data).indexOf(getDeviceId()) !== -1) {
         loginScreen.classList.add('hidden');
         return true;
       }
@@ -1146,8 +1153,6 @@
       if (result.ok) {
         localStorage.setItem('_licid', id);
         loginScreen.classList.add('hidden');
-      } else if (result.reason === 'device') {
-        showError('他の端末で使用中です');
       } else {
         showError('IDまたはパスコードが正しくありません');
       }
@@ -1156,56 +1161,6 @@
       showError('通信エラーが発生しました。もう一度お試しください');
     } finally {
       setLoading(false);
-    }
-  });
-
-  var deviceChangeBusy = false;
-
-  deviceChangeLink.addEventListener('click', async function(e) {
-    e.preventDefault();
-    if (deviceChangeBusy) return;
-    var id = loginIdInput.value.trim();
-    var pass = loginPassInput.value;
-    showError('');
-    if (!id || !pass) {
-      showError('IDまたはパスコードが正しくありません');
-      return;
-    }
-    deviceChangeBusy = true;
-    var originalText = deviceChangeLink.textContent;
-    deviceChangeLink.textContent = '確認中...';
-    try {
-      var db = window.__db;
-      var fns = window.__fsFns;
-      var ref = fns.doc(db, 'licenses', id);
-      var snap = await fns.getDoc(ref);
-      if (!snap.exists() || snap.data().passcode !== pass) {
-        showError('IDまたはパスコードが正しくありません');
-        return;
-      }
-      // 既存のpending申請があるか確認
-      var reqQuery = fns.query(
-        fns.collection(db, 'deviceChangeRequests'),
-        fns.where('licenseId', '==', id),
-        fns.where('status', '==', 'pending')
-      );
-      var existing = await fns.getDocs(reqQuery);
-      if (!existing.empty) {
-        showError('すでに申請済みです。承認をお待ちください');
-        return;
-      }
-      await fns.addDoc(fns.collection(db, 'deviceChangeRequests'), {
-        licenseId: id,
-        requestedAt: Date.now(),
-        status: 'pending'
-      });
-      showInfo('申請を送信しました。承認をお待ちください');
-    } catch (err) {
-      console.error('[端末変更リクエスト] エラー:', err);
-      showError('通信エラーが発生しました。もう一度お試しください');
-    } finally {
-      deviceChangeBusy = false;
-      deviceChangeLink.textContent = originalText;
     }
   });
 
