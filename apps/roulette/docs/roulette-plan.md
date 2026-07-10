@@ -15,7 +15,7 @@
 | ライセンス | 4-1〜4-4 | ライセンス一式（ログインゲート・端末ロック roulette_licenses・共有admin.htmlにタブ追加・firestore.rules追加・PWA manifest/sw/icons） | 完了（まとめて実装。**firestore.rulesのFirebaseデプロイは手動で要実施**） |
 | 仕上げ | 5-1 | 実機テスト・減速チューニング・バグ修正 | 未着手 |
 | 豪華演出 | 6-1 | 大当たり演出（着地項目＝基準項目で常に発動・タップで閉じる） | 完了（集中線・フラッシュ・シェイク・紙吹雪・金文字スラムイン・バイブ・Web Audioファンファーレ。文言はFEVER!!＝獲得を意味する語は使わない。難読化名 _fx/_fxc/_fxSpawn/_onFxTap/_lr/_fxT/_au/_aui/_aup） |
-| 豪華演出 | 6-2 | 項目ごとの写真登録（隠し設定パネルの項目編集を拡張・自動加工・localStorage保存・演出内に表示） | 未着手 |
+| 豪華演出 | 6-2 | 項目ごとの写真登録（隠し設定パネルの項目編集を拡張・自動加工・localStorage保存・演出内に表示） | 完了（写真＋/写真✓ボタン、長辺900px圧縮、_zk5保存、演出内に金枠表示。難読化名 _ph/_photoIdx/_onPhotoBtn/_procPhoto/_onPhotoPick） |
 
 ## メモ
 
