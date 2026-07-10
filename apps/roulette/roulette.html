@@ -236,6 +236,21 @@
     .item-del:disabled {
       opacity: 0.35;
     }
+    .item-photo {
+      flex: 0 0 auto;
+      appearance: none;
+      border: 1px solid #3a3a41;
+      background: #17171b;
+      color: #b7b7bd;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+    .item-photo.set {
+      border-color: #f4c150;
+      color: #f4c150;
+    }
+    .item-photo:disabled { opacity: 0.5; }
     .panel-add {
       appearance: none;
       border: 1px dashed #3a3a41;
@@ -362,7 +377,8 @@
       animation: fxIn 0.4s cubic-bezier(0.2, 2.2, 0.4, 1) both;
     }
     .fx-main {
-      font-size: clamp(56px, 21vw, 130px);
+      font-size: clamp(40px, 15.5vw, 120px);
+      white-space: nowrap;
       font-weight: 900;
       line-height: 1.05;
       background: linear-gradient(180deg, #fff6c8 0%, #ffd23f 35%, #ff9500 70%, #ffdf70 100%);
@@ -374,12 +390,24 @@
       animation: fxIn 0.55s cubic-bezier(0.2, 2.4, 0.4, 1) 0.1s both,
                  fxPulse 0.9s ease-in-out 0.7s infinite alternate;
     }
+    .fx-photo {
+      max-width: min(70vw, 320px);
+      max-height: 34vh;
+      object-fit: contain;
+      border: 4px solid #ffe066;
+      border-radius: 14px;
+      box-shadow: 0 0 30px rgba(255,190,60,0.85), 0 8px 20px rgba(0,0,0,0.5);
+      background: #000;
+      animation: fxInSkew 0.5s cubic-bezier(0.2, 2.4, 0.4, 1) 0.25s both;
+    }
     .fx-item {
-      font-size: clamp(30px, 11vw, 64px);
+      font-size: clamp(26px, 9vw, 60px);
+      white-space: nowrap;
+      max-width: 94vw;
       font-weight: 900;
       color: #fff;
       background: linear-gradient(180deg, #ff5a3c 0%, #d00000 100%);
-      padding: 1vh 7vw;
+      padding: 1vh 5vw;
       border: 3px solid #ffe066;
       border-radius: 12px;
       box-shadow: 0 0 24px rgba(255,60,30,0.85), inset 0 2px 0 rgba(255,255,255,0.35);
@@ -576,6 +604,7 @@
           <h3>表示項目</h3>
           <div class="item-list" id="itemList"></div>
           <button type="button" class="panel-add" id="itemAdd">追加</button>
+          <input type="file" id="photoInput" accept="image/*" style="display:none;">
         </section>
         <section class="panel-sec">
           <h3>基準項目</h3>
@@ -602,6 +631,7 @@
     <div class="fx-center">
       <div class="fx-badge">🎉 祝 🎉</div>
       <div class="fx-main">大当たり!!</div>
+      <img class="fx-photo" id="fxPhoto" alt="" style="display:none;">
       <div class="fx-item" id="fxItem"></div>
       <div class="fx-sub">FEVER!!</div>
     </div>
@@ -630,6 +660,11 @@
     })();
     // 基準項目のインデックス（設定パネルの「基準項目」で選択）
     var _ti = 0;
+    // 各項目に登録された画像（dataURL文字列。未設定は空文字）。_sg と同じ並び
+    var _ph = [];
+    (function () {
+      for (var i = 0; i < _sg.length; i++) _ph.push('');
+    })();
 
     // 表示項目数の下限・上限
     var _MIN_N = 2;
@@ -744,6 +779,7 @@
     var _zk2 = 'rls_a2'; // 基準項目インデックス
     var _zk3 = 'rls_a3'; // 配色テーマの選択
     var _zk4 = 'rls_a4'; // セグメント幅の重み
+    var _zk5 = 'rls_a5'; // 各項目の画像（dataURL配列）
 
     // localStorage からの読み込み（壊れた値・型不一致は既定値のまま無視する）
     function _rl() {
@@ -784,6 +820,17 @@
         }
       } catch (e) {}
       _pl = _plSet[_pi];
+
+      try {
+        var s5 = localStorage.getItem(_zk5);
+        if (s5) {
+          var ph = JSON.parse(s5);
+          if (Array.isArray(ph)) _ph = ph;
+        }
+      } catch (e) {}
+      // 画像配列の長さを項目数に合わせる（不足は空文字で補い、超過は切り詰める）
+      for (var j = 0; j < _sg.length; j++) { if (typeof _ph[j] !== 'string') _ph[j] = ''; }
+      _ph.length = _sg.length;
     }
 
     // localStorage への書き込み
@@ -793,6 +840,7 @@
         localStorage.setItem(_zk2, String(_ti));
         localStorage.setItem(_zk3, String(_pi));
         localStorage.setItem(_zk4, JSON.stringify(_wt));
+        localStorage.setItem(_zk5, JSON.stringify(_ph));
       } catch (e) {}
     }
 
@@ -1072,6 +1120,13 @@
           label.addEventListener('blur', function () { _onLabelBlur(idx, label); });
           row.appendChild(label);
 
+          var photo = document.createElement('button');
+          photo.type = 'button';
+          photo.className = 'item-photo' + (_ph[idx] ? ' set' : '');
+          photo.textContent = _ph[idx] ? '写真✓' : '写真＋';
+          photo.addEventListener('click', function () { _onPhotoBtn(idx); });
+          row.appendChild(photo);
+
           var del = document.createElement('button');
           del.type = 'button';
           del.className = 'item-del';
@@ -1177,6 +1232,7 @@
 
       _sg.splice(i, 1);
       _wt.splice(i, 1);
+      _ph.splice(i, 1);
 
       var tiChanged = false;
       if (_ti === i) {
@@ -1208,6 +1264,7 @@
         avg = sum / _wt.length;
       }
       _wt.push(avg);
+      _ph.push('');
 
       _bd = _buildBd();
       _draw();
@@ -1244,6 +1301,70 @@
       _wl();
     }
 
+    // ---- 項目ごとの画像（結果の強調表示で使う） ----
+
+    var _photoIdx = -1; // 画像編集中の項目インデックス
+
+    // 「写真」ボタン押下：未設定なら選択、設定済みなら変更/削除を選ばせる
+    function _onPhotoBtn(i) {
+      if (_ph[i]) {
+        if (confirm('この項目の写真を削除しますか？\n（キャンセルすると別の写真に変更できます）')) {
+          _ph[i] = '';
+          _wl();
+          _renderItemList();
+          return;
+        }
+      }
+      _photoIdx = i;
+      var inp = document.getElementById('photoInput');
+      inp.value = '';
+      inp.click();
+    }
+
+    // 画像を縮小・圧縮して dataURL 化（localStorage に収まるサイズにする）
+    function _procPhoto(file, cb) {
+      var rd = new FileReader();
+      rd.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var maxSide = 900;
+          var w = img.width, h = img.height;
+          if (w > h && w > maxSide) { h = Math.round(h * maxSide / w); w = maxSide; }
+          else if (h >= w && h > maxSide) { w = Math.round(w * maxSide / h); h = maxSide; }
+          var cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          var qs = [0.8, 0.6, 0.4], out = '';
+          for (var i = 0; i < qs.length; i++) {
+            try { out = cv.toDataURL('image/jpeg', qs[i]); } catch (e) { out = ''; break; }
+            if (out.length <= 900000) break; // localStorage を圧迫しない目安
+          }
+          cb(out && out.length <= 1400000 ? out : '');
+        };
+        img.onerror = function () { cb(''); };
+        img.src = rd.result;
+      };
+      rd.onerror = function () { cb(''); };
+      rd.readAsDataURL(file);
+    }
+
+    // ファイル選択後の取り込み
+    function _onPhotoPick(file) {
+      if (_photoIdx < 0 || !file) return;
+      var idx = _photoIdx;
+      _procPhoto(file, function (dataUrl) {
+        if (!dataUrl) { alert('画像を取り込めませんでした（サイズが大きすぎる可能性があります）'); return; }
+        try {
+          _ph[idx] = dataUrl;
+          _wl();
+          _renderItemList();
+        } catch (e) {
+          _ph[idx] = '';
+          alert('画像の保存に失敗しました（容量オーバーの可能性があります）');
+        }
+      });
+    }
+
     // ---- 結果の強調表示（着地項目が基準項目と一致したとき） ----
 
     var _lr = -1;  // 直近に着地した項目のインデックス
@@ -1271,6 +1392,14 @@
     // 強調表示を開く
     function _fx() {
       document.getElementById('fxItem').textContent = _sg[_lr] || '';
+      var ph = document.getElementById('fxPhoto');
+      if (_ph[_lr]) {
+        ph.src = _ph[_lr];
+        ph.style.display = '';
+      } else {
+        ph.style.display = 'none';
+        ph.removeAttribute('src');
+      }
       _fxSpawn();
       document.getElementById('fxLayer').classList.add('on');
       _fxT = performance.now();
@@ -1408,6 +1537,9 @@
 
     document.getElementById('panelClose').addEventListener('click', _sc);
     document.getElementById('itemAdd').addEventListener('click', _onAddItem);
+    document.getElementById('photoInput').addEventListener('change', function (e) {
+      if (e.target.files && e.target.files[0]) _onPhotoPick(e.target.files[0]);
+    });
     document.getElementById('panelOverlay').addEventListener('click', function (e) {
       if (e.target === this) _sc();
     });
