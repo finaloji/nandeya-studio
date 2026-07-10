@@ -603,7 +603,7 @@
       <div class="fx-badge">🎉 祝 🎉</div>
       <div class="fx-main">大当たり!!</div>
       <div class="fx-item" id="fxItem"></div>
-      <div class="fx-sub">GET!!</div>
+      <div class="fx-sub">FEVER!!</div>
     </div>
     <div class="fx-flash"></div>
     <div class="fx-hint">画面タップで閉じる</div>
@@ -848,6 +848,7 @@
     // 回転開始処理
     function _go() {
       if (_spin || _land) return;
+      _aui(); // 画面操作のタイミングで音の準備を済ませておく
       _spin = true;
       _ak = 0; // 状態が変わるのでカウントは破棄
       _setBtn('STOP');
@@ -899,6 +900,7 @@
     // 停止トリガー処理（STOPボタン・円盤タップ共通の入口）
     function _stop() {
       if (!_spin || _land) return;
+      _aui(); // 画面操作のタイミングで音の準備を済ませておく
       _spin = false;
       if (_raf) cancelAnimationFrame(_raf);
       _land = true;
@@ -1272,6 +1274,7 @@
       _fxSpawn();
       document.getElementById('fxLayer').classList.add('on');
       _fxT = performance.now();
+      _aup();
       if (navigator.vibrate) {
         try { navigator.vibrate([90, 50, 90, 50, 220]); } catch (e) {}
       }
@@ -1289,6 +1292,99 @@
     function _onFxTap() {
       if (performance.now() - _fxT < 600) return;
       _fxc();
+    }
+
+    // ---- 効果音（外部ファイルなしでその場で合成） ----
+
+    var _au = null; // AudioContext（画面操作のタイミングで準備しておく）
+
+    // 音の準備（iOSはユーザー操作中でないと音を出せないため、START/STOP押下時に呼ぶ）
+    function _aui() {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!_au) {
+        try { _au = new AC(); } catch (e) { return; }
+      }
+      if (_au.state === 'suspended') {
+        try { _au.resume(); } catch (e) {}
+      }
+    }
+
+    // ファンファーレの再生（衝撃音→上昇アルペジオ→和音＋キラキラ音）
+    function _aup() {
+      if (!_au) return;
+      if (_au.state === 'suspended') {
+        try { _au.resume(); } catch (e) {}
+      }
+      try {
+        var t0 = _au.currentTime;
+        var master = _au.createGain();
+        master.gain.value = 0.5;
+        master.connect(_au.destination);
+
+        // 衝撃音（ノイズバースト）
+        var len = Math.floor(_au.sampleRate * 0.25);
+        var buf = _au.createBuffer(1, len, _au.sampleRate);
+        var d = buf.getChannelData(0);
+        for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+        var noise = _au.createBufferSource();
+        noise.buffer = buf;
+        var ng = _au.createGain();
+        ng.gain.setValueAtTime(0.9, t0);
+        ng.gain.exponentialRampToValueAtTime(0.001, t0 + 0.25);
+        noise.connect(ng); ng.connect(master);
+        noise.start(t0);
+
+        // 上昇アルペジオ（C5→E5→G5→C6）
+        var notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach(function (f, idx) {
+          var o = _au.createOscillator();
+          o.type = 'square';
+          o.frequency.value = f;
+          var g = _au.createGain();
+          var st = t0 + 0.05 + idx * 0.12;
+          g.gain.setValueAtTime(0.0001, st);
+          g.gain.exponentialRampToValueAtTime(0.32, st + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, st + 0.35);
+          o.connect(g); g.connect(master);
+          o.start(st); o.stop(st + 0.4);
+        });
+
+        // 決めの和音（Cメジャー・ロング＋ビブラート）
+        notes.forEach(function (f) {
+          var o = _au.createOscillator();
+          o.type = 'sawtooth';
+          o.frequency.value = f;
+          var g = _au.createGain();
+          var st = t0 + 0.55;
+          g.gain.setValueAtTime(0.0001, st);
+          g.gain.exponentialRampToValueAtTime(0.2, st + 0.03);
+          g.gain.setValueAtTime(0.2, st + 0.9);
+          g.gain.exponentialRampToValueAtTime(0.001, st + 1.7);
+          var v = _au.createOscillator();
+          v.frequency.value = 6;
+          var vg = _au.createGain();
+          vg.gain.value = 6;
+          v.connect(vg); vg.connect(o.frequency);
+          o.connect(g); g.connect(master);
+          o.start(st); o.stop(st + 1.8);
+          v.start(st); v.stop(st + 1.8);
+        });
+
+        // キラキラ音（高音のピン。ランダムに散らす）
+        for (var k = 0; k < 10; k++) {
+          var st2 = t0 + 0.3 + Math.random() * 1.6;
+          var o2 = _au.createOscillator();
+          o2.type = 'sine';
+          o2.frequency.value = 2000 + Math.random() * 2500;
+          var g2 = _au.createGain();
+          g2.gain.setValueAtTime(0.0001, st2);
+          g2.gain.exponentialRampToValueAtTime(0.12, st2 + 0.01);
+          g2.gain.exponentialRampToValueAtTime(0.001, st2 + 0.25);
+          o2.connect(g2); g2.connect(master);
+          o2.start(st2); o2.stop(st2 + 0.3);
+        }
+      } catch (e) {}
     }
 
     // タップ・クリックの二重発火を避けつつ反応させる共通バインダー
