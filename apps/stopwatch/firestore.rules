@@ -27,6 +27,10 @@ service cloud.firestore {
              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
              && request.resource.data.devices is list
              && request.resource.data.devices.size() <= 2
+           )
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['note'])
+             && request.resource.data.note is string
            );
 
       // 削除: admin.html からのライセンス無効化操作のため許可
@@ -76,6 +80,10 @@ service cloud.firestore {
              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
              && request.resource.data.devices is list
              && request.resource.data.devices.size() <= 2
+           )
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['note'])
+             && request.resource.data.note is string
            );
       allow delete: if true;
     }
@@ -109,6 +117,10 @@ service cloud.firestore {
              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
              && request.resource.data.devices is list
              && request.resource.data.devices.size() <= 2
+           )
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['note'])
+             && request.resource.data.note is string
            );
       allow delete: if true;
     }
@@ -142,6 +154,10 @@ service cloud.firestore {
              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
              && request.resource.data.devices is list
              && request.resource.data.devices.size() <= 2
+           )
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['note'])
+             && request.resource.data.note is string
            );
       allow delete: if true;
     }
@@ -175,6 +191,10 @@ service cloud.firestore {
              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
              && request.resource.data.devices is list
              && request.resource.data.devices.size() <= 2
+           )
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['note'])
+             && request.resource.data.note is string
            );
       allow delete: if true;
     }

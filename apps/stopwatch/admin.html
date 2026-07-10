@@ -253,6 +253,19 @@
     font-style: italic;
   }
 
+  /* --- メモ欄のインライン編集 --- */
+  .note-input {
+    width: 100%;
+    min-width: 100px;
+    padding: 5px 6px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+  }
+  .note-input:focus { border-color: #111; outline: none; }
+  .note-input:disabled { background: #f2f2f2; color: #999; }
+
   @media (max-width: 600px) {
     .app-select-bar { flex-wrap: wrap; }
     .app-select-bar select { width: 100%; min-width: 0; }
@@ -536,10 +549,10 @@
       </div>
       <table>
         <thead>
-          <tr><th>顧客名（メモ）</th><th>利用中のアプリ</th></tr>
+          <tr><th>顧客名（メモ）</th><th>利用中のアプリ</th><th>操作</th></tr>
         </thead>
         <tbody id="customerTableBody">
-          <tr class="loading-row"><td colspan="2">読み込み中...</td></tr>
+          <tr class="loading-row"><td colspan="3">読み込み中...</td></tr>
         </tbody>
       </table>
     </section>
@@ -697,6 +710,25 @@
     return `<span class="${cls}">${n}/2台</span>`;
   }
 
+  // --- メモ欄のインライン編集（フォーカスを外した時点で保存） ---
+  async function handleNoteBlur(collectionName, id, inputEl) {
+    const newNote = inputEl.value.trim();
+    const original = inputEl.dataset.orig || "";
+    if (newNote === original) { inputEl.value = original; return; }
+    inputEl.disabled = true;
+    try {
+      await updateDoc(doc(db, collectionName, id), { note: newNote });
+      inputEl.value = newNote;
+      inputEl.dataset.orig = newNote;
+    } catch (err) {
+      console.error(err);
+      alert("メモの保存に失敗しました: " + (err && err.message ? err.message : err));
+      inputEl.value = original;
+    } finally {
+      inputEl.disabled = false;
+    }
+  }
+
   // --- ID・パスコードのコピー ---
   function flashCopied(buttonEl) {
     if (!buttonEl) return;
@@ -760,7 +792,7 @@
           <td data-label="ID">${escapeHtml(item.id)}</td>
           <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
           <td data-label="端末登録状況">${deviceStatusHtml(item)}</td>
-          <td data-label="メモ">${escapeHtml(item.note || "")}</td>
+          <td data-label="メモ"><input type="text" class="note-input" value="${escapeHtml(item.note || "")}" data-orig="${escapeHtml(item.note || "")}" maxlength="40"></td>
           <td data-label="発行日">${escapeHtml(createdAtText)}</td>
           <td data-label="操作">
             <div class="action-cell">
@@ -771,6 +803,9 @@
           </td>
         `;
 
+        tr.querySelector(".note-input").addEventListener("blur", (e) => {
+          handleNoteBlur(LICENSES_COLLECTION, item.id, e.target);
+        });
         tr.querySelector(".copy-btn").addEventListener("click", (e) => {
           copyCreds(item.id, item.passcode || "", e.target);
         });
@@ -915,7 +950,7 @@
           <td data-label="ID">${escapeHtml(item.id)}</td>
           <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
           <td data-label="端末登録状況">${deviceStatusHtml(item)}</td>
-          <td data-label="メモ">${escapeHtml(item.note || "")}</td>
+          <td data-label="メモ"><input type="text" class="note-input" value="${escapeHtml(item.note || "")}" data-orig="${escapeHtml(item.note || "")}" maxlength="40"></td>
           <td data-label="発行日">${escapeHtml(createdAtText)}</td>
           <td data-label="操作">
             <div class="action-cell">
@@ -924,6 +959,7 @@
               <button class="btn-danger delete-btn" type="button">削除</button>
             </div>
           </td>`;
+        tr.querySelector(".note-input").addEventListener("blur", e => handleNoteBlur(CALC_LICENSES, item.id, e.target));
         tr.querySelector(".copy-btn").addEventListener("click", e => copyCreds(item.id, item.passcode || "", e.target));
         tr.querySelector(".reset-btn").addEventListener("click", e => handleCalcResetDevice(item.id, e.target));
         tr.querySelector(".delete-btn").addEventListener("click", e => handleCalcDelete(item.id, e.target));
@@ -1049,7 +1085,7 @@
           <td data-label="ID">${escapeHtml(item.id)}</td>
           <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
           <td data-label="端末登録状況">${deviceStatusHtml(item)}</td>
-          <td data-label="メモ">${escapeHtml(item.note || "")}</td>
+          <td data-label="メモ"><input type="text" class="note-input" value="${escapeHtml(item.note || "")}" data-orig="${escapeHtml(item.note || "")}" maxlength="40"></td>
           <td data-label="発行日">${escapeHtml(createdAtText)}</td>
           <td data-label="操作">
             <div class="action-cell">
@@ -1058,6 +1094,7 @@
               <button class="btn-danger delete-btn" type="button">削除</button>
             </div>
           </td>`;
+        tr.querySelector(".note-input").addEventListener("blur", e => handleNoteBlur(RT_LICENSES, item.id, e.target));
         tr.querySelector(".copy-btn").addEventListener("click", e => copyCreds(item.id, item.passcode || "", e.target));
         tr.querySelector(".reset-btn").addEventListener("click", e => handleRtResetDevice(item.id, e.target));
         tr.querySelector(".delete-btn").addEventListener("click", e => handleRtDelete(item.id, e.target));
@@ -1183,7 +1220,7 @@
           <td data-label="ID">${escapeHtml(item.id)}</td>
           <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
           <td data-label="端末登録状況">${deviceStatusHtml(item)}</td>
-          <td data-label="メモ">${escapeHtml(item.note || "")}</td>
+          <td data-label="メモ"><input type="text" class="note-input" value="${escapeHtml(item.note || "")}" data-orig="${escapeHtml(item.note || "")}" maxlength="40"></td>
           <td data-label="発行日">${escapeHtml(createdAtText)}</td>
           <td data-label="操作">
             <div class="action-cell">
@@ -1192,6 +1229,7 @@
               <button class="btn-danger delete-btn" type="button">削除</button>
             </div>
           </td>`;
+        tr.querySelector(".note-input").addEventListener("blur", e => handleNoteBlur(CIPHER_LICENSES, item.id, e.target));
         tr.querySelector(".copy-btn").addEventListener("click", e => copyCreds(item.id, item.passcode || "", e.target));
         tr.querySelector(".reset-btn").addEventListener("click", e => handleCipherResetDevice(item.id, e.target));
         tr.querySelector(".delete-btn").addEventListener("click", e => handleCipherDelete(item.id, e.target));
@@ -1317,7 +1355,7 @@
           <td data-label="ID">${escapeHtml(item.id)}</td>
           <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
           <td data-label="端末登録状況">${deviceStatusHtml(item)}</td>
-          <td data-label="メモ">${escapeHtml(item.note || "")}</td>
+          <td data-label="メモ"><input type="text" class="note-input" value="${escapeHtml(item.note || "")}" data-orig="${escapeHtml(item.note || "")}" maxlength="40"></td>
           <td data-label="発行日">${escapeHtml(createdAtText)}</td>
           <td data-label="操作">
             <div class="action-cell">
@@ -1326,6 +1364,7 @@
               <button class="btn-danger delete-btn" type="button">削除</button>
             </div>
           </td>`;
+        tr.querySelector(".note-input").addEventListener("blur", e => handleNoteBlur(RO_LICENSES, item.id, e.target));
         tr.querySelector(".copy-btn").addEventListener("click", e => copyCreds(item.id, item.passcode || "", e.target));
         tr.querySelector(".reset-btn").addEventListener("click", e => handleRoResetDevice(item.id, e.target));
         tr.querySelector(".delete-btn").addEventListener("click", e => handleRoDelete(item.id, e.target));
@@ -1385,12 +1424,46 @@
     cipher: CIPHER_LICENSES,
     roulette: RO_LICENSES
   };
+  const APP_LOADERS = {
+    sw: loadLicenses,
+    calc: loadCalcLicenses,
+    clock: loadRtLicenses,
+    cipher: loadCipherLicenses,
+    roulette: loadRoLicenses
+  };
 
   const customerTableBodyEl = document.getElementById("customerTableBody");
   const customersRefreshBtnEl = document.getElementById("customersRefreshBtn");
 
+  const chipsHtml = (entries) => `
+    <div class="app-chip-list">
+      ${entries.map(e => `<span class="app-chip">${escapeHtml(APP_LABELS[e.appKey])}（${escapeHtml(e.id)}）</span>`).join("")}
+    </div>`;
+
+  // 顧客名（メモ）の一括変更：グループに属する全ライセンスのメモを書き換える
+  async function handleRenameGroup(entries, currentNote, buttonEl) {
+    const input = prompt("新しい顧客名（メモ）を入力してください\n（空欄にすると「メモ未設定」に戻ります。\n既存の別の顧客名と同じにすると、次回一覧を開いたときにその顧客としてまとめて表示されます）", currentNote);
+    if (input === null) return;
+    const newNote = input.trim();
+    if (newNote === currentNote) return;
+
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "更新中...";
+    try {
+      await Promise.all(entries.map(e => updateDoc(doc(db, APP_COLLECTIONS[e.appKey], e.id), { note: newNote })));
+      await Promise.all(Object.values(APP_LOADERS).map(fn => fn()));
+      await loadCustomerOverview();
+    } catch (err) {
+      console.error(err);
+      alert("名称変更に失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
   async function loadCustomerOverview() {
-    customerTableBodyEl.innerHTML = '<tr class="loading-row"><td colspan="2">読み込み中...</td></tr>';
+    customerTableBodyEl.innerHTML = '<tr class="loading-row"><td colspan="3">読み込み中...</td></tr>';
     try {
       const appKeys = Object.keys(APP_COLLECTIONS);
       const snapshots = await Promise.all(
@@ -1416,35 +1489,37 @@
       });
 
       if (grouped.size === 0 && unnoted.length === 0) {
-        customerTableBodyEl.innerHTML = '<tr class="empty-row"><td colspan="2">まだライセンスがありません</td></tr>';
+        customerTableBodyEl.innerHTML = '<tr class="empty-row"><td colspan="3">まだライセンスがありません</td></tr>';
         return;
       }
 
-      const chipsHtml = (entries) => `
-        <div class="app-chip-list">
-          ${entries.map(e => `<span class="app-chip">${escapeHtml(APP_LABELS[e.appKey])}（${escapeHtml(e.id)}）</span>`).join("")}
-        </div>`;
+      customerTableBodyEl.innerHTML = "";
 
-      const rows = [];
       Array.from(grouped.keys()).sort((a, b) => a.localeCompare(b, "ja")).forEach(note => {
-        rows.push(`
-          <tr>
-            <td data-label="顧客名（メモ）"><span class="customer-name">${escapeHtml(note)}</span></td>
-            <td data-label="利用中のアプリ">${chipsHtml(grouped.get(note))}</td>
-          </tr>`);
-      });
-      unnoted.forEach(entry => {
-        rows.push(`
-          <tr>
-            <td data-label="顧客名（メモ）"><span class="customer-name unnoted">（メモ未設定）</span></td>
-            <td data-label="利用中のアプリ">${chipsHtml([entry])}</td>
-          </tr>`);
+        const entries = grouped.get(note);
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td data-label="顧客名（メモ）"><span class="customer-name">${escapeHtml(note)}</span></td>
+          <td data-label="利用中のアプリ">${chipsHtml(entries)}</td>
+          <td data-label="操作"><button class="btn-sub rename-btn" type="button">名称変更</button></td>
+        `;
+        tr.querySelector(".rename-btn").addEventListener("click", e => handleRenameGroup(entries, note, e.target));
+        customerTableBodyEl.appendChild(tr);
       });
 
-      customerTableBodyEl.innerHTML = rows.join("");
+      unnoted.forEach(entry => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td data-label="顧客名（メモ）"><span class="customer-name unnoted">（メモ未設定）</span></td>
+          <td data-label="利用中のアプリ">${chipsHtml([entry])}</td>
+          <td data-label="操作"><button class="btn-sub rename-btn" type="button">名称変更</button></td>
+        `;
+        tr.querySelector(".rename-btn").addEventListener("click", e => handleRenameGroup([entry], "", e.target));
+        customerTableBodyEl.appendChild(tr);
+      });
     } catch (err) {
       console.error(err);
-      customerTableBodyEl.innerHTML = `<tr class="empty-row"><td colspan="2">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
+      customerTableBodyEl.innerHTML = `<tr class="empty-row"><td colspan="3">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
     }
   }
 
