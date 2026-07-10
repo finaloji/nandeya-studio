@@ -17,13 +17,17 @@ service cloud.firestore {
       // 型チェックで不正なドキュメント構造の作成も防ぐ。
       allow create: if resource == null
         && request.resource.data.passcode is string
-        && request.resource.data.deviceId == null
         && request.resource.data.note is string;
 
       // 更新: 端末登録・端末ロック解除のため deviceId のみの変更を許可。
       // passcode / createdAt / note は既存値から変更されていないことを確認する。
-      allow update: if request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['deviceId']);
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceId'])
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
+             && request.resource.data.devices is list
+             && request.resource.data.devices.size() <= 2
+           );
 
       // 削除: admin.html からのライセンス無効化操作のため許可
       allow delete: if true;
@@ -65,9 +69,14 @@ service cloud.firestore {
       allow read: if true;
       allow create: if resource == null
         && request.resource.data.passcode is string
-        && request.resource.data.deviceId is string;
-      allow update: if request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['deviceId']);
+        && request.resource.data.note is string;
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceId'])
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
+             && request.resource.data.devices is list
+             && request.resource.data.devices.size() <= 2
+           );
       allow delete: if true;
     }
 
@@ -93,10 +102,14 @@ service cloud.firestore {
       allow read: if true;
       allow create: if resource == null
         && request.resource.data.passcode is string
-        && request.resource.data.deviceId == null
         && request.resource.data.note is string;
-      allow update: if request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['deviceId']);
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceId'])
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
+             && request.resource.data.devices is list
+             && request.resource.data.devices.size() <= 2
+           );
       allow delete: if true;
     }
 
@@ -122,10 +135,14 @@ service cloud.firestore {
       allow read: if true;
       allow create: if resource == null
         && request.resource.data.passcode is string
-        && request.resource.data.deviceId == null
         && request.resource.data.note is string;
-      allow update: if request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['deviceId']);
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceId'])
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
+             && request.resource.data.devices is list
+             && request.resource.data.devices.size() <= 2
+           );
       allow delete: if true;
     }
 
@@ -151,10 +168,14 @@ service cloud.firestore {
       allow read: if true;
       allow create: if resource == null
         && request.resource.data.passcode is string
-        && request.resource.data.deviceId == null
         && request.resource.data.note is string;
-      allow update: if request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['deviceId']);
+      allow update: if
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deviceId'])
+        || (
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['devices'])
+             && request.resource.data.devices is list
+             && request.resource.data.devices.size() <= 2
+           );
       allow delete: if true;
     }
 

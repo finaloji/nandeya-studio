@@ -404,10 +404,6 @@
       </div>
       <div class="login-error" id="_rmsg"></div>
       <button class="login-btn" id="_rlb">ログイン</button>
-      <div class="login-device-change">
-        この端末を新しく登録したい場合<br>
-        <a href="#" id="_rdr">端末変更をリクエスト</a>
-      </div>
     </div>
   </div>
 
@@ -1108,6 +1104,9 @@
 
     // ===== 端末初期化処理（ログイン・端末ロック） =====
 
+    // 同時に使える端末数の上限（超過ログイン時は最古の端末から自動的に外れる）
+    var _MAXDEV = 2;
+
     // 端末IDを取得/生成
     function _grdi() {
       var id = localStorage.getItem('_rdevid');
@@ -1125,13 +1124,6 @@
       el.textContent = msg;
     }
 
-    // 案内表示
-    function _rshi(msg) {
-      var el = document.getElementById('_rmsg');
-      el.classList.add('info');
-      el.textContent = msg;
-    }
-
     // ローディング状態切替
     function _rslb(isLoading) {
       var btn = document.getElementById('_rlb');
@@ -1145,7 +1137,25 @@
       document.getElementById('_rag').classList.add('hidden');
     }
 
-    // ログイン処理
+    // 許可端末リストの取得（旧 deviceId 形式も吸収）
+    function _rdev(data) {
+      if (Array.isArray(data.devices)) return data.devices.slice();
+      if (data.deviceId) return [data.deviceId];
+      return [];
+    }
+
+    // この端末を許可リストへ（末尾＝最新。上限超過は先頭＝最古から削除）。
+    // 変更後の配列を返す。すでに最新で書き換え不要なら null。
+    function _radd(list, dev) {
+      var i = list.indexOf(dev);
+      if (i !== -1 && i === list.length - 1) return null;
+      if (i !== -1) list.splice(i, 1);
+      list.push(dev);
+      while (list.length > _MAXDEV) list.shift();
+      return list;
+    }
+
+    // ログイン処理（同時に使えるのは _MAXDEV 台まで。超過時は最古を自動的に外す）
     function _rtl(id, pass) {
       var fns = window.__rfns;
       var db  = window.__rdb;
@@ -1153,13 +1163,10 @@
         if (!snap.exists()) return { ok: false, reason: 'invalid' };
         var data = snap.data();
         if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
-        var myDev = _grdi();
-        if (!data.deviceId) {
-          return fns.updateDoc(fns.doc(db, 'roulette_licenses', id), { deviceId: myDev })
-            .then(function () { return { ok: true }; });
-        }
-        if (data.deviceId === myDev) return { ok: true };
-        return { ok: false, reason: 'device' };
+        var next = _radd(_rdev(data), _grdi());
+        if (next === null) return { ok: true };
+        return fns.updateDoc(fns.doc(db, 'roulette_licenses', id), { devices: next })
+          .then(function () { return { ok: true }; });
       });
     }
 
@@ -1172,49 +1179,10 @@
       return fns.getDoc(fns.doc(db, 'roulette_licenses', lid)).then(function (snap) {
         if (!snap.exists()) { localStorage.removeItem('_rlicid'); return false; }
         var data = snap.data();
-        if (data.deviceId === _grdi()) { _rhga(); return true; }
+        if (_rdev(data).indexOf(_grdi()) !== -1) { _rhga(); return true; }
         localStorage.removeItem('_rlicid');
         return false;
       }).catch(function () { return false; });
-    }
-
-    // 端末変更リクエスト送信
-    function _rdcr() {
-      var id   = document.getElementById('_rid').value.trim();
-      var pass = document.getElementById('_rpc').value;
-      if (!id || !pass) { _rshe('IDとパスコードを入力してください'); return; }
-      _rslb(true);
-      var fns = window.__rfns;
-      var db  = window.__rdb;
-      fns.getDoc(fns.doc(db, 'roulette_licenses', id)).then(function (snap) {
-        if (!snap.exists() || snap.data().passcode !== pass) {
-          _rshe('IDまたはパスコードが正しくありません');
-          _rslb(false);
-          return;
-        }
-        var q = fns.query(
-          fns.collection(db, 'roulette_deviceRequests'),
-          fns.where('licenseId', '==', id),
-          fns.where('status', '==', 'pending')
-        );
-        return fns.getDocs(q).then(function (qs) {
-          if (!qs.empty) {
-            _rshi('すでに申請済みです。承認をお待ちください');
-          } else {
-            return fns.addDoc(fns.collection(db, 'roulette_deviceRequests'), {
-              licenseId: id,
-              requestedAt: Date.now(),
-              status: 'pending'
-            }).then(function () {
-              _rshi('申請を送信しました。承認をお待ちください');
-            });
-          }
-        });
-      }).catch(function () {
-        _rshe('エラーが発生しました。再度お試しください');
-      }).finally(function () {
-        _rslb(false);
-      });
     }
 
     // 認証ボタン
@@ -1229,8 +1197,6 @@
         if (res.ok) {
           localStorage.setItem('_rlicid', id);
           _rhga();
-        } else if (res.reason === 'device') {
-          _rshe('別の端末で登録済みです');
         } else {
           _rshe('IDまたはパスコードが正しくありません');
         }
@@ -1239,12 +1205,6 @@
       }).finally(function () {
         _rslb(false);
       });
-    });
-
-    // 端末変更リンク
-    document.getElementById('_rdr').addEventListener('click', function (e) {
-      e.preventDefault();
-      _rdcr();
     });
 
     // Firebase 準備完了後に自動ログイン試行
