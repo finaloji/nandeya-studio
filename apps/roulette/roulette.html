@@ -297,6 +297,151 @@
       accent-color: #f4c150;
     }
 
+    /* --- 結果の強調表示（着地が基準項目のときのご褒美画面） --- */
+    .fx-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 150;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 45%, rgba(88,8,8,0.94) 0%, rgba(12,2,2,0.97) 75%);
+    }
+    .fx-layer.on {
+      display: flex;
+      animation: fxShake 0.5s ease-out 1;
+    }
+    .fx-rays {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 170vmax;
+      height: 170vmax;
+      margin: -85vmax 0 0 -85vmax;
+      background: repeating-conic-gradient(
+        rgba(255,214,64,0.30) 0deg 9deg,
+        rgba(255,214,64,0) 9deg 18deg
+      );
+      animation: fxSpin 14s linear infinite;
+    }
+    .fx-rays2 {
+      background: repeating-conic-gradient(
+        rgba(255,110,40,0.20) 0deg 14deg,
+        rgba(255,110,40,0) 14deg 28deg
+      );
+      animation: fxSpin 23s linear infinite reverse;
+    }
+    .fx-confetti {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .fx-confetti span {
+      position: absolute;
+      top: -12vh;
+      animation-name: fxFall;
+      animation-timing-function: linear;
+      animation-iteration-count: infinite;
+    }
+    .fx-center {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2.2vh;
+      text-align: center;
+      padding: 0 16px;
+    }
+    .fx-badge {
+      font-size: clamp(18px, 6vw, 30px);
+      font-weight: 800;
+      letter-spacing: 0.35em;
+      color: #ffe066;
+      text-shadow: 0 0 14px rgba(255,200,60,0.95);
+      animation: fxIn 0.4s cubic-bezier(0.2, 2.2, 0.4, 1) both;
+    }
+    .fx-main {
+      font-size: clamp(56px, 21vw, 130px);
+      font-weight: 900;
+      line-height: 1.05;
+      background: linear-gradient(180deg, #fff6c8 0%, #ffd23f 35%, #ff9500 70%, #ffdf70 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-stroke: 2px rgba(120,30,0,0.9);
+      filter: drop-shadow(0 4px 0 rgba(120,20,0,0.85)) drop-shadow(0 0 26px rgba(255,180,40,0.8));
+      animation: fxIn 0.55s cubic-bezier(0.2, 2.4, 0.4, 1) 0.1s both,
+                 fxPulse 0.9s ease-in-out 0.7s infinite alternate;
+    }
+    .fx-item {
+      font-size: clamp(30px, 11vw, 64px);
+      font-weight: 900;
+      color: #fff;
+      background: linear-gradient(180deg, #ff5a3c 0%, #d00000 100%);
+      padding: 1vh 7vw;
+      border: 3px solid #ffe066;
+      border-radius: 12px;
+      box-shadow: 0 0 24px rgba(255,60,30,0.85), inset 0 2px 0 rgba(255,255,255,0.35);
+      animation: fxInSkew 0.5s cubic-bezier(0.2, 2.4, 0.4, 1) 0.3s both;
+    }
+    .fx-sub {
+      font-size: clamp(16px, 5.4vw, 26px);
+      font-weight: 800;
+      letter-spacing: 0.5em;
+      color: #ffe9a8;
+      text-shadow: 0 0 10px rgba(255,190,60,0.85);
+      animation: fxIn 0.4s ease-out 0.5s both;
+    }
+    .fx-flash {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .fx-layer.on .fx-flash {
+      animation: fxFlash 0.7s ease-out 1 both;
+    }
+    .fx-hint {
+      position: absolute;
+      bottom: max(env(safe-area-inset-bottom), 20px);
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 13px;
+      letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.9);
+      opacity: 0;
+      animation: fxHint 1.6s ease-in-out 1.4s infinite;
+    }
+    @keyframes fxSpin { to { transform: rotate(360deg); } }
+    @keyframes fxFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes fxFall { to { transform: translateY(130vh) rotate(940deg); } }
+    @keyframes fxIn {
+      0% { transform: scale(3.2); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes fxInSkew {
+      0% { transform: scale(3.2) skewX(-6deg); opacity: 0; }
+      100% { transform: scale(1) skewX(-6deg); opacity: 1; }
+    }
+    @keyframes fxPulse {
+      from { transform: scale(1); }
+      to   { transform: scale(1.06); }
+    }
+    @keyframes fxShake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-9px, 6px); }
+      40% { transform: translate(8px, -7px); }
+      60% { transform: translate(-6px, 4px); }
+      80% { transform: translate(4px, -3px); }
+    }
+    @keyframes fxHint {
+      0%, 100% { opacity: 0.25; }
+      50% { opacity: 0.95; }
+    }
+
     /* --- ログイン画面 --- */
     .login-screen {
       position: fixed;
@@ -447,6 +592,21 @@
         </section>
       </div>
     </div>
+  </div>
+
+  <!-- 結果の強調表示 -->
+  <div class="fx-layer" id="fxLayer">
+    <div class="fx-rays"></div>
+    <div class="fx-rays fx-rays2"></div>
+    <div class="fx-confetti" id="fxConfetti"></div>
+    <div class="fx-center">
+      <div class="fx-badge">🎉 祝 🎉</div>
+      <div class="fx-main">大当たり!!</div>
+      <div class="fx-item" id="fxItem"></div>
+      <div class="fx-sub">GET!!</div>
+    </div>
+    <div class="fx-flash"></div>
+    <div class="fx-hint">画面タップで閉じる</div>
   </div>
 
   <script>
@@ -699,6 +859,7 @@
     // 補正モードONのときは基準項目、OFFのときは従来通りランダムに項目を選ぶ）
     function _pickLanding() {
       var r = _am ? _ti : Math.floor(Math.random() * _bd.length);
+      _lr = r; // 結果表示用に着地項目を控える
       var seg = _bd[r];
       var p = seg.a0 + Math.random() * (seg.a1 - seg.a0);
 
@@ -723,11 +884,15 @@
       if (t < 1) {
         _raf = requestAnimationFrame(_landTick);
       } else {
-        // 着地。余韻の間は次の操作を受け付けない
-        setTimeout(function () {
-          _land = false;
-          _setBtn('START');
-        }, _AFTERGLOW);
+        // 着地。基準項目なら一拍おいて結果の強調表示へ、それ以外は余韻ののちアイドルへ
+        if (_lr === _ti) {
+          setTimeout(_fx, 500);
+        } else {
+          setTimeout(function () {
+            _land = false;
+            _setBtn('START');
+          }, _AFTERGLOW);
+        }
       }
     }
 
@@ -1077,6 +1242,55 @@
       _wl();
     }
 
+    // ---- 結果の強調表示（着地項目が基準項目と一致したとき） ----
+
+    var _lr = -1;  // 直近に着地した項目のインデックス
+    var _fxT = 0;  // 強調表示を開始した時刻(ms)
+
+    // 紙吹雪の生成（表示のたびに作り直す）
+    function _fxSpawn() {
+      var wrap = document.getElementById('fxConfetti');
+      wrap.innerHTML = '';
+      var colors = ['#FFD700', '#FF3B30', '#4FC3F7', '#FF9F0A', '#7CFC00', '#FF69B4', '#FFFFFF', '#FFE066'];
+      for (var i = 0; i < 90; i++) {
+        var s = document.createElement('span');
+        s.style.left = (Math.random() * 100) + 'vw';
+        s.style.width = (6 + Math.random() * 9) + 'px';
+        s.style.height = (8 + Math.random() * 12) + 'px';
+        s.style.background = colors[Math.floor(Math.random() * colors.length)];
+        if (Math.random() < 0.3) s.style.borderRadius = '50%';
+        s.style.transform = 'rotate(' + (Math.random() * 360).toFixed(0) + 'deg)';
+        s.style.animationDuration = (2.6 + Math.random() * 2.4).toFixed(2) + 's';
+        s.style.animationDelay = (-Math.random() * 4).toFixed(2) + 's';
+        wrap.appendChild(s);
+      }
+    }
+
+    // 強調表示を開く
+    function _fx() {
+      document.getElementById('fxItem').textContent = _sg[_lr] || '';
+      _fxSpawn();
+      document.getElementById('fxLayer').classList.add('on');
+      _fxT = performance.now();
+      if (navigator.vibrate) {
+        try { navigator.vibrate([90, 50, 90, 50, 220]); } catch (e) {}
+      }
+    }
+
+    // 強調表示を閉じてアイドルへ戻す
+    function _fxc() {
+      document.getElementById('fxLayer').classList.remove('on');
+      document.getElementById('fxConfetti').innerHTML = '';
+      _land = false;
+      _setBtn('START');
+    }
+
+    // 強調表示のタップ（開いた直後の誤タップでは閉じない）
+    function _onFxTap() {
+      if (performance.now() - _fxT < 600) return;
+      _fxc();
+    }
+
     // タップ・クリックの二重発火を避けつつ反応させる共通バインダー
     function bindBtn(el, action) {
       el.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
@@ -1101,6 +1315,7 @@
     document.getElementById('panelOverlay').addEventListener('click', function (e) {
       if (e.target === this) _sc();
     });
+    bindArrowHit(document.getElementById('fxLayer'), _onFxTap);
 
     // ===== 端末初期化処理（ログイン・端末ロック） =====
 
