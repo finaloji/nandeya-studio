@@ -6,6 +6,29 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <title>Roulette</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <!-- 端末設定モジュール -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const _cfg = {
+      apiKey: "AIzaSyBSSGdNDndjiUj40m4V4QA6Kjqr-oRnBc8",
+      authDomain: "nandeya-magic-app.firebaseapp.com",
+      projectId: "nandeya-magic-app",
+      storageBucket: "nandeya-magic-app.firebasestorage.app",
+      messagingSenderId: "181170873357",
+      appId: "1:181170873357:web:b3c3fef8aea6390f37a144"
+    };
+    const _app = initializeApp(_cfg);
+    const _db  = getFirestore(_app);
+    window.__rdb  = _db;
+    window.__rfns = { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs };
+    window.dispatchEvent(new Event('_rfsready'));
+  </script>
 
   <style>
     * {
@@ -273,9 +296,121 @@
       width: 100%;
       accent-color: #f4c150;
     }
+
+    /* --- ログイン画面 --- */
+    .login-screen {
+      position: fixed;
+      inset: 0;
+      background: #050506;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .login-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .login-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #f4c150;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .login-icon svg { width: 40px; height: 40px; }
+    .login-title {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      margin-bottom: 32px;
+    }
+    .login-form { width: 100%; max-width: 320px; }
+    .login-field {
+      background: #1C1C1E;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .login-field input {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+    }
+    .login-field input::placeholder { color: #8e8e93; }
+    .login-error {
+      color: #FF3B30;
+      font-size: 13px;
+      min-height: 18px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .login-error.info { color: #30D158; }
+    .login-btn {
+      width: 100%;
+      background: #f4c150;
+      color: #1a1205;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 0;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+    .login-device-change {
+      text-align: center;
+      color: #8e8e93;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .login-device-change a { color: #f4c150; }
   </style>
 </head>
 <body>
+  <!-- ログイン画面 -->
+  <div class="login-screen" id="_rag">
+    <div class="login-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="#1a1205" stroke-width="1.6"/>
+        <circle cx="12" cy="12" r="1.8" fill="#1a1205"/>
+        <line x1="12" y1="3" x2="12" y2="21" stroke="#1a1205" stroke-width="1.2"/>
+        <line x1="3" y1="12" x2="21" y2="12" stroke="#1a1205" stroke-width="1.2"/>
+        <line x1="5.6" y1="5.6" x2="18.4" y2="18.4" stroke="#1a1205" stroke-width="1.2"/>
+        <line x1="18.4" y1="5.6" x2="5.6" y2="18.4" stroke="#1a1205" stroke-width="1.2"/>
+        <polygon points="12,1.4 10.4,4.2 13.6,4.2" fill="#1a1205"/>
+      </svg>
+    </div>
+    <div class="login-title">ルーレット</div>
+    <div class="login-form">
+      <div class="login-field">
+        <input id="_rid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none">
+      </div>
+      <div class="login-field">
+        <input id="_rpc" type="password" placeholder="パスコード" autocomplete="off">
+      </div>
+      <div class="login-error" id="_rmsg"></div>
+      <button class="login-btn" id="_rlb">ログイン</button>
+      <div class="login-device-change">
+        この端末を新しく登録したい場合<br>
+        <a href="#" id="_rdr">端末変更をリクエスト</a>
+      </div>
+    </div>
+  </div>
+
   <div class="stage">
     <div class="title">ルーレット</div>
 
@@ -970,6 +1105,160 @@
     document.getElementById('panelOverlay').addEventListener('click', function (e) {
       if (e.target === this) _sc();
     });
+
+    // ===== 端末初期化処理（ログイン・端末ロック） =====
+
+    // 端末IDを取得/生成
+    function _grdi() {
+      var id = localStorage.getItem('_rdevid');
+      if (!id) {
+        id = 'rd-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+        localStorage.setItem('_rdevid', id);
+      }
+      return id;
+    }
+
+    // エラー表示
+    function _rshe(msg) {
+      var el = document.getElementById('_rmsg');
+      el.classList.remove('info');
+      el.textContent = msg;
+    }
+
+    // 案内表示
+    function _rshi(msg) {
+      var el = document.getElementById('_rmsg');
+      el.classList.add('info');
+      el.textContent = msg;
+    }
+
+    // ローディング状態切替
+    function _rslb(isLoading) {
+      var btn = document.getElementById('_rlb');
+      btn.textContent = isLoading ? '確認中...' : 'ログイン';
+      btn.disabled = isLoading;
+      btn.style.opacity = isLoading ? '0.6' : '1';
+    }
+
+    // 認証画面を隠す
+    function _rhga() {
+      document.getElementById('_rag').classList.add('hidden');
+    }
+
+    // ログイン処理
+    function _rtl(id, pass) {
+      var fns = window.__rfns;
+      var db  = window.__rdb;
+      return fns.getDoc(fns.doc(db, 'roulette_licenses', id)).then(function (snap) {
+        if (!snap.exists()) return { ok: false, reason: 'invalid' };
+        var data = snap.data();
+        if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
+        var myDev = _grdi();
+        if (!data.deviceId) {
+          return fns.updateDoc(fns.doc(db, 'roulette_licenses', id), { deviceId: myDev })
+            .then(function () { return { ok: true }; });
+        }
+        if (data.deviceId === myDev) return { ok: true };
+        return { ok: false, reason: 'device' };
+      });
+    }
+
+    // 自動ログイン試行
+    function _rtal() {
+      var lid = localStorage.getItem('_rlicid');
+      if (!lid) return Promise.resolve(false);
+      var fns = window.__rfns;
+      var db  = window.__rdb;
+      return fns.getDoc(fns.doc(db, 'roulette_licenses', lid)).then(function (snap) {
+        if (!snap.exists()) { localStorage.removeItem('_rlicid'); return false; }
+        var data = snap.data();
+        if (data.deviceId === _grdi()) { _rhga(); return true; }
+        localStorage.removeItem('_rlicid');
+        return false;
+      }).catch(function () { return false; });
+    }
+
+    // 端末変更リクエスト送信
+    function _rdcr() {
+      var id   = document.getElementById('_rid').value.trim();
+      var pass = document.getElementById('_rpc').value;
+      if (!id || !pass) { _rshe('IDとパスコードを入力してください'); return; }
+      _rslb(true);
+      var fns = window.__rfns;
+      var db  = window.__rdb;
+      fns.getDoc(fns.doc(db, 'roulette_licenses', id)).then(function (snap) {
+        if (!snap.exists() || snap.data().passcode !== pass) {
+          _rshe('IDまたはパスコードが正しくありません');
+          _rslb(false);
+          return;
+        }
+        var q = fns.query(
+          fns.collection(db, 'roulette_deviceRequests'),
+          fns.where('licenseId', '==', id),
+          fns.where('status', '==', 'pending')
+        );
+        return fns.getDocs(q).then(function (qs) {
+          if (!qs.empty) {
+            _rshi('すでに申請済みです。承認をお待ちください');
+          } else {
+            return fns.addDoc(fns.collection(db, 'roulette_deviceRequests'), {
+              licenseId: id,
+              requestedAt: Date.now(),
+              status: 'pending'
+            }).then(function () {
+              _rshi('申請を送信しました。承認をお待ちください');
+            });
+          }
+        });
+      }).catch(function () {
+        _rshe('エラーが発生しました。再度お試しください');
+      }).finally(function () {
+        _rslb(false);
+      });
+    }
+
+    // 認証ボタン
+    document.getElementById('_rlb').addEventListener('click', function () {
+      var id   = document.getElementById('_rid').value.trim();
+      var pass = document.getElementById('_rpc').value;
+      if (!id || !pass) { _rshe('IDとパスコードを入力してください'); return; }
+      if (!window.__rdb) { _rshe('接続中です。しばらくお待ちください'); return; }
+      document.getElementById('_rmsg').textContent = '';
+      _rslb(true);
+      _rtl(id, pass).then(function (res) {
+        if (res.ok) {
+          localStorage.setItem('_rlicid', id);
+          _rhga();
+        } else if (res.reason === 'device') {
+          _rshe('別の端末で登録済みです');
+        } else {
+          _rshe('IDまたはパスコードが正しくありません');
+        }
+      }).catch(function () {
+        _rshe('エラーが発生しました。再度お試しください');
+      }).finally(function () {
+        _rslb(false);
+      });
+    });
+
+    // 端末変更リンク
+    document.getElementById('_rdr').addEventListener('click', function (e) {
+      e.preventDefault();
+      _rdcr();
+    });
+
+    // Firebase 準備完了後に自動ログイン試行
+    window.addEventListener('_rfsready', function () {
+      _rtal().catch(function () {});
+    });
+    if (window.__rdb) {
+      _rtal().catch(function () {});
+    }
+
+    // Service Worker 登録（Android PWA対応）
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
   </script>
 </body>
 </html>
