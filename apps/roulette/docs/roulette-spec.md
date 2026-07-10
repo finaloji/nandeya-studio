@@ -2,7 +2,7 @@
 
 **アプリ名（内部名）**: roulette-force
 **ホーム画面表示名**: ルーレット
-**配置先**: `apps/roulette/roulette.html`（本体）＋ `apps/roulette/admin.html`（管理画面）＋ `apps/roulette/manifest.json` ＋ `apps/roulette/icons/`
+**配置先**: `apps/roulette/roulette.html`（本体）＋ `apps/roulette/manifest.json` ＋ `apps/roulette/sw.js` ＋ `apps/roulette/icons/`。管理画面は共有の `apps/stopwatch/admin.html` にルーレットタブとして統合（新規admin.htmlは作らない）
 **ホスティング**: `https://finaloji.github.io/nandeya-studio/apps/roulette/roulette.html`
 
 > このファイルは仕様検討中のドラフトです。確定した項目と「要相談」の項目が混在しています。
@@ -261,17 +261,22 @@ duration  = 2.5〜4.0 秒（extraTurns に応じて）
 
 既存アプリ（stopwatch / calc）と同じ **ID・パスコード＋端末ロック方式**。詳細は `apps/stopwatch/docs/auth-spec.md` を踏襲する。ここでは差分のみ記載。
 
-### 方式
+### 方式（実装済み）
 
 - 起動時にログインゲートを表示。ID・パスコードで認証し、1IDにつき1端末のみ使用可（`deviceId` ロック）。
-- Firestore（プロジェクト `nandeya-magic-app`）の `licenses` コレクションを共用。ドキュメントID＝発行ID。
-- 端末変更は `deviceChangeRequests` に申請 → `admin.html` で承認して `deviceId` を null に戻す運用。
-- ログイン済み記録は localStorage に保持し、再訪時は Firestore で端末IDの有効性を確認してから通常画面へ。
+- Firestore（プロジェクト `nandeya-magic-app`）の **アプリ専用コレクション `roulette_licenses` / `roulette_deviceRequests`** を使う（calc/clock/cipher と同じくアプリ別コレクション方式＝「いつもどおり」）。ドキュメントID＝発行ID。
+- 端末変更は `roulette_deviceRequests` に申請 → 管理画面で承認して `deviceId` を null に戻す運用。
+- ログイン済み記録（`_rlicid`）と端末ID（`_rdevid`）は localStorage に保持。再訪時は Firestore で端末IDの有効性を確認してから通常画面へ（自動ログイン）。
+- 難読化名：`_rag`（ゲート）/ `_rid` `_rpc`（入力）/ `_rlb`（ボタン）/ `_rdr`（端末変更）/ `_rtl`（ログイン）/ `_rtal`（自動ログイン）/ `_rdcr`（端末変更申請）/ `_grdi`（端末ID）/ window `__rdb` `__rfns` / イベント `_rfsready`。
 
-### 管理画面
+### 管理画面（実装済み）
 
-- `apps/roulette/admin.html`（既存 admin と同型）。ID発行・一覧・削除・端末登録リセット・端末変更承認。
-- 既存アプリと同じ `licenses` コレクションを共用する（いつもどおりの運用）。
+- **共有の `apps/stopwatch/admin.html` に「ルーレット」タブを追加**（新規ファイルは作らない。全アプリのライセンスを1画面で管理する既存方式に合わせる）。ID発行・一覧・削除・端末登録リセット・端末変更承認。要素IDは `ro` プレフィクス、コレクションは `roulette_licenses` / `roulette_deviceRequests`。
+
+### Firestoreルール（要デプロイ）
+
+- `apps/stopwatch/firestore.rules` に `roulette_licenses` / `roulette_deviceRequests` のルールを追加済み（clock/cipher と同じ `deviceId == null` パターン）。
+- **このルールファイルは Firebase 側へ手動でデプロイする必要がある**（Firebaseコンソール or CLI）。未反映だと本番で末尾の全拒否ルールに当たり、ログイン時の `deviceId` 書き込みが拒否される。
 
 ### サブスク構想との整合（要相談）
 
