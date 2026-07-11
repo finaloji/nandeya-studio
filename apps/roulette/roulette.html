@@ -364,6 +364,9 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      width: 100%;
+      max-width: 100vw;
+      min-width: 0;
       gap: 2.2vh;
       text-align: center;
       padding: 0 16px;
@@ -377,7 +380,8 @@
       animation: fxIn 0.4s cubic-bezier(0.2, 2.2, 0.4, 1) both;
     }
     .fx-main {
-      font-size: clamp(40px, 15.5vw, 120px);
+      width: 100%;
+      font-size: clamp(38px, 14vw, 86px);
       white-space: nowrap;
       font-weight: 900;
       line-height: 1.05;
@@ -392,6 +396,7 @@
     }
     .fx-photo {
       max-width: min(70vw, 320px);
+      width: auto;
       max-height: 34vh;
       object-fit: contain;
       border: 4px solid #ffe066;
@@ -403,7 +408,7 @@
     .fx-item {
       font-size: clamp(26px, 9vw, 60px);
       white-space: nowrap;
-      max-width: 94vw;
+      max-width: calc(100vw - 32px);
       font-weight: 900;
       color: #fff;
       background: linear-gradient(180deg, #ff5a3c 0%, #d00000 100%);
@@ -841,7 +846,10 @@
         localStorage.setItem(_zk3, String(_pi));
         localStorage.setItem(_zk4, JSON.stringify(_wt));
         localStorage.setItem(_zk5, JSON.stringify(_ph));
-      } catch (e) {}
+        return true;
+      } catch (e) {
+        return false;
+      }
     }
 
     _rl();
@@ -907,7 +915,18 @@
     // 到達角・着地項目の決定（起点角から、選ばれた項目の範囲内のどこかへの到達角と所要時間を算出。
     // 補正モードONのときは基準項目、OFFのときは従来通りランダムに項目を選ぶ）
     function _pickLanding() {
-      var r = _am ? _ti : Math.floor(Math.random() * _bd.length);
+      var r;
+      if (_am) {
+        r = _ti;
+      } else {
+        // 円盤全周から一様に1点を選び、それが含まれる範囲を当選項目とする
+        // （項目数で均等に選ぶと、範囲の広さと当選確率が食い違ってしまうため）
+        var full = _bd[0].a0 + Math.random() * 360;
+        r = _bd.length - 1;
+        for (var bi = 0; bi < _bd.length; bi++) {
+          if (full < _bd[bi].a1) { r = bi; break; }
+        }
+      }
       _lr = r; // 結果表示用に着地項目を控える
       var seg = _bd[r];
       var p = seg.a0 + Math.random() * (seg.a1 - seg.a0);
@@ -1354,12 +1373,13 @@
       var idx = _photoIdx;
       _procPhoto(file, function (dataUrl) {
         if (!dataUrl) { alert('画像を取り込めませんでした（サイズが大きすぎる可能性があります）'); return; }
-        try {
-          _ph[idx] = dataUrl;
-          _wl();
+        var prev = _ph[idx] || '';
+        _ph[idx] = dataUrl;
+        if (_wl()) {
           _renderItemList();
-        } catch (e) {
-          _ph[idx] = '';
+        } else {
+          _ph[idx] = prev;
+          _wl();
           alert('画像の保存に失敗しました（容量オーバーの可能性があります）');
         }
       });
