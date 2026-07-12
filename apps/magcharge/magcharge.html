@@ -27,10 +27,99 @@
     background-position: center center;
     background-size: cover;
   }
+  #_g {
+    position: fixed;
+    inset: 0;
+    display: none;
+    box-sizing: border-box;
+    padding: 22px;
+    z-index: 10;
+    background: #121212;
+    color: #ededed;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", system-ui, sans-serif;
+    align-items: center;
+    justify-content: center;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  #_gc {
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #_p {
+    width: 100%;
+    height: 240px;
+    box-sizing: border-box;
+    border: 1px solid #3a3a3a;
+    border-radius: 10px;
+    background-color: #000;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: contain;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-size: 14px;
+  }
+  #_m {
+    min-height: 18px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #b7b7b7;
+    text-align: center;
+  }
+  #_g button {
+    -webkit-appearance: none;
+    appearance: none;
+    font-size: 16px;
+    padding: 13px 16px;
+    border: none;
+    border-radius: 10px;
+    background: #2b2b2b;
+    color: #ededed;
+  }
+  #_g button:disabled {
+    opacity: 0.4;
+  }
+  #_cd {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #3a3a3a;
+    border-radius: 10px;
+  }
+  #_cd span {
+    font-size: 14px;
+    text-align: center;
+    color: #ededed;
+  }
+  #_f {
+    display: none;
+  }
 </style>
 </head>
 <body>
 <div id="v"></div>
+<div id="_g">
+  <div id="_gc">
+    <div id="_p"></div>
+    <div id="_m"></div>
+    <button id="_b1" type="button">画像を選択</button>
+    <button id="_b2" type="button">消去</button>
+    <div id="_cd">
+      <span>選択した画像を消去しますか？</span>
+      <button id="_b4" type="button">消去する</button>
+      <button id="_b5" type="button">やめる</button>
+    </div>
+    <button id="_b3" type="button">閉じる</button>
+  </div>
+  <input id="_f" type="file" accept="image/*">
+</div>
 <script>
 (function () {
   'use strict';
@@ -38,6 +127,28 @@
   var _dn = '_mgs';
   var _sn = '_s1';
   var _ky = '_k1';
+
+  var _V = document.getElementById('v');
+  var _G = document.getElementById('_g');
+  var _P = document.getElementById('_p');
+  var _M = document.getElementById('_m');
+  var _B1 = document.getElementById('_b1');
+  var _B2 = document.getElementById('_b2');
+  var _B3 = document.getElementById('_b3');
+  var _B4 = document.getElementById('_b4');
+  var _B5 = document.getElementById('_b5');
+  var _CD = document.getElementById('_cd');
+  var _F = document.getElementById('_f');
+
+  var _op = false;
+  var _tc = 0;
+  var _t0 = 0;
+  var _pt = 0;
+  var _lp = null;
+  var _bz = false;
+  var _hv = false;
+  var _cu = null;
+  var _mu = null;
 
   function _od() {
     return new Promise(function (res, rej) {
@@ -66,6 +177,42 @@
     });
   }
 
+  function _gvp() {
+    return _od().then(function (db) {
+      return _gv(db).then(function (v) { db.close(); return v; });
+    });
+  }
+
+  function _wv(val) {
+    return _od().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx;
+        try {
+          tx = db.transaction(_sn, 'readwrite');
+          tx.objectStore(_sn).put(val, _ky);
+        } catch (e) { db.close(); rej(e); return; }
+        tx.oncomplete = function () { db.close(); res(); };
+        tx.onerror = function () { db.close(); rej(tx.error); };
+        tx.onabort = function () { db.close(); rej(tx.error); };
+      });
+    });
+  }
+
+  function _rv() {
+    return _od().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx;
+        try {
+          tx = db.transaction(_sn, 'readwrite');
+          tx.objectStore(_sn).delete(_ky);
+        } catch (e) { db.close(); rej(e); return; }
+        tx.oncomplete = function () { db.close(); res(); };
+        tx.onerror = function () { db.close(); rej(tx.error); };
+        tx.onabort = function () { db.close(); rej(tx.error); };
+      });
+    });
+  }
+
   function _ck(u) {
     return new Promise(function (res, rej) {
       var im = new Image();
@@ -78,37 +225,224 @@
     });
   }
 
-  function _sh(u) {
-    document.getElementById('v').style.backgroundImage = 'url("' + u + '")';
+  function _su(v) {
+    var u = null;
+    if (v instanceof Blob) { u = URL.createObjectURL(v); }
+    else if (typeof v === 'string' && v) { u = v; }
+    if (!u) {
+      if (_mu) { URL.revokeObjectURL(_mu); _mu = null; }
+      _V.style.backgroundImage = '';
+      return Promise.resolve();
+    }
+    return _ck(u)
+      .then(function () {
+        if (_mu) { URL.revokeObjectURL(_mu); _mu = null; }
+        if (v instanceof Blob) { _mu = u; }
+        _V.style.backgroundImage = 'url("' + u + '")';
+      })
+      .catch(function () {
+        if (v instanceof Blob) { URL.revokeObjectURL(u); }
+      });
   }
 
   function _in() {
-    _od()
-      .then(function (db) {
-        return _gv(db).then(function (v) {
-          db.close();
-          return v;
-        });
-      })
-      .then(function (v) {
-        var u = null;
-        if (v instanceof Blob) {
-          u = URL.createObjectURL(v);
-        } else if (typeof v === 'string' && v) {
-          u = v;
-        }
-        if (!u) { return; }
-        return _ck(u).then(_sh).catch(function () {});
-      })
+    _gvp()
+      .then(function (v) { return _su(v); })
       .catch(function () {});
   }
 
-  document.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+  function _mt(s) {
+    _M.textContent = s || '';
+  }
+
+  function _pv(v) {
+    if (_cu) { URL.revokeObjectURL(_cu); _cu = null; }
+    var u;
+    if (v instanceof Blob) { u = URL.createObjectURL(v); _cu = u; }
+    else { u = v; }
+    _P.style.backgroundImage = 'url("' + u + '")';
+    _P.textContent = '';
+  }
+
+  function _ph() {
+    if (_cu) { URL.revokeObjectURL(_cu); _cu = null; }
+    _P.style.backgroundImage = '';
+    _P.textContent = '画像なし';
+  }
+
+  function _rf() {
+    _gvp()
+      .then(function (v) {
+        if (v instanceof Blob || (typeof v === 'string' && v)) {
+          _pv(v);
+          _hv = true;
+          _B2.disabled = false;
+        } else {
+          _ph();
+          _hv = false;
+          _B2.disabled = true;
+        }
+      })
+      .catch(function () {
+        _ph();
+        _hv = false;
+        _B2.disabled = true;
+      });
+  }
+
+  function _cn() {
+    _CD.style.display = 'none';
+  }
+
+  function _bl(on) {
+    _bz = on;
+    _B1.disabled = on;
+    _B4.disabled = on;
+    _B2.disabled = on ? true : !_hv;
+  }
+
+  function _ow() {
+    _rs();
+    _op = true;
+    _cn();
+    _mt('');
+    _G.style.display = 'flex';
+    _rf();
+  }
+
+  function _cw() {
+    _G.style.display = 'none';
+    _op = false;
+    _cn();
+    if (_cu) { URL.revokeObjectURL(_cu); _cu = null; }
+  }
+
+  function _rs() {
+    _tc = 0;
+    _t0 = 0;
+    _pt = 0;
+    if (_lp) { clearTimeout(_lp); _lp = null; }
+  }
+
+  function _hs(x, y) {
+    var w = Math.max(60, window.innerWidth * 0.15);
+    var h = Math.max(60, window.innerHeight * 0.15);
+    return x >= 0 && x <= w && y >= 0 && y <= h;
+  }
+
+  function _dw(x, y) {
+    if (_op) { return; }
+    if (!_hs(x, y)) { _rs(); return; }
+    var now = Date.now();
+    if (_tc > 0 && (now - _t0) > 3000) { _rs(); }
+    if (_tc === 0) { _t0 = now; }
+    _pt = now;
+    if (_tc === 3) {
+      _lp = setTimeout(function () {
+        _lp = null;
+        if ((Date.now() - _t0) <= 3000) { _ow(); }
+        else { _rs(); }
+      }, 800);
+    }
+  }
+
+  function _uw() {
+    if (_op) { return; }
+    if (_lp) { clearTimeout(_lp); _lp = null; }
+    if (_pt === 0) { return; }
+    var now = Date.now();
+    var held = now - _pt;
+    _pt = 0;
+    if (_tc < 3) {
+      if (held <= 500 && (now - _t0) <= 3000) { _tc++; }
+      else { _rs(); }
+    } else {
+      _rs();
+    }
+  }
+
+  document.addEventListener('touchmove', function (e) { if (!_op) { e.preventDefault(); } }, { passive: false });
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
   document.addEventListener('gesturechange', function (e) { e.preventDefault(); });
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   document.addEventListener('dblclick', function (e) { e.preventDefault(); });
   document.addEventListener('selectstart', function (e) { e.preventDefault(); });
+
+  document.addEventListener('pointerdown', function (e) {
+    if (!e.isPrimary) { return; }
+    _dw(e.clientX, e.clientY);
+  });
+  document.addEventListener('pointerup', function (e) {
+    if (!e.isPrimary) { return; }
+    _uw();
+  });
+  document.addEventListener('pointercancel', function () {
+    if (!_op) { _rs(); }
+  });
+
+  _B1.addEventListener('click', function () {
+    if (_bz) { return; }
+    _cn();
+    _mt('');
+    _F.click();
+  });
+
+  _F.addEventListener('change', function () {
+    var f = _F.files && _F.files[0];
+    _F.value = '';
+    if (!f) { return; }
+    if (_bz) { return; }
+    _bl(true);
+    _mt('');
+    var url = URL.createObjectURL(f);
+    _ck(url)
+      .then(function () { return _wv(f); })
+      .then(function () {
+        URL.revokeObjectURL(url);
+        _pv(f);
+        _hv = true;
+        _bl(false);
+        return _su(f);
+      })
+      .catch(function () {
+        URL.revokeObjectURL(url);
+        _mt('この画像は読み込めませんでした');
+        _bl(false);
+      });
+  });
+
+  _B2.addEventListener('click', function () {
+    if (_bz || !_hv) { return; }
+    _mt('');
+    _CD.style.display = 'flex';
+  });
+
+  _B4.addEventListener('click', function () {
+    if (_bz || !_hv) { return; }
+    _bl(true);
+    _rv()
+      .then(function () {
+        _cn();
+        _ph();
+        _hv = false;
+        _bl(false);
+        return _su(null);
+      })
+      .catch(function () {
+        _cn();
+        _mt('消去できませんでした');
+        _bl(false);
+      });
+  });
+
+  _B5.addEventListener('click', function () {
+    _cn();
+  });
+
+  _B3.addEventListener('click', function () {
+    if (_bz) { return; }
+    _cw();
+  });
 
   _in();
 })();
