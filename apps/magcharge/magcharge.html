@@ -27,6 +27,32 @@
     background-position: center center;
     background-size: cover;
   }
+  #_w {
+    position: absolute;
+    top: 12%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    z-index: 5;
+    pointer-events: none;
+    display: none;
+  }
+  #_d {
+    font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 2px;
+  }
+  #_c {
+    font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+    font-size: 25vw;
+    line-height: 1.0;
+    font-weight: 600;
+    letter-spacing: -3px;
+    color: rgba(255,255,255,0.6);
+  }
   #_g {
     position: fixed;
     inset: 0;
@@ -105,6 +131,10 @@
 </head>
 <body>
 <div id="v"></div>
+<div id="_w">
+  <div id="_d"></div>
+  <div id="_c"></div>
+</div>
 <div id="_g">
   <div id="_gc">
     <div id="_p"></div>
@@ -129,6 +159,9 @@
   var _ky = '_k1';
 
   var _V = document.getElementById('v');
+  var _W = document.getElementById('_w');
+  var _D = document.getElementById('_d');
+  var _C = document.getElementById('_c');
   var _G = document.getElementById('_g');
   var _P = document.getElementById('_p');
   var _M = document.getElementById('_m');
@@ -149,6 +182,29 @@
   var _hv = false;
   var _cu = null;
   var _mu = null;
+  var _pg = false;
+  var _wd = ['日', '月', '火', '水', '木', '金', '土'];
+
+  function _z(n) {
+    return n < 10 ? '0' + n : '' + n;
+  }
+
+  function _tk() {
+    var n = new Date();
+    _D.textContent = (n.getMonth() + 1) + '月' + n.getDate() + '日 (' + _wd[n.getDay()] + ')';
+    _C.textContent = _z(n.getHours()) + ':' + _z(n.getMinutes());
+  }
+
+  function _sh() {
+    if (_pg && !_op) {
+      _tk();
+      _W.style.display = 'block';
+    } else {
+      _W.style.display = 'none';
+    }
+  }
+
+  setInterval(_tk, 250);
 
   function _od() {
     return new Promise(function (res, rej) {
@@ -232,6 +288,8 @@
     if (!u) {
       if (_mu) { URL.revokeObjectURL(_mu); _mu = null; }
       _V.style.backgroundImage = '';
+      _pg = false;
+      _sh();
       return Promise.resolve();
     }
     return _ck(u)
@@ -239,6 +297,8 @@
         if (_mu) { URL.revokeObjectURL(_mu); _mu = null; }
         if (v instanceof Blob) { _mu = u; }
         _V.style.backgroundImage = 'url("' + u + '")';
+        _pg = true;
+        _sh();
       })
       .catch(function () {
         if (v instanceof Blob) { URL.revokeObjectURL(u); }
@@ -304,6 +364,7 @@
   function _ow() {
     _rs();
     _op = true;
+    _sh();
     _cn();
     _mt('');
     _G.style.display = 'flex';
@@ -313,6 +374,7 @@
   function _cw() {
     _G.style.display = 'none';
     _op = false;
+    _sh();
     _cn();
     if (_cu) { URL.revokeObjectURL(_cu); _cu = null; }
   }
