@@ -127,6 +127,13 @@
   #_f {
     display: none;
   }
+  #_o {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: none;
+    z-index: 20;
+  }
 </style>
 </head>
 <body>
@@ -150,6 +157,7 @@
   </div>
   <input id="_f" type="file" accept="image/*">
 </div>
+<div id="_o"></div>
 <script>
 (function () {
   'use strict';
@@ -172,6 +180,12 @@
   var _B5 = document.getElementById('_b5');
   var _CD = document.getElementById('_cd');
   var _F = document.getElementById('_f');
+  var _O = document.getElementById('_o');
+
+  var _al = null;
+  var _ft = null;
+  var _ar = false;
+  var _fd = false;
 
   var _op = false;
   var _tc = 0;
@@ -362,6 +376,7 @@
   }
 
   function _ow() {
+    _ra();
     _rs();
     _op = true;
     _sh();
@@ -390,6 +405,39 @@
     var w = Math.max(60, window.innerWidth * 0.15);
     var h = Math.max(60, window.innerHeight * 0.15);
     return x >= 0 && x <= w && y >= 0 && y <= h;
+  }
+
+  function _ha(x, y) {
+    var w = Math.max(60, window.innerWidth * 0.15);
+    var h = Math.max(60, window.innerHeight * 0.15);
+    return x >= window.innerWidth - w && y >= window.innerHeight - h;
+  }
+
+  function _ra() {
+    if (_al) { clearTimeout(_al); _al = null; }
+    if (_ft) { clearTimeout(_ft); _ft = null; }
+    _ar = false;
+  }
+
+  function _da() {
+    _al = null;
+    if (_op || _fd) { return; }
+    if (_ar) { return; }
+    _ar = true;
+    _ft = setTimeout(_fr, 8000);
+  }
+
+  function _fr() {
+    _ft = null;
+    if (_op) { _ra(); return; }
+    _fd = true;
+    _O.style.display = 'block';
+  }
+
+  function _ds() {
+    _O.style.display = 'none';
+    _fd = false;
+    _ra();
   }
 
   function _dw(x, y) {
@@ -431,15 +479,26 @@
   document.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
   document.addEventListener('pointerdown', function (e) {
+    if (_fd) { return; }
     if (!e.isPrimary) { return; }
     _dw(e.clientX, e.clientY);
+    if (!_op && !_fd && _ha(e.clientX, e.clientY)) {
+      _al = setTimeout(_da, 1000);
+    }
   });
   document.addEventListener('pointerup', function (e) {
     if (!e.isPrimary) { return; }
+    if (_al) { clearTimeout(_al); _al = null; }
     _uw();
   });
   document.addEventListener('pointercancel', function () {
+    if (_al) { clearTimeout(_al); _al = null; }
     if (!_op) { _rs(); }
+  });
+
+  _O.addEventListener('pointerdown', function (e) {
+    e.stopPropagation();
+    _ds();
   });
 
   _B1.addEventListener('click', function () {
