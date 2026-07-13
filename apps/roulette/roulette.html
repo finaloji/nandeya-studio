@@ -69,6 +69,26 @@
       flex: 0 0 auto;
     }
 
+    /* 設定ボタン（左上・常時表示） */
+    .settings-btn {
+      position: fixed;
+      top: max(env(safe-area-inset-top), 12px);
+      left: max(env(safe-area-inset-left), 12px);
+      z-index: 10;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      appearance: none;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 11px;
+      color: #cfcfd2;
+    }
+    .settings-btn svg { width: 23px; height: 23px; display: block; }
+
     /* 円盤エリア（主役） */
     .wheel-wrap {
       position: relative;
@@ -584,6 +604,13 @@
     </div>
   </div>
 
+  <button class="settings-btn" id="settingsBtn" type="button" aria-label="設定">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+
   <div class="stage">
     <div class="title">ルーレット</div>
 
@@ -1047,9 +1074,6 @@
 
     // ---- 設定パネル（タイトル3連打で開閉） ----
     var _sp = false; // 設定パネルの表示中フラグ
-    var _tk = 0;     // タイトル連続タップのカウント
-    var _tt = 0;     // 直前タップの時刻(ms)
-    var _tc = 0;     // クールダウン解除時刻(ms)
     var _tiNoticeTimer = null;
 
     // 設定パネルを開く
@@ -1066,37 +1090,6 @@
       _sp = false;
       var ov = document.getElementById('panelOverlay');
       ov.classList.remove('open');
-    }
-
-    // タイトル文字タップ時の分岐（3連打での設定パネル開閉判定。矢印用カウンターとは別実体）
-    function _stl() {
-      if (_sp) return;
-      if (_spin || _land) {
-        // 回転中・減速中はあらゆる操作を無視し、カウントにも加算しない
-        _tk = 0;
-        return;
-      }
-
-      var now = performance.now();
-
-      if (now < _tc) {
-        _tk = 0;
-        _tt = 0;
-        return;
-      }
-
-      if (_tk > 0 && (now - _tt) > _AK_GAP) {
-        _tk = 0;
-      }
-
-      _tk++;
-      _tt = now;
-
-      if (_tk >= 3) {
-        _tk = 0;
-        _tc = now + _AK_COOL;
-        _so();
-      }
     }
 
     // 基準項目が自動的に変わったときの一時的な通知表示
@@ -1552,7 +1545,7 @@
     bindBtn(document.getElementById('action'), _onAction);
     bindBtn(document.querySelector('.wheel-wrap'), _onWheelTap);
     bindArrowHit(document.getElementById('arrowHit'), _arm);
-    bindBtn(document.querySelector('.title'), _stl);
+    bindBtn(document.getElementById('settingsBtn'), _so);
 
     document.getElementById('panelClose').addEventListener('click', _sc);
     document.getElementById('itemAdd').addEventListener('click', _onAddItem);
