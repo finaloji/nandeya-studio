@@ -241,6 +241,51 @@
   var _ar = false;
   var _fd = false;
 
+  var _au = null;
+  var _ag = null;
+  var _ak = false;
+
+  function _ai() {
+    if (_ak) { return; }
+    try {
+      var Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) { _ak = true; return; }
+      _au = new Ctor();
+      if (_au.resume) { _au.resume(); }
+      _ag = _au.createGain();
+      _ag.gain.value = 1;
+      _ag.connect(_au.destination);
+      var b = _au.createBuffer(1, 1, _au.sampleRate);
+      var s = _au.createBufferSource();
+      s.buffer = b;
+      s.connect(_au.destination);
+      s.start(0);
+      _ak = true;
+    } catch (e) {
+      _ak = true;
+    }
+  }
+
+  function _ap() {
+    if (!_au || !_ag) { return; }
+    try {
+      if (_au.resume) { _au.resume(); }
+      var t = _au.currentTime;
+      var o = _au.createOscillator();
+      var g = _au.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(660, t);
+      o.frequency.exponentialRampToValueAtTime(392, t + 0.14);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.3, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+      o.connect(g);
+      g.connect(_ag);
+      o.start(t);
+      o.stop(t + 0.22);
+    } catch (e) {}
+  }
+
   var _op = false;
   var _tc = 0;
   var _t0 = 0;
@@ -613,6 +658,7 @@
     _fd = true;
     _W.style.display = 'none';
     _O.style.display = 'block';
+    _ap();
     _fa();
   }
 
@@ -663,6 +709,7 @@
   document.addEventListener('selectstart', function (e) { e.preventDefault(); });
 
   document.addEventListener('pointerdown', function (e) {
+    _ai();
     if (_fd) { return; }
     if (!e.isPrimary) { return; }
     _dw(e.clientX, e.clientY);
