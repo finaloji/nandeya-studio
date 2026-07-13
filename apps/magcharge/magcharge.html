@@ -134,6 +134,33 @@
     display: none;
     z-index: 20;
   }
+  #_o1 {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(66vw, 66vh);
+    height: min(66vw, 66vh);
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -50%);
+  }
+  #_o2 {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #_o4 {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, "SF Pro Display", "Hiragino Sans", system-ui, sans-serif;
+    font-size: calc(min(66vw, 66vh) * 0.18);
+    font-weight: 600;
+    letter-spacing: -1px;
+    color: #fff;
+  }
 </style>
 </head>
 <body>
@@ -157,7 +184,15 @@
   </div>
   <input id="_f" type="file" accept="image/*">
 </div>
-<div id="_o"></div>
+<div id="_o">
+  <div id="_o1">
+    <svg id="_o2" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="47" fill="none" stroke="#2c2c2e" stroke-width="2.75"></circle>
+      <circle id="_o3" cx="50" cy="50" r="47" fill="none" stroke="#30d158" stroke-width="2.75" stroke-linecap="round" stroke-dasharray="295.31" stroke-dashoffset="295.31" transform="rotate(-90 50 50)"></circle>
+    </svg>
+    <div id="_o4"></div>
+  </div>
+</div>
 <script>
 (function () {
   'use strict';
@@ -181,6 +216,9 @@
   var _CD = document.getElementById('_cd');
   var _F = document.getElementById('_f');
   var _O = document.getElementById('_o');
+  var _O1 = document.getElementById('_o1');
+  var _O3 = document.getElementById('_o3');
+  var _O4 = document.getElementById('_o4');
 
   var _al = null;
   var _ft = null;
@@ -419,6 +457,59 @@
     _ar = false;
   }
 
+  var _xr = null;
+  var _xz = 0;
+  var _xp = 0;
+  var _xc = 295.31;
+
+  function _xa(p) {
+    _O3.style.strokeDashoffset = _xc * (1 - p / 100);
+    _O4.textContent = p + '%';
+  }
+
+  function _fb(ts) {
+    var t = ts - _xz;
+    var u, p;
+    if (t < 500) {
+      u = t / 500;
+      if (u < 0) { u = 0; }
+      u = 1 - (1 - u) * (1 - u) * (1 - u);
+      _O1.style.opacity = u;
+      _O1.style.transform = 'translate(-50%,-50%) scale(' + (1.5 - 0.5 * u) + ')';
+      _xa(_xp);
+    } else {
+      _O1.style.opacity = '1';
+      _O1.style.transform = 'translate(-50%,-50%)';
+      if (t < 900) {
+        _xa(_xp);
+      } else if (t < 3500) {
+        u = (t - 900) / 2600;
+        p = Math.floor(_xp + (100 - _xp) * Math.pow(u, 2.6));
+        if (p > 100) { p = 100; }
+        _xa(p);
+      } else {
+        _xa(100);
+        _xr = null;
+        return;
+      }
+    }
+    _xr = requestAnimationFrame(_fb);
+  }
+
+  function _fx() {
+    if (_xr !== null) { cancelAnimationFrame(_xr); _xr = null; }
+    _O1.style.opacity = '0';
+    _O1.style.transform = 'translate(-50%,-50%) scale(1.5)';
+  }
+
+  function _fa() {
+    _fx();
+    _xp = 25 + Math.floor(Math.random() * 21);
+    _xa(_xp);
+    _xz = performance.now();
+    _xr = requestAnimationFrame(_fb);
+  }
+
   function _da() {
     _al = null;
     if (_op || _fd) { return; }
@@ -432,9 +523,11 @@
     if (_op) { _ra(); return; }
     _fd = true;
     _O.style.display = 'block';
+    _fa();
   }
 
   function _ds() {
+    _fx();
     _O.style.display = 'none';
     _fd = false;
     _ra();
