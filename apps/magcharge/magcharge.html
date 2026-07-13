@@ -146,8 +146,8 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: min(50vw, 40vh);
-    height: min(50vw, 40vh);
+    width: min(58vw, 46vh);
+    height: min(58vw, 46vh);
     pointer-events: none;
     opacity: 0;
     filter: blur(12px);
@@ -165,7 +165,7 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: calc(50% + min(25vw, 20vh) + 4vh);
+    top: calc(50% + min(29vw, 23vh) + 4vh);
     text-align: center;
     font-family: -apple-system, "SF Pro Display", "Hiragino Sans", system-ui, sans-serif;
     font-size: 17px;
@@ -200,9 +200,9 @@
 <div id="_o">
   <div id="_o1">
     <svg id="_o2" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <circle id="_o7" cx="50" cy="50" r="47" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="6" stroke-dasharray="295.31" stroke-dashoffset="0" transform="rotate(-90 50 50)"></circle>
-      <circle id="_o3" cx="50" cy="50" r="47" fill="none" stroke="#32d74b" stroke-width="6" stroke-linecap="round" stroke-dasharray="295.31" stroke-dashoffset="295.31" transform="rotate(-90 50 50)"></circle>
-      <path id="_o5" d="M13.5 2 L6 13.5 H11 L10.5 22 L18 10.5 H13 Z" fill="#32d74b" transform="translate(50 50) scale(2) translate(-12 -12)"></path>
+      <circle id="_o7" cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="8.5" stroke-dasharray="282.74" stroke-dashoffset="0" transform="rotate(-90 50 50)"></circle>
+      <circle id="_o3" cx="50" cy="50" r="45" fill="none" stroke="#ff453a" stroke-width="8.5" stroke-linecap="round" stroke-dasharray="282.74" stroke-dashoffset="282.74" transform="rotate(-90 50 50)"></circle>
+      <path id="_o5" d="M13.5 2 L6 13.5 H11 L10.5 22 L18 10.5 H13 Z" fill="#ff453a" transform="translate(50 50) scale(1.8) translate(-12 -12)"></path>
     </svg>
   </div>
   <div id="_o6"></div>
@@ -476,10 +476,21 @@
   var _xr = null;
   var _xz = 0;
   var _xp = 0;
-  var _xc = 295.31;
+  var _xc = 282.74;
+
+  function _xq(p) {
+    return p > 20 ? '#32d74b' : '#ff453a';
+  }
+
+  function _xb(q) {
+    var c = _xq(q);
+    _O3.style.strokeDashoffset = _xc * (1 - q / 100);
+    _O3.style.stroke = c;
+    _O5.style.fill = c;
+  }
 
   function _xa(p) {
-    _O3.style.strokeDashoffset = _xc * (1 - p / 100);
+    _xb(p);
     _O6.textContent = p + '% 充電済み';
   }
 
@@ -513,15 +524,26 @@
       }
     }
     if (t >= 1400 && t < 9400) {
-      u = (t - 1400) / 400;
+      u = (t - 1400) / 350;
       if (u > 1) { u = 1; }
       _O5.style.opacity = u;
+    }
+    if (t >= 1750 && t < 9400) {
+      u = (t - 1750) / 350;
+      if (u > 1) { u = 1; }
       _O6.style.opacity = u;
     }
-    if (t < 1900) {
+    if (t < 1400) {
+      _xb(0);
+    } else if (t < 1750) {
+      u = (t - 1400) / 350;
+      u = 1 - (1 - u) * (1 - u) * (1 - u);
+      _xb(_xp * u);
+      _O6.textContent = _xp + '% 充電済み';
+    } else if (t < 2400) {
       _xa(_xp);
     } else if (t < 9200) {
-      u = (t - 1900) / 7300;
+      u = (t - 2400) / 6800;
       p = u * u * (3 - 2 * u);
       u = 0.65 * u + 0.35 * p;
       p = Math.floor(_xp + (100 - _xp) * u);
@@ -563,14 +585,16 @@
     _O6.textContent = '';
     _O3.style.strokeDasharray = '';
     _O3.style.strokeDashoffset = '';
+    _O3.style.stroke = '';
+    _O5.style.fill = '';
     _O7.style.strokeDasharray = '';
     _O7.style.strokeDashoffset = '';
   }
 
   function _fa() {
     _fx();
-    _xp = 25 + Math.floor(Math.random() * 21);
-    _xa(_xp);
+    _xp = 5 + Math.floor(Math.random() * 6);
+    _xb(0);
     _xz = performance.now();
     _xr = requestAnimationFrame(_fb);
   }
