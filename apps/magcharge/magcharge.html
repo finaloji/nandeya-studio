@@ -3,7 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Viewer</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VOLT">
+<title>VOLT</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<!-- ライセンス確認モジュール（Firestore初期化） -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const _cfg = {
+    apiKey: "AIzaSyBSSGdNDndjiUj40m4V4QA6Kjqr-oRnBc8",
+    authDomain: "nandeya-magic-app.firebaseapp.com",
+    projectId: "nandeya-magic-app",
+    storageBucket: "nandeya-magic-app.firebasestorage.app",
+    messagingSenderId: "181170873357",
+    appId: "1:181170873357:web:b3c3fef8aea6390f37a144"
+  };
+  const _app = initializeApp(_cfg);
+  const _db  = getFirestore(_app);
+  window.__mgdb  = _db;
+  window.__mgfns = { doc, getDoc, updateDoc, addDoc, collection, query, where, getDocs };
+  window.dispatchEvent(new Event('_mgfsready'));
+</script>
+
 <style>
   html, body {
     margin: 0;
@@ -190,9 +218,100 @@
     pointer-events: none;
     opacity: 0;
   }
+
+  /* ライセンス確認画面（初回のみ表示・以降は端末に記憶） */
+  .lgate {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: -apple-system, "SF Pro Display", "Hiragino Sans", system-ui, sans-serif;
+    transition: opacity 0.3s, visibility 0.3s;
+  }
+  .lgate.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .lg-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+  .lg-icon img { width: 100%; height: 100%; display: block; }
+  .lg-title {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 30px;
+  }
+  .lg-form { width: 100%; max-width: 320px; }
+  .lg-field {
+    background: #1c1c1e;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .lg-field input {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 16px;
+    font-family: inherit;
+    width: 100%;
+    outline: none;
+  }
+  .lg-field input::placeholder { color: #8e8e93; }
+  .lg-msg {
+    color: #ff3b30;
+    font-size: 13px;
+    min-height: 18px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .lg-msg.info { color: #30d158; }
+  .lg-btn {
+    width: 100%;
+    background: #0a84ff;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 0;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    margin-bottom: 24px;
+  }
 </style>
 </head>
 <body>
+
+<!-- ライセンス確認画面（初回のみ表示・以降は端末に記憶） -->
+<div class="lgate" id="_mag">
+  <div class="lg-icon"><img src="icons/apple-touch-icon.png" alt=""></div>
+  <div class="lg-title">VOLT</div>
+  <div class="lg-form">
+    <div class="lg-field">
+      <input id="_mid" type="text" placeholder="ID" autocomplete="off" autocorrect="off" autocapitalize="none">
+    </div>
+    <div class="lg-field">
+      <input id="_mpc" type="password" placeholder="パスコード" autocomplete="off">
+    </div>
+    <div class="lg-msg" id="_mmsg"></div>
+    <button class="lg-btn" id="_mlb">ログイン</button>
+  </div>
+</div>
+
 <div id="v"></div>
 <div id="_w">
   <div id="_d"></div>
@@ -849,6 +968,118 @@
 
   _in();
 })();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js');
+  }
+</script>
+
+<!-- ライセンス確認（ID・パスコード＋2端末までのLRUロック。一度確認できた端末はオフラインでも継続利用可） -->
+<script>
+  (function () {
+    'use strict';
+
+    // 端末ID（初回に生成してlocalStorageへ）
+    function _mgdi() {
+      var id = localStorage.getItem('_mgdev');
+      if (!id) {
+        id = 'mg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+        localStorage.setItem('_mgdev', id);
+      }
+      return id;
+    }
+
+    var _mmsg = document.getElementById('_mmsg');
+    var _mlb  = document.getElementById('_mlb');
+
+    function _mshe(msg) { _mmsg.classList.remove('info'); _mmsg.textContent = msg; }
+    function _mslb(loading) {
+      _mlb.textContent = loading ? '確認中...' : 'ログイン';
+      _mlb.disabled = loading;
+      _mlb.style.opacity = loading ? '0.6' : '1';
+    }
+    function _mhga() {
+      document.getElementById('_mag').classList.add('hidden');
+    }
+
+    // 端末ロック（同時に使えるのは _mmax 台まで。超過時は最古を自動的に外す）
+    var _mmax = 2;
+    function _mgdv(data) {
+      if (Array.isArray(data.devices)) return data.devices.slice();
+      if (data.deviceId) return [data.deviceId];
+      return [];
+    }
+    function _madv(list, dev) {
+      var i = list.indexOf(dev);
+      if (i !== -1 && i === list.length - 1) return null;
+      if (i !== -1) list.splice(i, 1);
+      list.push(dev);
+      while (list.length > _mmax) list.shift();
+      return list;
+    }
+
+    // ログイン処理
+    function _matl(id, pass) {
+      var fns = window.__mgfns, db = window.__mgdb;
+      return fns.getDoc(fns.doc(db, 'magcharge_licenses', id)).then(function (snap) {
+        if (!snap.exists()) return { ok: false, reason: 'invalid' };
+        var data = snap.data();
+        if (data.passcode !== pass) return { ok: false, reason: 'invalid' };
+        var next = _madv(_mgdv(data), _mgdi());
+        if (next === null) return { ok: true };
+        return fns.updateDoc(fns.doc(db, 'magcharge_licenses', id), { devices: next })
+          .then(function () { return { ok: true }; });
+      });
+    }
+
+    // 自動ログイン（保存済みIDと端末IDの一致を確認）。
+    // 通信断で確認できない場合は、過去にこの端末で確認済みならオフラインのまま継続利用させる。
+    function _mtal() {
+      var lid = localStorage.getItem('_mglic');
+      if (!lid) return Promise.resolve(false);
+      var fns = window.__mgfns, db = window.__mgdb;
+      return fns.getDoc(fns.doc(db, 'magcharge_licenses', lid)).then(function (snap) {
+        if (!snap.exists()) { localStorage.removeItem('_mglic'); localStorage.removeItem('_mgok'); return false; }
+        if (_mgdv(snap.data()).indexOf(_mgdi()) !== -1) {
+          localStorage.setItem('_mgok', '1');
+          _mhga();
+          return true;
+        }
+        localStorage.removeItem('_mglic');
+        localStorage.removeItem('_mgok');
+        return false;
+      }).catch(function () {
+        if (localStorage.getItem('_mgok') === '1') { _mhga(); return true; }
+        return false;
+      });
+    }
+
+    // ログインボタン
+    _mlb.addEventListener('click', function () {
+      var id   = document.getElementById('_mid').value.trim();
+      var pass = document.getElementById('_mpc').value;
+      if (!id || !pass) { _mshe('IDとパスコードを入力してください'); return; }
+      if (!window.__mgdb) { _mshe('接続中です。しばらくお待ちください'); return; }
+      _mmsg.textContent = '';
+      _mslb(true);
+      _matl(id, pass).then(function (res) {
+        if (res.ok) {
+          localStorage.setItem('_mglic', id);
+          localStorage.setItem('_mgok', '1');
+          _mhga();
+        } else {
+          _mshe('IDまたはパスコードが正しくありません');
+        }
+      }).catch(function () {
+        _mshe('エラーが発生しました。再度お試しください');
+      }).finally(function () { _mslb(false); });
+    });
+
+    // Firebase 準備完了後に自動ログイン試行（順序保険つき）
+    window.addEventListener('_mgfsready', function () { _mtal().catch(function () {}); });
+    if (window.__mgdb) { _mtal().catch(function () {}); }
+  })();
 </script>
 </body>
 </html>

@@ -318,6 +318,7 @@
       <option value="clock">Re:Time</option>
       <option value="cipher">CIPHER</option>
       <option value="roulette">ルーレット</option>
+      <option value="magcharge">VOLT</option>
       <option value="customers">顧客一覧</option>
     </select>
   </div>
@@ -537,6 +538,49 @@
     </section>
   </div>
 
+  <!-- VOLTタブ -->
+  <div id="tab-magcharge" class="tab-panel">
+    <section>
+      <h2>ID発行</h2>
+      <div class="form-row">
+        <div class="field">
+          <label for="mgIssueId">ID</label>
+          <input type="text" id="mgIssueId" placeholder="例: magcharge001">
+        </div>
+        <div class="field">
+          <label for="mgIssuePasscode">パスコード</label>
+          <div class="inline-btn-group">
+            <input type="text" id="mgIssuePasscode" placeholder="例: A1B2C3">
+            <button class="btn-sub" id="mgGenPasscodeBtn" type="button">自動生成</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="mgIssueNote">メモ（任意）</label>
+          <input type="text" id="mgIssueNote" placeholder="例: 〇〇さん用">
+        </div>
+        <div class="field">
+          <button class="btn" id="mgIssueBtn" type="button">発行</button>
+        </div>
+      </div>
+      <div class="msg" id="mgIssueMsg"></div>
+    </section>
+
+    <section>
+      <h2>ライセンス一覧</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>パスコード</th><th>端末登録状況</th>
+            <th>メモ</th><th>発行日</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="mgLicenseTableBody">
+          <tr class="loading-row"><td colspan="6">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </div>
+
   <!-- 顧客一覧タブ -->
   <div id="tab-customers" class="tab-panel">
     <section>
@@ -599,6 +643,7 @@
       loadRtLicenses();
       loadCipherLicenses();
       loadRoLicenses();
+      loadMgLicenses();
       loadCustomerOverview();
     } else {
       gateErrorEl.textContent = "パスワードが正しくありません";
@@ -1408,6 +1453,141 @@
   }
 
   // =============================================
+  // VOLT（magcharge）用
+  // ※Firestoreルール上、作成/リセットの deviceId は null を使う
+  // =============================================
+  const MG_LICENSES = "magcharge_licenses";
+
+  const mgIssueMsgEl       = document.getElementById("mgIssueMsg");
+  const mgIssueIdEl        = document.getElementById("mgIssueId");
+  const mgIssuePasscodeEl  = document.getElementById("mgIssuePasscode");
+  const mgIssueNoteEl      = document.getElementById("mgIssueNote");
+  const mgIssueBtnEl       = document.getElementById("mgIssueBtn");
+  const mgGenPasscodeBtnEl = document.getElementById("mgGenPasscodeBtn");
+  const mgTableBodyEl      = document.getElementById("mgLicenseTableBody");
+
+  function setMgIssueMsg(text, type) {
+    mgIssueMsgEl.textContent = text;
+    mgIssueMsgEl.className = "msg" + (type ? " " + type : "");
+  }
+
+  function setMgFormDisabled(disabled) {
+    mgIssueIdEl.disabled = disabled;
+    mgIssuePasscodeEl.disabled = disabled;
+    mgIssueNoteEl.disabled = disabled;
+    mgGenPasscodeBtnEl.disabled = disabled;
+    mgIssueBtnEl.disabled = disabled;
+  }
+
+  mgGenPasscodeBtnEl.addEventListener("click", () => {
+    mgIssuePasscodeEl.value = generatePasscode();
+  });
+
+  mgIssueBtnEl.addEventListener("click", async () => {
+    const id       = mgIssueIdEl.value.trim();
+    const passcode = mgIssuePasscodeEl.value.trim();
+    const note     = mgIssueNoteEl.value.trim();
+    if (!id || !passcode) { setMgIssueMsg("IDとパスコードを入力してください", "err"); return; }
+
+    setMgFormDisabled(true);
+    mgIssueBtnEl.textContent = "処理中...";
+    setMgIssueMsg("", "");
+
+    try {
+      const ref = doc(db, MG_LICENSES, id);
+      if ((await getDoc(ref)).exists()) {
+        setMgIssueMsg("このIDは既に使われています", "err");
+        return;
+      }
+      await setDoc(ref, { passcode, deviceId: null, createdAt: Date.now(), note: note || "" });
+      setMgIssueMsg("発行しました", "ok");
+      mgIssueIdEl.value = "";
+      mgIssuePasscodeEl.value = "";
+      mgIssueNoteEl.value = "";
+      await loadMgLicenses();
+    } catch (err) {
+      console.error(err);
+      setMgIssueMsg("発行に失敗しました: " + (err && err.message ? err.message : err), "err");
+    } finally {
+      setMgFormDisabled(false);
+      mgIssueBtnEl.textContent = "発行";
+    }
+  });
+
+  async function loadMgLicenses() {
+    mgTableBodyEl.innerHTML = '<tr class="loading-row"><td colspan="6">読み込み中...</td></tr>';
+    try {
+      const snapshot = await getDocs(collection(db, MG_LICENSES));
+      const items = [];
+      snapshot.forEach(d => items.push({ id: d.id, ...d.data() }));
+      items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      if (items.length === 0) {
+        mgTableBodyEl.innerHTML = '<tr class="empty-row"><td colspan="6">まだライセンスがありません</td></tr>';
+        return;
+      }
+
+      mgTableBodyEl.innerHTML = "";
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        const createdAtText = item.createdAt ? new Date(item.createdAt).toLocaleDateString("ja-JP") : "-";
+        tr.innerHTML = `
+          <td data-label="ID">${escapeHtml(item.id)}</td>
+          <td data-label="パスコード">${escapeHtml(item.passcode || "")}</td>
+          <td data-label="端末登録状況">${deviceStatusHtml(item)}</td>
+          <td data-label="メモ"><input type="text" class="note-input" value="${escapeHtml(item.note || "")}" data-orig="${escapeHtml(item.note || "")}" maxlength="40"></td>
+          <td data-label="発行日">${escapeHtml(createdAtText)}</td>
+          <td data-label="操作">
+            <div class="action-cell">
+              <button class="btn-sub copy-btn" type="button">コピー</button>
+              <button class="btn-sub reset-btn" type="button" ${deviceCount(item) === 0 ? "disabled" : ""}>端末登録をリセット</button>
+              <button class="btn-danger delete-btn" type="button">削除</button>
+            </div>
+          </td>`;
+        tr.querySelector(".note-input").addEventListener("blur", e => handleNoteBlur(MG_LICENSES, item.id, e.target));
+        tr.querySelector(".copy-btn").addEventListener("click", e => copyCreds(item.id, item.passcode || "", e.target));
+        tr.querySelector(".reset-btn").addEventListener("click", e => handleMgResetDevice(item.id, e.target));
+        tr.querySelector(".delete-btn").addEventListener("click", e => handleMgDelete(item.id, e.target));
+        mgTableBodyEl.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      mgTableBodyEl.innerHTML = `<tr class="empty-row"><td colspan="6">取得に失敗しました: ${escapeHtml(err && err.message ? err.message : err)}</td></tr>`;
+    }
+  }
+
+  async function handleMgDelete(id, buttonEl) {
+    if (!confirm("本当に削除しますか？")) return;
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      await deleteDoc(doc(db, MG_LICENSES, id));
+      await loadMgLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("削除に失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  async function handleMgResetDevice(id, buttonEl) {
+    const original = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = "処理中...";
+    try {
+      await updateDoc(doc(db, MG_LICENSES, id), { devices: [] });
+      await loadMgLicenses();
+    } catch (err) {
+      console.error(err);
+      alert("端末登録のリセットに失敗しました: " + (err && err.message ? err.message : err));
+      buttonEl.disabled = false;
+      buttonEl.textContent = original;
+    }
+  }
+
+  // =============================================
   // 顧客一覧（全アプリのメモをもとに横断集計）
   // =============================================
   const APP_LABELS = {
@@ -1415,21 +1595,24 @@
     calc: "電卓フォース",
     clock: "Re:Time",
     cipher: "CIPHER",
-    roulette: "ルーレット"
+    roulette: "ルーレット",
+    magcharge: "VOLT"
   };
   const APP_COLLECTIONS = {
     sw: LICENSES_COLLECTION,
     calc: CALC_LICENSES,
     clock: RT_LICENSES,
     cipher: CIPHER_LICENSES,
-    roulette: RO_LICENSES
+    roulette: RO_LICENSES,
+    magcharge: MG_LICENSES
   };
   const APP_LOADERS = {
     sw: loadLicenses,
     calc: loadCalcLicenses,
     clock: loadRtLicenses,
     cipher: loadCipherLicenses,
-    roulette: loadRoLicenses
+    roulette: loadRoLicenses,
+    magcharge: loadMgLicenses
   };
 
   const customerTableBodyEl = document.getElementById("customerTableBody");
