@@ -13,6 +13,7 @@
 | `apps/clock/` | 時間巻き戻し時計（clock-force） |
 | `apps/lockscreen/` | ロック画面アプリ（CIPHER） |
 | `apps/proxy-magician/` | 代打マジシャン（毒舌AIマジシャン） |
+| `apps/magcharge/` | VOLT（鼻で充電・MagSafeフォース） |
 | `tools/invoice/` | 見積書・請求書作成ツール v2 |
 | `tools/blog/` | 出張レポートブログ作成ツール（白紙化中・今後作り直す予定） |
 | `docs/` | リポジトリ横断のドキュメント（サブスクプラットフォーム構想、開発フローなど） |
