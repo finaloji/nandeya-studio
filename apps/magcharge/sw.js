@@ -1,4 +1,4 @@
-const CACHE = 'magcharge-v1';
+const CACHE = 'magcharge-v2';
 const ASSETS = [
   './magcharge.html',
   './manifest.json',

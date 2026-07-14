@@ -50,6 +50,7 @@
 - `type="module"` スクリプトはDOMより後に実行されるため、Firebase の初期化タイミングに注意。`_fsready` カスタムイベントで同期している
 - iOSのnumeric inputはEnterキーが発火しないため、決定ボタンを明示的に設置すること
 - GitHub Pages のデプロイは時々失敗する。push後にcurlで配信を確認し、反映されない場合は再pushで復旧する
+- PWA化した（sw.js を持つ）アプリは、ロジックを変更したら **sw.js の `CACHE` バージョン文字列も上げること**。上げないと既訪問端末のService Workerが古いHTMLをキャッシュしたまま更新されず、ユーザー側で不具合が再現し続ける
 
 ## 開発フロー
 
