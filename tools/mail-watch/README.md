@@ -126,3 +126,17 @@ wrangler d1 create mail-watch-db
 
 - **ローカル**: `.dev.vars.example` を `.dev.vars` にコピーして値を記入（`.dev.vars` は Git 除外済み）
 - **本番**: `wrangler secret put <名前>` で登録
+
+### Gmail の refresh token 取得（`scripts/get-refresh-token.mjs`）
+
+OAuth 同意画面を「本番公開」した状態で、Google Cloud の認証情報ページで取得した
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を使い、ブラウザ認可を経て refresh token を取得する使い捨てスクリプト。
+（同意画面をテストモードのままにすると refresh token が 7 日で失効するため、本番公開が前提）
+
+```
+GOOGLE_CLIENT_ID=<クライアントID> GOOGLE_CLIENT_SECRET=<クライアントシークレット> node scripts/get-refresh-token.mjs
+```
+
+表示された URL をブラウザで開き、対象の Gmail アカウントで認可する
+（「このアプリは確認されていません」の警告は「詳細」→「（アプリ名）に移動」で進めてよい）。
+コンソールに `refresh_token` が出力されるので、`.dev.vars` の `GOOGLE_REFRESH_TOKEN` に設定する。
