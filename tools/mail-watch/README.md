@@ -67,8 +67,8 @@ curl http://localhost:8787/
 `wrangler dev` 実行中に別ターミナルから発火をエミュレートできる。
 
 ```
-curl "http://localhost:8787/__scheduled?cron=*/5+*+*+*+*"
-curl "http://localhost:8787/__scheduled?cron=0+23+*+*+*"
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=*/5+*+*+*+*"
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=0+23+*+*+*"
 ```
 
 dev サーバー側のコンソールに「5分毎Cron発火」「毎朝8時JST Cron発火」のログが出る。
