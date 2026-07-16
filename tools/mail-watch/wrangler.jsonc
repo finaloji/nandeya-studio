@@ -1,0 +1,27 @@
+// mail-watch: Cloudflare Workers 設定ファイル
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mail-watch",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+
+  // Cron Triggers（Cron は UTC 指定）
+  // 1. "*/5 * * * *"  … 5分毎（メール取得・通知の定期実行用）
+  // 2. "0 23 * * *"   … UTC 23:00 = JST 8:00（毎朝8時のダイジェスト用。JST換算に注意）
+  "triggers": {
+    "crons": ["*/5 * * * *", "0 23 * * *"]
+  },
+
+  // D1 データベースバインディング
+  // database_id は本番 D1 未作成のためプレースホルダー。
+  // ローカル開発（wrangler dev / --local）ではこの値のままで動作する。
+  // 本番デプロイ時に `wrangler d1 create mail-watch-db` で作成した ID に差し替えること。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mail-watch-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

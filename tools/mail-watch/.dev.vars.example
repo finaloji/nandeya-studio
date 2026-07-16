@@ -1,0 +1,11 @@
+# mail-watch ローカル開発用シークレットのサンプル
+# このファイルを .dev.vars にコピーして実際の値を設定する（.dev.vars は Git 除外済み）。
+# スプリント1-1時点では未設定のままで問題なく動作する。
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REFRESH_TOKEN=
+GEMINI_API_KEY=
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_TARGET_USER_ID=
+ADMIN_PASSCODE_HASH=

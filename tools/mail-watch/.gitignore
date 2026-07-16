@@ -1,0 +1,8 @@
+# 依存パッケージ
+node_modules/
+
+# Wrangler のローカル状態（ローカルD1の実体を含む）
+.wrangler/
+
+# ローカル開発用シークレット（実物はコミット禁止。サンプルは .dev.vars.example）
+.dev.vars
