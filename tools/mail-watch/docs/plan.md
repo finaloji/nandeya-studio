@@ -11,7 +11,7 @@
 | 基盤 | 1-2 | Gmail API 疎通（refresh token→access token・メール検索/取得） | 完了 |
 | 基盤 | 1-3 | 自動配信メールの除外フィルタ（既知ドメインを機械的に除外） | 完了 |
 | 基盤 | 1-4 | 取得メールのD1保存＋gmail_id重複排除（Cron 5分毎） | 完了 |
-| AI | 2-1 | Gemini API で要約・期限・緊急度・宛先分類（JSON出力）→D1保存 | 未着手 |
+| AI | 2-1 | Gemini API で要約・期限・緊急度・宛先分類（JSON出力）→D1保存 | 完了 |
 | AI | 2-2 | 通知要否の最終判定（rep かつ 緊急度low以外のみLINE通知対象） | 未着手 |
 | 通知 | 3-1 | LINE push通知（Flex Message・Gmailリンク・管理画面リンク） | 未着手 |
 | 通知 | 3-2 | 通知履歴の記録（action_logs・notify_count） | 未着手 |

@@ -5,10 +5,14 @@
  * - 除外フィルタを通過したメール（GmailMessageDetail）をemailsテーブルへ保存する
  * - gmail_idのUNIQUE制約により、既に保存済みのメールは重複としてスキップする
  *
- * AI要約・LINE通知・Cronからの自動呼び出しは対象外（後続スプリント）。
+ * このスプリントで追加した範囲:
+ * - Geminiで整理したAI項目（summary/deadline/urgency/target）を、gmail_idで特定した行にUPDATEする
+ *
+ * LINE通知・Cronからの自動呼び出しは対象外（後続スプリント）。
  */
 
 import type { GmailMessageDetail } from "./gmail";
+import type { EmailAiFields } from "./gemini";
 
 /** SQLiteのUNIQUE制約違反時にD1が返すエラーメッセージの特徴（sqlite3のメッセージ形式に含まれる文字列） */
 const UNIQUE_CONSTRAINT_ERROR_PATTERN = /unique constraint/i;
@@ -89,4 +93,20 @@ async function insertEmail(db: D1Database, email: GmailMessageDetail): Promise<v
 function isUniqueConstraintError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return UNIQUE_CONSTRAINT_ERROR_PATTERN.test(message);
+}
+
+/**
+ * Geminiで整理したAI項目（EmailAiFields）を、gmail_idで一意に特定したemails行へUPDATEする。
+ * summary/deadline/urgency/targetのうちnullの項目は、そのままNULLとしてD1に反映する
+ * （代替文言・デフォルト値は補わない）。
+ */
+export async function updateEmailAiFields(db: D1Database, gmailId: string, fields: EmailAiFields): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE emails
+       SET summary = ?, deadline = ?, urgency = ?, target = ?
+       WHERE gmail_id = ?`
+    )
+    .bind(fields.summary, fields.deadline, fields.urgency, fields.target, gmailId)
+    .run();
 }

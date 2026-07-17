@@ -1,14 +1,16 @@
 /**
  * mail-watch: 代表宛メール見落とし防止AI秘書（Cloudflare Workers）
  *
- * スプリント1-3時点のエントリポイント。
+ * エントリポイント。
  * - HTTP: 稼働確認レスポンスに加え、Gmail連携の動作確認用エンドポイント（GET /debug/gmail-check）を提供する
- *   （除外フィルタを通過したメールはD1のemailsテーブルへ保存する）
- * - Cron: どのCronが発火したかログ出力するのみ（Gmail連携呼び出し・DB保存はまだ行わない）
+ *   （除外フィルタを通過したメールはD1のemailsテーブルへ保存し、新規保存された分のみGeminiでAI整理してUPDATEする）
+ * - Cron: どのCronが発火したかログ出力するのみ（Gmail連携呼び出し・AI整理・LINE通知の自動組み込みはまだ行わない）
  */
 
 import { GmailApiError, fetchAccessToken, fetchMessageDetails, filterExcludedSenders, searchMessageIds } from "./gmail";
-import { saveEmails } from "./db";
+import type { GmailMessageDetail } from "./gmail";
+import { saveEmails, updateEmailAiFields } from "./db";
+import { GEMINI_CALL_INTERVAL_MS, GeminiApiError, classifyEmail } from "./gemini";
 
 /** バインディングとシークレットの型定義（値の設定は後続スプリント） */
 export interface Env {
@@ -74,6 +76,14 @@ async function handleGmailCheck(env: Env): Promise<Response> {
         ? await saveEmails(env.DB, passed)
         : { insertedCount: 0, duplicateCount: 0, failedCount: 0, results: [] };
 
+    // D1へ新規保存された（outcome: "inserted"）メールのみをAI整理の対象とする。
+    // 重複スキップ・保存失敗の行は対象外。
+    const insertedGmailIds = new Set(
+      saveSummary.results.filter((r) => r.outcome === "inserted").map((r) => r.gmailId)
+    );
+    const insertedEmails = passed.filter((d) => insertedGmailIds.has(d.id));
+    const aiOrganizeResults = await organizeEmailsWithAi(env, insertedEmails);
+
     return Response.json({
       status: "ok",
       count: passed.length,
@@ -100,10 +110,74 @@ async function handleGmailCheck(env: Env): Promise<Response> {
         failedCount: saveSummary.failedCount,
         results: saveSummary.results,
       },
+      aiOrganize: {
+        targetCount: insertedEmails.length,
+        succeededCount: aiOrganizeResults.filter((r) => r.outcome === "succeeded").length,
+        failedCount: aiOrganizeResults.filter((r) => r.outcome === "failed").length,
+        results: aiOrganizeResults,
+      },
     });
   } catch (error) {
     return gmailCheckErrorResponse(error, "detail");
   }
+}
+
+/** 1件のAI整理を試みた結果 */
+interface AiOrganizeResult {
+  /** GmailメッセージID */
+  gmailId: string;
+  /** "succeeded": Gemini呼び出し・D1 UPDATEとも成功 / "failed": いずれかの段階で失敗 */
+  outcome: "succeeded" | "failed";
+  /** outcomeが"failed"の場合、どの段階で失敗したか（呼び出し自体 / JSONパース / DB更新） */
+  stage?: "call" | "parse" | "db";
+  /** outcomeが"failed"の場合のエラーメッセージ */
+  errorMessage?: string;
+}
+
+/**
+ * D1へ新規保存されたメールについて、1件ずつGemini APIでAI整理（summary/deadline/urgency/target）を行い、
+ * emails行へUPDATEする。Gemini呼び出しは並列実行せず、GEMINI_CALL_INTERVAL_MSの間隔を空けて逐次実行する。
+ * 対象が0件の場合はGemini APIを一切呼び出さない。
+ * 1件の失敗（呼び出し失敗・パース失敗・DB更新失敗）が他のメールの処理を止めることはない。
+ */
+async function organizeEmailsWithAi(env: Env, emails: GmailMessageDetail[]): Promise<AiOrganizeResult[]> {
+  const results: AiOrganizeResult[] = [];
+
+  for (let i = 0; i < emails.length; i++) {
+    if (i > 0) {
+      await sleep(GEMINI_CALL_INTERVAL_MS);
+    }
+
+    const email = emails[i];
+
+    try {
+      const fields = await classifyEmail(env.GEMINI_API_KEY, email);
+
+      try {
+        await updateEmailAiFields(env.DB, email.id, fields);
+        results.push({ gmailId: email.id, outcome: "succeeded" });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`[mail-watch] AI整理結果のD1反映に失敗しました (gmail_id=${email.id}): ${errorMessage}`);
+        results.push({ gmailId: email.id, outcome: "failed", stage: "db", errorMessage });
+      }
+    } catch (error) {
+      if (error instanceof GeminiApiError) {
+        console.error(`[mail-watch] Gemini連携エラー (stage=${error.stage}, gmail_id=${email.id}): ${error.message}`);
+        results.push({ gmailId: email.id, outcome: "failed", stage: error.stage, errorMessage: error.message });
+      } else {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`[mail-watch] AI整理で想定外のエラー (gmail_id=${email.id}): ${errorMessage}`);
+        results.push({ gmailId: email.id, outcome: "failed", stage: "call", errorMessage });
+      }
+    }
+  }
+
+  return results;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Gmail連携エラーを、どの段階で・何が起きたか分かる形でレスポンスにする */
