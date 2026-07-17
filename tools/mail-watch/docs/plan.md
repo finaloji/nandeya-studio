@@ -8,7 +8,7 @@
 | グループ | # | 作業内容 | 状態 |
 |---------|---|---------|------|
 | 基盤 | 1-1 | Wranglerプロジェクト作成・D1スキーマ（emails / action_logs） | 完了 |
-| 基盤 | 1-2 | Gmail API 疎通（refresh token→access token・メール検索/取得） | 未着手 |
+| 基盤 | 1-2 | Gmail API 疎通（refresh token→access token・メール検索/取得） | 完了 |
 | 基盤 | 1-3 | 取得メールのD1保存＋gmail_id重複排除（Cron 5分毎） | 未着手 |
 | AI | 2-1 | Gemini API で要約・期限・緊急度・宛先分類（JSON出力）→D1保存 | 未着手 |
 | 通知 | 3-1 | LINE push通知（Flex Message・Gmailリンク・管理画面リンク） | 未着手 |
@@ -21,10 +21,10 @@
 
 ## 人間側のタスク
 
-- [ ] **開発PCに Node.js（18以上）をインストール**（ローカル動作確認・デプロイに必要。https://nodejs.org/ からLTS版）
-- [ ] Google Cloud プロジェクト作成＋Gmail API 有効化
-- [ ] OAuth同意画面を「外部・本番公開」に設定（テストモードだとトークンが7日で失効）
-- [ ] OAuthクライアント作成＋refresh token 取得（取得手順はスプリント1-2で用意する）
+- [x] 開発PCに Node.js（18以上）をインストール
+- [x] Google Cloud プロジェクト作成＋Gmail API 有効化
+- [x] OAuth同意画面を「外部・本番公開」に設定（テストモードだとトークンが7日で失効）
+- [x] OAuthクライアント作成＋refresh token 取得（`scripts/get-refresh-token.mjs` で取得済み。ローカル `.dev.vars` に設定済み）
 - [ ] LINE Messaging API チャネル作成＋長期アクセストークン発行
 - [ ] 代表の LINE userId 取得
 - [ ] Cloudflare アカウント作成（無料）

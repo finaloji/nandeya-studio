@@ -1,10 +1,12 @@
 /**
  * mail-watch: 代表宛メール見落とし防止AI秘書（Cloudflare Workers）
  *
- * スプリント1-1時点の暫定エントリポイント。
- * - HTTP: 稼働確認レスポンスを返すのみ
- * - Cron: どのCronが発火したかログ出力するのみ（DB書き込みなし）
+ * スプリント1-2時点のエントリポイント。
+ * - HTTP: 稼働確認レスポンスに加え、Gmail連携の動作確認用エンドポイント（GET /debug/gmail-check）を提供する
+ * - Cron: どのCronが発火したかログ出力するのみ（DB書き込み・Gmail連携呼び出しはまだ行わない）
  */
+
+import { GmailApiError, fetchAccessToken, fetchMessageDetails, searchMessageIds } from "./gmail";
 
 /** バインディングとシークレットの型定義（値の設定は後続スプリント） */
 export interface Env {
@@ -32,9 +34,91 @@ export interface Env {
 const CRON_EVERY_5_MIN = "*/5 * * * *";
 const CRON_MORNING_DIGEST = "0 23 * * *"; // UTC 23:00 = JST 8:00
 
+/**
+ * 動作確認用: access token取得 → Gmail検索 → 各メール詳細取得、を一連で実行し結果を返す。
+ * D1保存・AI要約・LINE通知は行わない（スコープ外）。開発者が手動でアクセスして確認する想定。
+ */
+async function handleGmailCheck(env: Env): Promise<Response> {
+  let accessToken: string;
+  try {
+    accessToken = await fetchAccessToken(env);
+  } catch (error) {
+    return gmailCheckErrorResponse(error, "token");
+  }
+
+  let messageIds: string[];
+  try {
+    messageIds = await searchMessageIds(accessToken);
+  } catch (error) {
+    return gmailCheckErrorResponse(error, "search");
+  }
+
+  if (messageIds.length === 0) {
+    return Response.json({
+      status: "ok",
+      message: "該当するメールは0件でした",
+      count: 0,
+      messages: [],
+    });
+  }
+
+  try {
+    const details = await fetchMessageDetails(accessToken, messageIds);
+    return Response.json({
+      status: "ok",
+      count: details.length,
+      messages: details.map((d) => ({
+        id: d.id,
+        threadId: d.threadId,
+        subject: d.subject,
+        from: d.from,
+        receivedAt: d.receivedAt,
+        bodyPreview: d.body.slice(0, 200),
+        bodyLength: d.body.length,
+      })),
+    });
+  } catch (error) {
+    return gmailCheckErrorResponse(error, "detail");
+  }
+}
+
+/** Gmail連携エラーを、どの段階で・何が起きたか分かる形でレスポンスにする */
+function gmailCheckErrorResponse(error: unknown, fallbackStage: "token" | "search" | "detail"): Response {
+  if (error instanceof GmailApiError) {
+    console.error(`[mail-watch] Gmail連携エラー (stage=${error.stage}): ${error.message}`, error.detail);
+    return Response.json(
+      {
+        status: "error",
+        stage: error.stage,
+        message: error.message,
+        rateLimited: error.rateLimited,
+        detail: error.detail,
+      },
+      { status: 200 }
+    );
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`[mail-watch] 想定外のエラー (stage=${fallbackStage}): ${message}`);
+  return Response.json(
+    {
+      status: "error",
+      stage: fallbackStage,
+      message,
+    },
+    { status: 200 }
+  );
+}
+
 export default {
-  /** HTTP アクセス時: 稼働確認用の簡素な応答を返す */
-  async fetch(_request: Request, _env: Env, _ctx: ExecutionContext): Promise<Response> {
+  /** HTTP アクセス時: 稼働確認用の応答に加え、Gmail連携の動作確認用エンドポイントを提供する */
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/debug/gmail-check") {
+      return await handleGmailCheck(env);
+    }
+
     return Response.json({
       name: "mail-watch",
       status: "ok",
