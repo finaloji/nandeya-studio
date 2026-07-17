@@ -18,6 +18,41 @@ import type { Env } from "./index";
  */
 export const GMAIL_SEARCH_QUERY = '("橋本大輝" OR "代表取締役") newer_than:2d -in:sent';
 
+/** 送信者除外リストの1項目。addressはメールアドレスの完全一致、domainは@以降のドメインの完全一致で判定する */
+export interface SenderExcludeRule {
+  /** "address": メールアドレスそのものと完全一致した場合に除外 / "domain": @以降のドメインと完全一致した場合に除外 */
+  type: "address" | "domain";
+  /** 比較対象の値（address指定ならメールアドレス、domain指定ならドメイン）。大文字・小文字は比較時に無視される */
+  value: string;
+  /** 除外理由（何のための除外か。実際に確認できたサービス名など） */
+  reason: string;
+}
+
+/**
+ * 送信者の除外リスト。
+ * 求人媒体や自動配信システムからの通知メールは、署名欄などに会社名・代表者名が自動で入るため
+ * Gmail検索クエリ（GMAIL_SEARCH_QUERY）の条件に誤ってヒットしてしまう。
+ * ここに列挙した送信者アドレス/ドメインからのメールは、AI判定に渡す前に機械的に除外する
+ * （判定方法の詳細はisExcludedSenderを参照。判定対象は送信者の「メールアドレス部分」のみで、表示名は見ない）。
+ * 運用しながら追加・調整しやすいよう、検索クエリと同様にここに集約しておく。空配列でも正常に動作する（＝何も除外しない）。
+ */
+export const SENDER_EXCLUDE_LIST: SenderExcludeRule[] = [
+  {
+    // ドメイン指定。実機確認で誤ヒットが確認できたもの: Airワーク（採用管理システムの自動通知）
+    // 送信者例: no-reply@rct.airwork.net
+    type: "domain",
+    value: "rct.airwork.net",
+    reason: "Airワーク（採用管理システムの自動通知）",
+  },
+  {
+    // ドメイン指定。実機確認で誤ヒットが確認できたもの: JALマイレージバンク（メルマガ）
+    // 送信者例: jmbnews@jalmail.jal.com
+    type: "domain",
+    value: "jalmail.jal.com",
+    reason: "JALマイレージバンク（メルマガ）",
+  },
+];
+
 /** 詳細取得を連続実行する際、Gmail APIのレート制限を誘発しないための間隔（ミリ秒） */
 const DETAIL_FETCH_INTERVAL_MS = 150;
 
@@ -177,6 +212,46 @@ export function truncateBody(body: string, maxChars: number): string {
   return body.slice(0, maxChars);
 }
 
+/** 除外フィルタを通過したメールと、除外されたメール（除外理由付き）を分けて保持する */
+export interface FilterExcludedSendersResult {
+  /** 除外リストに一致せず、後続処理（将来のD1保存・AI要約）に渡すメール */
+  passed: GmailMessageDetail[];
+  /** 除外リストに一致し、後続処理には渡さないメール（除外理由付き） */
+  excluded: ExcludedMessage[];
+}
+
+/** 除外されたメール1件分の情報 */
+export interface ExcludedMessage {
+  /** 除外されたメールの詳細 */
+  message: GmailMessageDetail;
+  /** 一致した除外リスト項目の理由（SenderExcludeRule.reason） */
+  reason: string;
+}
+
+/**
+ * メール詳細の一覧に対し、送信者の除外リスト（SENDER_EXCLUDE_LIST）による判定を行い、
+ * 通過したメールと除外されたメールに振り分ける。
+ * 除外リストが空の場合や、送信者アドレスが取り出せなかった場合は除外しない（疑わしきは除外しない）。
+ */
+export function filterExcludedSenders(details: GmailMessageDetail[]): FilterExcludedSendersResult {
+  const passed: GmailMessageDetail[] = [];
+  const excluded: ExcludedMessage[] = [];
+
+  for (const detail of details) {
+    const matchedRule = findMatchingExcludeRule(detail.from);
+    if (matchedRule) {
+      excluded.push({ message: detail, reason: matchedRule.reason });
+      console.log(
+        `[mail-watch] 送信者除外リストに一致したためスキップ (id=${detail.id}, from="${detail.from}", reason=${matchedRule.reason})`
+      );
+    } else {
+      passed.push(detail);
+    }
+  }
+
+  return { passed, excluded };
+}
+
 // --- 以下、内部ヘルパー ---
 
 interface GmailApiMessageResponse {
@@ -256,4 +331,44 @@ function htmlToText(html: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * 送信者情報（fromヘッダーの値）が除外リスト（SENDER_EXCLUDE_LIST）のいずれかに一致するか判定する。
+ * 一致すればその項目（SenderExcludeRule）を、一致しなければundefinedを返す。
+ * 送信者アドレスが取り出せない場合（"(送信者不明)"等）は判定できないため一致なし扱いとする。
+ */
+function findMatchingExcludeRule(from: string): SenderExcludeRule | undefined {
+  const address = extractSenderAddress(from);
+  if (!address) return undefined;
+
+  const normalizedAddress = address.trim().toLowerCase();
+  const atIndex = normalizedAddress.lastIndexOf("@");
+  if (atIndex === -1) return undefined;
+  const domain = normalizedAddress.slice(atIndex + 1);
+
+  return SENDER_EXCLUDE_LIST.find((rule) => {
+    const normalizedValue = rule.value.trim().toLowerCase();
+    if (rule.type === "address") {
+      return normalizedAddress === normalizedValue;
+    }
+    return domain === normalizedValue;
+  });
+}
+
+/**
+ * fromヘッダーの値からメールアドレス部分のみを取り出す。
+ * "表示名 <address@example.com>" 形式・アドレスのみの形式どちらにも対応する。
+ * アドレス形式として解釈できない場合（"(送信者不明)"等）はundefinedを返す。
+ */
+function extractSenderAddress(from: string): string | undefined {
+  const angleMatch = from.match(/<([^<>]+)>/);
+  const candidate = (angleMatch ? angleMatch[1] : from).trim();
+
+  // 簡易的なメールアドレス形式チェック（"@"を含み、前後に文字がある）
+  if (!/^[^\s@]+@[^\s@]+$/.test(candidate)) {
+    return undefined;
+  }
+
+  return candidate;
 }

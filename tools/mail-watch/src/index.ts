@@ -6,7 +6,7 @@
  * - Cron: どのCronが発火したかログ出力するのみ（DB書き込み・Gmail連携呼び出しはまだ行わない）
  */
 
-import { GmailApiError, fetchAccessToken, fetchMessageDetails, searchMessageIds } from "./gmail";
+import { GmailApiError, fetchAccessToken, fetchMessageDetails, filterExcludedSenders, searchMessageIds } from "./gmail";
 
 /** バインディングとシークレットの型定義（値の設定は後続スプリント） */
 export interface Env {
@@ -64,10 +64,12 @@ async function handleGmailCheck(env: Env): Promise<Response> {
 
   try {
     const details = await fetchMessageDetails(accessToken, messageIds);
+    const { passed, excluded } = filterExcludedSenders(details);
+
     return Response.json({
       status: "ok",
-      count: details.length,
-      messages: details.map((d) => ({
+      count: passed.length,
+      messages: passed.map((d) => ({
         id: d.id,
         threadId: d.threadId,
         subject: d.subject,
@@ -75,6 +77,14 @@ async function handleGmailCheck(env: Env): Promise<Response> {
         receivedAt: d.receivedAt,
         bodyPreview: d.body.slice(0, 200),
         bodyLength: d.body.length,
+      })),
+      excludedCount: excluded.length,
+      excludedMessages: excluded.map(({ message, reason }) => ({
+        id: message.id,
+        threadId: message.threadId,
+        subject: message.subject,
+        from: message.from,
+        reason,
       })),
     });
   } catch (error) {
