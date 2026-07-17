@@ -1,12 +1,14 @@
 /**
  * mail-watch: 代表宛メール見落とし防止AI秘書（Cloudflare Workers）
  *
- * スプリント1-2時点のエントリポイント。
+ * スプリント1-3時点のエントリポイント。
  * - HTTP: 稼働確認レスポンスに加え、Gmail連携の動作確認用エンドポイント（GET /debug/gmail-check）を提供する
- * - Cron: どのCronが発火したかログ出力するのみ（DB書き込み・Gmail連携呼び出しはまだ行わない）
+ *   （除外フィルタを通過したメールはD1のemailsテーブルへ保存する）
+ * - Cron: どのCronが発火したかログ出力するのみ（Gmail連携呼び出し・DB保存はまだ行わない）
  */
 
 import { GmailApiError, fetchAccessToken, fetchMessageDetails, filterExcludedSenders, searchMessageIds } from "./gmail";
+import { saveEmails } from "./db";
 
 /** バインディングとシークレットの型定義（値の設定は後続スプリント） */
 export interface Env {
@@ -35,8 +37,8 @@ const CRON_EVERY_5_MIN = "*/5 * * * *";
 const CRON_MORNING_DIGEST = "0 23 * * *"; // UTC 23:00 = JST 8:00
 
 /**
- * 動作確認用: access token取得 → Gmail検索 → 各メール詳細取得、を一連で実行し結果を返す。
- * D1保存・AI要約・LINE通知は行わない（スコープ外）。開発者が手動でアクセスして確認する想定。
+ * 動作確認用: access token取得 → Gmail検索 → 各メール詳細取得 → 除外フィルタ → D1保存、を一連で実行し結果を返す。
+ * AI要約・LINE通知は行わない（スコープ外）。開発者が手動でアクセスして確認する想定。
  */
 async function handleGmailCheck(env: Env): Promise<Response> {
   let accessToken: string;
@@ -66,6 +68,12 @@ async function handleGmailCheck(env: Env): Promise<Response> {
     const details = await fetchMessageDetails(accessToken, messageIds);
     const { passed, excluded } = filterExcludedSenders(details);
 
+    // 除外フィルタを通過したメールのみD1のemailsテーブルへ保存する。0件の場合は保存処理自体を行わない
+    const saveSummary =
+      passed.length > 0
+        ? await saveEmails(env.DB, passed)
+        : { insertedCount: 0, duplicateCount: 0, failedCount: 0, results: [] };
+
     return Response.json({
       status: "ok",
       count: passed.length,
@@ -86,6 +94,12 @@ async function handleGmailCheck(env: Env): Promise<Response> {
         from: message.from,
         reason,
       })),
+      dbSave: {
+        insertedCount: saveSummary.insertedCount,
+        duplicateCount: saveSummary.duplicateCount,
+        failedCount: saveSummary.failedCount,
+        results: saveSummary.results,
+      },
     });
   } catch (error) {
     return gmailCheckErrorResponse(error, "detail");
