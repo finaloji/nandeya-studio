@@ -27,10 +27,10 @@
 - [x] Google Cloud プロジェクト作成＋Gmail API 有効化
 - [x] OAuth同意画面を「外部・本番公開」に設定（テストモードだとトークンが7日で失効）
 - [x] OAuthクライアント作成＋refresh token 取得（`scripts/get-refresh-token.mjs` で取得済み。ローカル `.dev.vars` に設定済み）
-- [ ] LINE Messaging API チャネル作成＋長期アクセストークン発行
-- [ ] 代表の LINE userId 取得
+- [x] LINE Messaging API チャネル作成＋長期アクセストークン発行（LINE公式アカウント経由での作成に手順変更あり。`.dev.vars`に設定済み）
+- [x] 代表の LINE userId 取得（webhook.siteで一時取得。push通知の疎通テストも完了）
 - [ ] Cloudflare アカウント作成（無料）
-- [ ] Gemini API キー取得（Google AI Studio）
+- [x] Gemini API キー取得（Google AI Studio。`.dev.vars`に設定済み）
 - [ ] 管理画面パスコードの値を決める
 
 ## メモ
