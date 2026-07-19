@@ -11,6 +11,9 @@ import { GmailApiError, fetchAccessToken, fetchMessageDetails, filterExcludedSen
 import type { GmailMessageDetail } from "./gmail";
 import { saveEmails, updateEmailAiFields } from "./db";
 import { GEMINI_CALL_INTERVAL_MS, GeminiApiError, classifyEmail } from "./gemini";
+import type { EmailAiFields } from "./gemini";
+import { decideNotifications } from "./notification";
+import type { NotificationCandidate } from "./notification";
 
 /** バインディングとシークレットの型定義（値の設定は後続スプリント） */
 export interface Env {
@@ -84,6 +87,13 @@ async function handleGmailCheck(env: Env): Promise<Response> {
     const insertedEmails = passed.filter((d) => insertedGmailIds.has(d.id));
     const aiOrganizeResults = await organizeEmailsWithAi(env, insertedEmails);
 
+    // AI整理が成功したメールのみを通知要否判定の対象とする（失敗したメールは判定対象外）。
+    // AI整理全体（対象メール全件のループ）が完了した後、まとめて1回で判定する。
+    const notificationCandidates: NotificationCandidate[] = aiOrganizeResults
+      .filter((r) => r.outcome === "succeeded")
+      .map((r) => ({ gmailId: r.gmailId, target: r.target ?? null, urgency: r.urgency ?? null }));
+    const notificationDecisionSummary = decideNotifications(notificationCandidates);
+
     return Response.json({
       status: "ok",
       count: passed.length,
@@ -116,6 +126,12 @@ async function handleGmailCheck(env: Env): Promise<Response> {
         failedCount: aiOrganizeResults.filter((r) => r.outcome === "failed").length,
         results: aiOrganizeResults,
       },
+      notificationDecision: {
+        targetCount: notificationDecisionSummary.targetCount,
+        shouldNotifyCount: notificationDecisionSummary.shouldNotifyCount,
+        skipCount: notificationDecisionSummary.skipCount,
+        results: notificationDecisionSummary.results,
+      },
     });
   } catch (error) {
     return gmailCheckErrorResponse(error, "detail");
@@ -132,6 +148,10 @@ interface AiOrganizeResult {
   stage?: "call" | "parse" | "db";
   /** outcomeが"failed"の場合のエラーメッセージ */
   errorMessage?: string;
+  /** outcomeが"succeeded"の場合のGeminiによる緊急度判定（通知要否判定に使う） */
+  urgency?: EmailAiFields["urgency"];
+  /** outcomeが"succeeded"の場合のGeminiによる宛先分類（通知要否判定に使う） */
+  target?: EmailAiFields["target"];
 }
 
 /**
@@ -155,7 +175,7 @@ async function organizeEmailsWithAi(env: Env, emails: GmailMessageDetail[]): Pro
 
       try {
         await updateEmailAiFields(env.DB, email.id, fields);
-        results.push({ gmailId: email.id, outcome: "succeeded" });
+        results.push({ gmailId: email.id, outcome: "succeeded", urgency: fields.urgency, target: fields.target });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`[mail-watch] AI整理結果のD1反映に失敗しました (gmail_id=${email.id}): ${errorMessage}`);
