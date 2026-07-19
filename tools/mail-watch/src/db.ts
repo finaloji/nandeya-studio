@@ -201,8 +201,19 @@ export async function recordNotifications(db: D1Database, gmailIds: string[]): P
 export const EMAIL_STATUSES = ["unread", "acknowledged", "in_progress", "done"] as const;
 export type EmailStatus = (typeof EMAIL_STATUSES)[number];
 
-/** 管理画面一覧に表示する1件分のメール情報（内部id・gmail_id・notify_count等は含めない） */
+/** action_logsテーブルのactionカラムが取りうる値（D1のCHECK制約と一致させること） */
+export type ActionLogAction = "notified" | "digest_notified" | "replied" | "acknowledged" | "in_progress" | "done";
+
+/** 管理画面カードの履歴欄に表示する1件分のaction_logs行 */
+export interface DashboardActionLog {
+  action: ActionLogAction;
+  createdAt: string;
+}
+
+/** 管理画面一覧に表示する1件分のメール情報 */
 export interface DashboardEmailRow {
+  /** ステータス更新API呼び出し時にメールを識別するためのGmailメッセージID */
+  gmailId: string;
   threadId: string;
   subject: string;
   fromAddr: string;
@@ -212,6 +223,8 @@ export interface DashboardEmailRow {
   urgency: "high" | "mid" | "low" | null;
   target: "rep" | "staff" | "other" | null;
   status: EmailStatus;
+  /** このメールに紐づくaction_logsの直近10件（新しい順） */
+  actionLogs: DashboardActionLog[];
 }
 
 /** 管理画面一覧: ステータスごとのメール一覧と件数をまとめたもの */
@@ -226,19 +239,26 @@ export interface DashboardData {
  * 管理画面一覧の表示に必要なデータを、4ステータス分まとめてD1から取得する。
  * 表示のたびに都度クエリを実行する（キャッシュしない）。
  * 各ステータスの一覧は受信日時（received_at）の新しい順で取得する。
+ * 各メールに紐づくaction_logsの直近10件も、カードごとの追加リクエストを発生させず
+ * まとめて1回のクエリで取得する。
  */
 export async function getDashboardData(db: D1Database): Promise<DashboardData> {
   const emailsByStatus = {} as Record<EmailStatus, DashboardEmailRow[]>;
   const countsByStatus = {} as Record<EmailStatus, number>;
 
+  // action_logsをまとめて引き当てるための、emailsの内部id → DashboardEmailRow の対応
+  const rowByInternalId = new Map<number, DashboardEmailRow>();
+
   for (const status of EMAIL_STATUSES) {
     const { results } = await db
       .prepare(
-        `SELECT thread_id, subject, from_addr, received_at, summary, deadline, urgency, target, status
+        `SELECT id, gmail_id, thread_id, subject, from_addr, received_at, summary, deadline, urgency, target, status
          FROM emails WHERE status = ? ORDER BY received_at DESC`
       )
       .bind(status)
       .all<{
+        id: number;
+        gmail_id: string;
         thread_id: string;
         subject: string;
         from_addr: string;
@@ -250,21 +270,115 @@ export async function getDashboardData(db: D1Database): Promise<DashboardData> {
         status: EmailStatus;
       }>();
 
-    emailsByStatus[status] = results.map((row) => ({
-      threadId: row.thread_id,
-      subject: row.subject,
-      fromAddr: row.from_addr,
-      receivedAt: row.received_at,
-      summary: row.summary,
-      deadline: row.deadline,
-      urgency: row.urgency,
-      target: row.target,
-      status: row.status,
-    }));
-    countsByStatus[status] = results.length;
+    const rows = results.map((row) => {
+      const dashboardRow: DashboardEmailRow = {
+        gmailId: row.gmail_id,
+        threadId: row.thread_id,
+        subject: row.subject,
+        fromAddr: row.from_addr,
+        receivedAt: row.received_at,
+        summary: row.summary,
+        deadline: row.deadline,
+        urgency: row.urgency,
+        target: row.target,
+        status: row.status,
+        actionLogs: [],
+      };
+      rowByInternalId.set(row.id, dashboardRow);
+      return dashboardRow;
+    });
+
+    emailsByStatus[status] = rows;
+    countsByStatus[status] = rows.length;
+  }
+
+  // 対象メール全件（内部id）分のaction_logsを、1回のクエリでまとめて取得する（各email_idにつき新しい順で直近10件のみ）
+  const internalIds = Array.from(rowByInternalId.keys());
+  if (internalIds.length > 0) {
+    const placeholders = internalIds.map(() => "?").join(", ");
+    const { results } = await db
+      .prepare(
+        `SELECT email_id, action, created_at FROM (
+           SELECT email_id, action, created_at,
+             ROW_NUMBER() OVER (PARTITION BY email_id ORDER BY created_at DESC, id DESC) AS rn
+           FROM action_logs
+           WHERE email_id IN (${placeholders})
+         ) WHERE rn <= 10
+         ORDER BY email_id, created_at DESC`
+      )
+      .bind(...internalIds)
+      .all<{ email_id: number; action: ActionLogAction; created_at: string }>();
+
+    for (const logRow of results) {
+      const dashboardRow = rowByInternalId.get(logRow.email_id);
+      if (dashboardRow) {
+        dashboardRow.actionLogs.push({ action: logRow.action, createdAt: logRow.created_at });
+      }
+    }
   }
 
   return { emailsByStatus, countsByStatus };
+}
+
+/** ステータス更新API（updateEmailStatus）に指定できる遷移先ステータス（unreadへは戻せないため対象外） */
+export type UpdatableEmailStatus = Exclude<EmailStatus, "unread">;
+
+/** ステータス更新1件を試みた結果の種別 */
+export type UpdateEmailStatusOutcome =
+  | "updated" // 更新・ログ記録とも成功
+  | "already_at_or_past" // 対象メールが既に指定ステータス（またはそれ以降）だった（逆戻りリクエストも含む。更新・ログ記録は行わない）
+  | "not_found" // 対象メールがemailsテーブルに存在しない
+  | "failed"; // D1への書き込みが失敗した
+
+/** ステータス更新1件を試みた結果 */
+export interface UpdateEmailStatusResult {
+  outcome: UpdateEmailStatusOutcome;
+  /** 更新後（更新しなかった場合は更新前）のステータス。not_foundの場合はnull */
+  status: EmailStatus | null;
+}
+
+/**
+ * 指定したgmail_idのメールのステータスをtargetStatusへ更新し、action_logsへ実際の遷移先1行のみを記録する。
+ * emails.statusのUPDATEとaction_logsへのINSERTは、recordNotifications同様にdb.batch()でアトミックに実行する。
+ *
+ * 遷移ルール（unread → acknowledged → in_progress → done の一直線・前方向のみ）:
+ * - 現在のステータスより後ろのステータスへの遷移のみ許可する（中間の読み飛ばしは可）
+ * - 現在のステータスと同じ、またはそれより前（逆戻り）のステータスをリクエストされた場合は、
+ *   更新・ログ記録とも行わず outcome: "already_at_or_past" を返す（冪等）
+ */
+export async function updateEmailStatus(
+  db: D1Database,
+  gmailId: string,
+  targetStatus: UpdatableEmailStatus
+): Promise<UpdateEmailStatusResult> {
+  const row = await db
+    .prepare(`SELECT id, status FROM emails WHERE gmail_id = ?`)
+    .bind(gmailId)
+    .first<{ id: number; status: EmailStatus }>();
+
+  if (!row) {
+    console.error(`[mail-watch] ステータス更新エラー: 対象のメールがemailsテーブルに見つかりませんでした (gmail_id=${gmailId})`);
+    return { outcome: "not_found", status: null };
+  }
+
+  const currentIndex = EMAIL_STATUSES.indexOf(row.status);
+  const targetIndex = EMAIL_STATUSES.indexOf(targetStatus);
+
+  if (targetIndex <= currentIndex) {
+    return { outcome: "already_at_or_past", status: row.status };
+  }
+
+  try {
+    await db.batch([
+      db.prepare(`UPDATE emails SET status = ? WHERE id = ?`).bind(targetStatus, row.id),
+      db.prepare(`INSERT INTO action_logs (email_id, action) VALUES (?, ?)`).bind(row.id, targetStatus),
+    ]);
+    return { outcome: "updated", status: targetStatus };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[mail-watch] ステータス更新の書き込みに失敗しました (gmail_id=${gmailId}): ${errorMessage}`);
+    return { outcome: "failed", status: row.status };
+  }
 }
 
 /** 指定したgmail_idの一覧について、emailsテーブルの内部id(id)をまとめて1回のIN句クエリで引き当てる */

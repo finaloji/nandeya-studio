@@ -11,7 +11,15 @@
 
 import { GmailApiError, fetchAccessToken, fetchMessageDetails, filterExcludedSenders, searchMessageIds } from "./gmail";
 import type { GmailMessageDetail } from "./gmail";
-import { getDashboardData, recordNotifications, saveEmails, updateEmailAiFields } from "./db";
+import {
+  EMAIL_STATUSES,
+  getDashboardData,
+  recordNotifications,
+  saveEmails,
+  updateEmailAiFields,
+  updateEmailStatus,
+} from "./db";
+import type { EmailStatus, UpdatableEmailStatus } from "./db";
 import { GEMINI_CALL_INTERVAL_MS, GeminiApiError, classifyEmail } from "./gemini";
 import type { EmailAiFields } from "./gemini";
 import { decideNotifications } from "./notification";
@@ -341,11 +349,80 @@ function sleep(ms: number): Promise<void> {
 /**
  * 管理画面（`/`）表示用: D1から4ステータス分のメール一覧・件数を取得し、HTMLを組み立てて返す。
  * パスコード認証は未実装（後日追加予定）。検索エンジン非インデックス化のみ meta robots で対応する。
+ * ?tab=<status> クエリパラメータで初期表示タブを指定できる（未指定・不正値の場合は「未確認」タブ）。
+ * 既存の「1回のGETで4ステータス分すべて取得」という構造は変えない。
  */
-async function handleDashboard(env: Env): Promise<Response> {
+async function handleDashboard(env: Env, url: URL): Promise<Response> {
   const data = await getDashboardData(env.DB);
-  const html = renderDashboardHtml(data);
+  const initialStatus = parseInitialTabStatus(url);
+  const html = renderDashboardHtml(data, initialStatus);
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+}
+
+/** `/`のクエリパラメータ`tab`から初期表示タブのステータスを取り出す。不正・未指定の場合は"unread"にフォールバックする */
+function parseInitialTabStatus(url: URL): EmailStatus {
+  const tab = url.searchParams.get("tab");
+  if (tab !== null && (EMAIL_STATUSES as readonly string[]).includes(tab)) {
+    return tab as EmailStatus;
+  }
+  return "unread";
+}
+
+/** ステータス更新API（PUT /emails/{gmail_id}/status）のリクエストボディに指定できる遷移先ステータス */
+const UPDATABLE_STATUSES: readonly UpdatableEmailStatus[] = ["acknowledged", "in_progress", "done"];
+
+/**
+ * PUT /emails/{gmail_id}/status : 対象メールのステータスを更新し、action_logsへ実際の遷移先1行を記録する。
+ * リクエストボディ { status: "acknowledged" | "in_progress" | "done" } を受け取る（サーバー側で次状態を自動計算しない）。
+ * 結果種別（updated/already_at_or_past/not_found/failed）と更新後のステータスをレスポンスで返す。
+ */
+async function handleUpdateEmailStatus(env: Env, gmailId: string, request: Request): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch (error) {
+    return Response.json(
+      { status: "error", outcome: "invalid_request", message: "リクエストボディがJSONとして解釈できません" },
+      { status: 400 }
+    );
+  }
+
+  const targetStatus = (body as { status?: unknown } | null)?.status;
+  if (typeof targetStatus !== "string" || !UPDATABLE_STATUSES.includes(targetStatus as UpdatableEmailStatus)) {
+    return Response.json(
+      {
+        status: "error",
+        outcome: "invalid_request",
+        message: "statusはacknowledged/in_progress/doneのいずれかを指定してください",
+      },
+      { status: 400 }
+    );
+  }
+
+  const result = await updateEmailStatus(env.DB, gmailId, targetStatus as UpdatableEmailStatus);
+
+  switch (result.outcome) {
+    case "updated":
+      return Response.json({ status: "ok", outcome: "updated", currentStatus: result.status });
+    case "already_at_or_past":
+      return Response.json({
+        status: "ok",
+        outcome: "already_at_or_past",
+        currentStatus: result.status,
+        message: "既にそのステータス（またはそれ以降）です",
+      });
+    case "not_found":
+      return Response.json(
+        { status: "error", outcome: "not_found", currentStatus: null, message: "対象のメールが見つかりませんでした" },
+        { status: 404 }
+      );
+    case "failed":
+    default:
+      return Response.json(
+        { status: "error", outcome: "failed", currentStatus: result.status, message: "更新に失敗しました" },
+        { status: 500 }
+      );
+  }
 }
 
 /** Gmail連携エラーを、どの段階で・何が起きたか分かる形でレスポンスにする */
@@ -382,11 +459,19 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/") {
-      return await handleDashboard(env);
+      return await handleDashboard(env, url);
     }
 
     if (url.pathname === "/debug/gmail-check") {
       return await handleGmailCheck(env);
+    }
+
+    const statusUpdateMatch = url.pathname.match(/^\/emails\/([^/]+)\/status$/);
+    if (statusUpdateMatch) {
+      if (request.method !== "PUT") {
+        return Response.json({ status: "error", message: "Method Not Allowed" }, { status: 405 });
+      }
+      return await handleUpdateEmailStatus(env, decodeURIComponent(statusUpdateMatch[1]), request);
     }
 
     return Response.json({

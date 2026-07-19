@@ -10,7 +10,7 @@
  * URLの取り扱いに関する注意書き等はページ内に置かない（実装の複雑化を避けるための方針）。
  */
 
-import type { DashboardData, DashboardEmailRow, EmailStatus } from "./db";
+import type { DashboardActionLog, DashboardData, DashboardEmailRow, EmailStatus, UpdatableEmailStatus } from "./db";
 import { EMAIL_STATUSES } from "./db";
 
 /** ステータスごとのタブ表示名 */
@@ -35,16 +35,33 @@ const TARGET_LABELS: Record<"rep" | "staff" | "other", string> = {
   other: "その他",
 };
 
+/** ステータス操作ボタンの表示名（unreadへ戻すボタンは提供しないため対象外） */
+const STATUS_ACTION_LABELS: Record<UpdatableEmailStatus, string> = {
+  acknowledged: "確認済み",
+  in_progress: "対応中",
+  done: "完了",
+};
+
+/** action_logsの履歴欄に表示するアクション種別ごとの表示名 */
+const ACTION_LOG_LABELS: Record<DashboardActionLog["action"], string> = {
+  notified: "LINE通知",
+  digest_notified: "まとめ通知",
+  replied: "返信検出",
+  acknowledged: "確認済みに変更",
+  in_progress: "対応中に変更",
+  done: "完了に変更",
+};
+
 /**
  * 管理画面のHTML全体を組み立てる。
- * dataは4ステータス分すべてを含み、初期表示は「未確認」タブとする。
+ * dataは4ステータス分すべてを含み、initialStatusに指定したタブを初期表示とする（未指定時は「未確認」タブ）。
  */
-export function renderDashboardHtml(data: DashboardData): string {
+export function renderDashboardHtml(data: DashboardData, initialStatus: EmailStatus = "unread"): string {
   const tabButtons = EMAIL_STATUSES.map(
     (status) => `
       <button
         type="button"
-        class="tab-button${status === "unread" ? " is-active" : ""}"
+        class="tab-button${status === initialStatus ? " is-active" : ""}"
         data-status="${status}"
         onclick="switchTab('${status}')"
       >${escapeHtml(STATUS_LABELS[status])} (${data.countsByStatus[status]})</button>`
@@ -53,7 +70,7 @@ export function renderDashboardHtml(data: DashboardData): string {
   const tabPanels = EMAIL_STATUSES.map(
     (status) => `
       <section
-        class="tab-panel${status === "unread" ? " is-active" : ""}"
+        class="tab-panel${status === initialStatus ? " is-active" : ""}"
         id="panel-${status}"
         data-status="${status}"
       >${renderEmailList(data.emailsByStatus[status], status)}</section>`
@@ -113,15 +130,79 @@ function renderEmailCard(email: DashboardEmailRow): string {
         <div><dt>期限</dt><dd>${escapeHtml(deadlineText)}</dd></div>
       </dl>
       <a class="gmail-link" href="${escapeHtmlAttribute(gmailUrl)}" target="_blank" rel="noopener noreferrer">Gmailで開く</a>
+      ${renderStatusActions(email)}
+      ${renderActionLogHistory(email.actionLogs)}
     </article>`;
 }
 
 /**
- * ISO 8601形式のUTC文字列（例: 2026-07-17T09:13:14.000Z）をJST表示用の文字列に変換する。
- * 外部ライブラリは使わず、+9時間の単純計算で行う。
+ * ステータス操作ボタン群を組み立てる。
+ * 固定順序（unread < acknowledged < in_progress < done）上で現在より後ろにあるものすべてをボタンとして出す。
+ * doneのメールは最終状態のため操作ボタンなし。
+ */
+function renderStatusActions(email: DashboardEmailRow): string {
+  const currentIndex = EMAIL_STATUSES.indexOf(email.status);
+  const nextStatuses = EMAIL_STATUSES.slice(currentIndex + 1) as UpdatableEmailStatus[];
+
+  if (nextStatuses.length === 0) {
+    return "";
+  }
+
+  const buttons = nextStatuses
+    .map(
+      (status) => `
+        <button
+          type="button"
+          class="status-action-button"
+          data-target-status="${status}"
+          onclick="updateStatus(this, '${escapeHtmlAttribute(email.gmailId)}', '${status}')"
+        >${escapeHtml(STATUS_ACTION_LABELS[status])}</button>`
+    )
+    .join("");
+
+  return `
+      <div class="status-actions">${buttons}</div>
+      <p class="status-error" style="display: none;"></p>`;
+}
+
+/** 操作・通知履歴（action_logs）セクションを組み立てる。直近10件・新しい順。0件時は「履歴はありません」と表示する */
+function renderActionLogHistory(actionLogs: DashboardActionLog[]): string {
+  if (actionLogs.length === 0) {
+    return `
+      <div class="history-section">
+        <p class="history-title">履歴</p>
+        <p class="history-empty">履歴はありません</p>
+      </div>`;
+  }
+
+  const items = actionLogs
+    .map(
+      (log) => `
+        <li>
+          <span class="history-action">${escapeHtml(ACTION_LOG_LABELS[log.action])}</span>
+          <span class="history-time">${escapeHtml(formatToJst(log.createdAt))}</span>
+        </li>`
+    )
+    .join("");
+
+  return `
+      <div class="history-section">
+        <p class="history-title">履歴</p>
+        <ul class="history-list">${items}</ul>
+      </div>`;
+}
+
+/**
+ * UTC日時文字列をJST表示用の文字列に変換する。外部ライブラリは使わず、+9時間の単純計算で行う。
+ * 対応する入力形式:
+ * - ISO 8601形式（例: 2026-07-17T09:13:14.000Z。emails.received_at等、Gmail APIから取得した値）
+ * - SQLiteのdatetime('now')形式（例: 2026-07-19 16:11:25。TもZも含まないが値はUTC。action_logs.created_at等）
+ *   後者はTもZも無いため、そのまま new Date() に渡すと実行環境のローカルタイムゾーンとして誤解釈される
+ *   （例: JSTの実行環境ではUTCの値を9時間ずれて解釈してしまう）。渡す前にUTCである旨を明示する。
  */
 function formatToJst(isoUtc: string): string {
-  const date = new Date(isoUtc);
+  const normalized = isoUtc.includes("T") ? isoUtc : `${isoUtc.replace(" ", "T")}Z`;
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) {
     return isoUtc;
   }
@@ -260,9 +341,63 @@ const DASHBOARD_CSS = `
     text-decoration: none;
     font-size: 14px;
   }
+  .status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .status-action-button {
+    flex: 1 1 auto;
+    min-width: 88px;
+    padding: 10px 8px;
+    font-size: 14px;
+    border: 1px solid #1a73e8;
+    border-radius: 8px;
+    background: #fff;
+    color: #1a73e8;
+    cursor: pointer;
+  }
+  .status-action-button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .status-error {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: #b3261e;
+  }
+  .history-section {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+  }
+  .history-title {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: #888;
+  }
+  .history-empty {
+    margin: 0;
+    font-size: 13px;
+    color: #999;
+  }
+  .history-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+    color: #555;
+  }
+  .history-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 0;
+  }
 `;
 
-/** タブ切り替え用のクライアントサイドJavaScript */
+/** タブ切り替え・ステータス更新ボタン用のクライアントサイドJavaScript */
 const DASHBOARD_SCRIPT = `
   function switchTab(status) {
     document.querySelectorAll(".tab-button").forEach(function (button) {
@@ -271,5 +406,50 @@ const DASHBOARD_SCRIPT = `
     document.querySelectorAll(".tab-panel").forEach(function (panel) {
       panel.classList.toggle("is-active", panel.getAttribute("data-status") === status);
     });
+  }
+
+  /**
+   * ステータス更新ボタン押下時の処理。
+   * 連打防止のため押下直後に同一カードのボタンをすべて無効化し、
+   * 成功時はページ全体を再読み込み（更新後のステータスをタブ指定クエリパラメータで渡す）、
+   * 失敗時はその場でエラーメッセージを表示してボタンを再度有効化する（画面遷移はしない）。
+   */
+  async function updateStatus(button, gmailId, targetStatus) {
+    var card = button.closest(".email-card");
+    var buttons = card.querySelectorAll(".status-action-button");
+    var errorEl = card.querySelector(".status-error");
+
+    buttons.forEach(function (b) { b.disabled = true; });
+    if (errorEl) {
+      errorEl.textContent = "";
+      errorEl.style.display = "none";
+    }
+
+    try {
+      var response = await fetch("/emails/" + encodeURIComponent(gmailId) + "/status", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+      var result = await response.json();
+
+      if (result && result.outcome === "updated" && result.currentStatus) {
+        window.location.href = "/?tab=" + encodeURIComponent(result.currentStatus);
+        return;
+      }
+
+      var message = (result && result.message) || "更新に失敗しました";
+      if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = "block";
+      }
+      buttons.forEach(function (b) { b.disabled = false; });
+    } catch (error) {
+      if (errorEl) {
+        errorEl.textContent = "通信に失敗しました。もう一度お試しください";
+        errorEl.style.display = "block";
+      }
+      buttons.forEach(function (b) { b.disabled = false; });
+    }
   }
 `;
