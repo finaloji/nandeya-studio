@@ -9,7 +9,7 @@
 
 import { GmailApiError, fetchAccessToken, fetchMessageDetails, filterExcludedSenders, searchMessageIds } from "./gmail";
 import type { GmailMessageDetail } from "./gmail";
-import { saveEmails, updateEmailAiFields } from "./db";
+import { recordNotifications, saveEmails, updateEmailAiFields } from "./db";
 import { GEMINI_CALL_INTERVAL_MS, GeminiApiError, classifyEmail } from "./gemini";
 import type { EmailAiFields } from "./gemini";
 import { decideNotifications } from "./notification";
@@ -111,6 +111,17 @@ async function handleGmailCheck(env: Env): Promise<Response> {
       aiFieldsById
     );
 
+    // LINE送信に成功したメールのみを対象に、action_logsへの記録とemailsのnotify_count更新を行う。
+    // 送信フェーズ（sendLineNotifications）が全件完了した後にまとめて記録する（フェーズを分離する）。
+    // 対象が0件の場合はrecordNotifications自体を呼び出さない（D1へのクエリを発生させない）。
+    const notifiedGmailIds = lineNotifySummary.results
+      .filter((r) => r.outcome === "succeeded")
+      .map((r) => r.gmailId);
+    const notifyRecordSummary =
+      notifiedGmailIds.length > 0
+        ? await recordNotifications(env.DB, notifiedGmailIds)
+        : { targetCount: 0, succeededCount: 0, failedCount: 0, results: [] };
+
     return Response.json({
       status: "ok",
       count: passed.length,
@@ -154,6 +165,12 @@ async function handleGmailCheck(env: Env): Promise<Response> {
         succeededCount: lineNotifySummary.succeededCount,
         failedCount: lineNotifySummary.failedCount,
         results: lineNotifySummary.results,
+      },
+      notifyRecord: {
+        targetCount: notifyRecordSummary.targetCount,
+        succeededCount: notifyRecordSummary.succeededCount,
+        failedCount: notifyRecordSummary.failedCount,
+        results: notifyRecordSummary.results,
       },
     });
   } catch (error) {
