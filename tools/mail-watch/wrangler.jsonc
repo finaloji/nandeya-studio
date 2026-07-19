@@ -12,15 +12,12 @@
     "crons": ["*/5 * * * *", "0 23 * * *"]
   },
 
-  // D1 データベースバインディング
-  // database_id は本番 D1 未作成のためプレースホルダー。
-  // ローカル開発（wrangler dev / --local）ではこの値のままで動作する。
-  // 本番デプロイ時に `wrangler d1 create mail-watch-db` で作成した ID に差し替えること。
+  // D1 データベースバインディング（本番: 2026-07-19 に wrangler d1 create で作成済み）
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "mail-watch-db",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "4162da5f-f29f-4a02-9ef3-436c615f13c3",
       "migrations_dir": "migrations"
     }
   ]

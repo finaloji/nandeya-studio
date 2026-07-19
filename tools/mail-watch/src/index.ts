@@ -68,9 +68,9 @@ const CRON_MORNING_DIGEST = "0 23 * * *"; // UTC 23:00 = JST 8:00
 /**
  * 朝のまとめ通知で「管理画面を開く」ボタンのリンク先に使うベースURL。
  * Cron実行時（scheduledハンドラ）はHTTPリクエストが存在しないため、この固定値を使う。
- * TODO: 本番デプロイ後、実際のWorkers公開URL（*.workers.dev）へ更新すること。
+ * 本番公開URL（2026-07-19 デプロイ時に確定）。
  */
-const MORNING_DIGEST_DASHBOARD_BASE_URL = "https://mail-watch.example.workers.dev";
+const MORNING_DIGEST_DASHBOARD_BASE_URL = "https://mail-watch.nandeya-ai.workers.dev";
 
 /**
  * Gmail連携チェック1回分の実行結果。access token取得・Gmail検索・詳細取得以降のいずれかの段階で

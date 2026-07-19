@@ -20,7 +20,7 @@
 | 朝通知 | 5-1 | 返信済み検出（Gmailスレッド確認→自動完了・replied記録） | 完了 |
 | 朝通知 | 5-2 | 朝のまとめ通知（未返信・未完了メールを1通にまとめてpush・Cron毎朝） | 完了 |
 | 仕上げ | 6-1 | 5分毎Cronへの接続（Gmail取得→AI整理→通知の一連処理を自動実行） | 完了 |
-| 仕上げ | 6-2 | 本番デプロイ（wrangler deploy・secret登録・管理画面URLの実URL反映・動作確認） | 未着手 |
+| 仕上げ | 6-2 | 本番デプロイ（wrangler deploy・secret登録・管理画面URLの実URL反映・動作確認） | 完了 |
 
 ## 人間側のタスク
 
@@ -30,7 +30,7 @@
 - [x] OAuthクライアント作成＋refresh token 取得（`scripts/get-refresh-token.mjs` で取得済み。ローカル `.dev.vars` に設定済み）
 - [x] LINE Messaging API チャネル作成＋長期アクセストークン発行（LINE公式アカウント経由での作成に手順変更あり。`.dev.vars`に設定済み）
 - [x] 代表の LINE userId 取得（webhook.siteで一時取得。push通知の疎通テストも完了）
-- [ ] Cloudflare アカウント作成（無料）
+- [x] Cloudflare アカウント作成（無料。mt4619kowaza@gmail.com）
 - [x] Gemini API キー取得（Google AI Studio。`.dev.vars`に設定済み）
 - [x] ~~管理画面パスコードの値を決める~~ → 当面パスコード認証なしで運用するため不要（2026-07-19決定）
 
@@ -42,4 +42,5 @@
 - スプリント1-2の完了時点で refresh token 取得用の使い捨てスクリプトを用意し、人間側タスクを進められるようにする
 - スプリント1-2の実機確認で、検索キーワードだけでは求人媒体の自動通知等が誤ってヒットすることが判明（2026-07-17）。自動配信ドメインの機械的除外（1-3）とAIによる通知要否判定（2-2）で対応する
 - 管理画面のパスコード認証は当面実装しない（2026-07-19決定）。URLを知っていれば誰でも閲覧・操作できる状態で運用する。後日必要になれば追加する
- 朝のまとめ通知の「管理画面を開く」ボタンのリンク先は、Cron実行時は`MORNING_DIGEST_DASHBOARD_BASE_URL`という仮のプレースホルダーURL（`index.ts`内）を使っている。本番デプロイ後、実際の`*.workers.dev`URLに更新すること（6-1のタスクに含める）
+- **2026-07-19 本番デプロイ完了**。公開URL: https://mail-watch.nandeya-ai.workers.dev/（Cloudflareアカウント: mt4619kowaza@gmail.com、D1データベースID: 4162da5f-f29f-4a02-9ef3-436c615f13c3）。5分毎Cron・毎朝8時JSTCronとも登録済みで、これ以降は完全自動運用
+- デプロイ時のハマりどころ: PowerShellの`"値" | wrangler secret put NAME`は末尾に改行が混入し、Google OAuthの`invalid_client`エラーの原因になった。secretの値を渡す際はBashの`printf '%s' '値' | wrangler secret put NAME`を使うこと（改行が入らない）
