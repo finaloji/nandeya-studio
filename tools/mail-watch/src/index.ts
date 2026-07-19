@@ -2,19 +2,22 @@
  * mail-watch: 代表宛メール見落とし防止AI秘書（Cloudflare Workers）
  *
  * エントリポイント。
- * - HTTP: 稼働確認レスポンスに加え、Gmail連携の動作確認用エンドポイント（GET /debug/gmail-check）を提供する
- *   （除外フィルタを通過したメールはD1のemailsテーブルへ保存し、新規保存された分のみGeminiでAI整理してUPDATEする）
+ * - HTTP: 稼働確認レスポンスに加え、以下のエンドポイントを提供する
+ *   - GET /            : 管理画面（一覧表示）。パスコード認証は未実装（後日追加予定）
+ *   - GET /debug/gmail-check : Gmail連携の動作確認用エンドポイント（開発者向け）
+ *     （除外フィルタを通過したメールはD1のemailsテーブルへ保存し、新規保存された分のみGeminiでAI整理してUPDATEする）
  * - Cron: どのCronが発火したかログ出力するのみ（Gmail連携呼び出し・AI整理・LINE通知の自動組み込みはまだ行わない）
  */
 
 import { GmailApiError, fetchAccessToken, fetchMessageDetails, filterExcludedSenders, searchMessageIds } from "./gmail";
 import type { GmailMessageDetail } from "./gmail";
-import { recordNotifications, saveEmails, updateEmailAiFields } from "./db";
+import { getDashboardData, recordNotifications, saveEmails, updateEmailAiFields } from "./db";
 import { GEMINI_CALL_INTERVAL_MS, GeminiApiError, classifyEmail } from "./gemini";
 import type { EmailAiFields } from "./gemini";
 import { decideNotifications } from "./notification";
 import type { NotificationCandidate, NotificationDecisionResult } from "./notification";
 import { LINE_CALL_INTERVAL_MS, LineApiError, pushLineNotification } from "./line";
+import { renderDashboardHtml } from "./dashboard";
 
 /** バインディングとシークレットの型定義（値の設定は後続スプリント） */
 export interface Env {
@@ -335,6 +338,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * 管理画面（`/`）表示用: D1から4ステータス分のメール一覧・件数を取得し、HTMLを組み立てて返す。
+ * パスコード認証は未実装（後日追加予定）。検索エンジン非インデックス化のみ meta robots で対応する。
+ */
+async function handleDashboard(env: Env): Promise<Response> {
+  const data = await getDashboardData(env.DB);
+  const html = renderDashboardHtml(data);
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+}
+
 /** Gmail連携エラーを、どの段階で・何が起きたか分かる形でレスポンスにする */
 function gmailCheckErrorResponse(error: unknown, fallbackStage: "token" | "search" | "detail"): Response {
   if (error instanceof GmailApiError) {
@@ -367,6 +380,10 @@ export default {
   /** HTTP アクセス時: 稼働確認用の応答に加え、Gmail連携の動作確認用エンドポイントを提供する */
   async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/") {
+      return await handleDashboard(env);
+    }
 
     if (url.pathname === "/debug/gmail-check") {
       return await handleGmailCheck(env);

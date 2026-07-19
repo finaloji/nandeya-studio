@@ -197,6 +197,76 @@ export async function recordNotifications(db: D1Database, gmailIds: string[]): P
   return { targetCount: gmailIds.length, succeededCount, failedCount, results };
 }
 
+/** emailsテーブルのstatusカラムが取りうる値（D1のCHECK制約と一致させること） */
+export const EMAIL_STATUSES = ["unread", "acknowledged", "in_progress", "done"] as const;
+export type EmailStatus = (typeof EMAIL_STATUSES)[number];
+
+/** 管理画面一覧に表示する1件分のメール情報（内部id・gmail_id・notify_count等は含めない） */
+export interface DashboardEmailRow {
+  threadId: string;
+  subject: string;
+  fromAddr: string;
+  receivedAt: string;
+  summary: string | null;
+  deadline: string | null;
+  urgency: "high" | "mid" | "low" | null;
+  target: "rep" | "staff" | "other" | null;
+  status: EmailStatus;
+}
+
+/** 管理画面一覧: ステータスごとのメール一覧と件数をまとめたもの */
+export interface DashboardData {
+  /** ステータスごとのメール一覧（受信日時の新しい順） */
+  emailsByStatus: Record<EmailStatus, DashboardEmailRow[]>;
+  /** ステータスごとの件数 */
+  countsByStatus: Record<EmailStatus, number>;
+}
+
+/**
+ * 管理画面一覧の表示に必要なデータを、4ステータス分まとめてD1から取得する。
+ * 表示のたびに都度クエリを実行する（キャッシュしない）。
+ * 各ステータスの一覧は受信日時（received_at）の新しい順で取得する。
+ */
+export async function getDashboardData(db: D1Database): Promise<DashboardData> {
+  const emailsByStatus = {} as Record<EmailStatus, DashboardEmailRow[]>;
+  const countsByStatus = {} as Record<EmailStatus, number>;
+
+  for (const status of EMAIL_STATUSES) {
+    const { results } = await db
+      .prepare(
+        `SELECT thread_id, subject, from_addr, received_at, summary, deadline, urgency, target, status
+         FROM emails WHERE status = ? ORDER BY received_at DESC`
+      )
+      .bind(status)
+      .all<{
+        thread_id: string;
+        subject: string;
+        from_addr: string;
+        received_at: string;
+        summary: string | null;
+        deadline: string | null;
+        urgency: "high" | "mid" | "low" | null;
+        target: "rep" | "staff" | "other" | null;
+        status: EmailStatus;
+      }>();
+
+    emailsByStatus[status] = results.map((row) => ({
+      threadId: row.thread_id,
+      subject: row.subject,
+      fromAddr: row.from_addr,
+      receivedAt: row.received_at,
+      summary: row.summary,
+      deadline: row.deadline,
+      urgency: row.urgency,
+      target: row.target,
+      status: row.status,
+    }));
+    countsByStatus[status] = results.length;
+  }
+
+  return { emailsByStatus, countsByStatus };
+}
+
 /** 指定したgmail_idの一覧について、emailsテーブルの内部id(id)をまとめて1回のIN句クエリで引き当てる */
 async function lookupEmailIdsByGmailIds(db: D1Database, gmailIds: string[]): Promise<Map<string, number>> {
   const placeholders = gmailIds.map(() => "?").join(", ");
