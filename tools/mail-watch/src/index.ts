@@ -6,7 +6,8 @@
  *   - GET /            : 管理画面（一覧表示）。パスコード認証は未実装（後日追加予定）
  *   - GET /debug/gmail-check : Gmail連携の動作確認用エンドポイント（開発者向け）
  *     （除外フィルタを通過したメールはD1のemailsテーブルへ保存し、新規保存された分のみGeminiでAI整理してUPDATEする）
- * - Cron: どのCronが発火したかログ出力するのみ（Gmail連携呼び出し・AI整理・LINE通知の自動組み込みはまだ行わない）
+ * - Cron: どのCronが発火したかログ出力する。CRON_EVERY_5_MINはGmail連携チェック（/debug/gmail-checkと同じ一連処理）を、
+ *   CRON_MORNING_DIGESTは朝のまとめ通知処理を自動実行する
  */
 
 import {
@@ -72,31 +73,49 @@ const CRON_MORNING_DIGEST = "0 23 * * *"; // UTC 23:00 = JST 8:00
 const MORNING_DIGEST_DASHBOARD_BASE_URL = "https://mail-watch.example.workers.dev";
 
 /**
- * 動作確認用: access token取得 → Gmail検索 → 各メール詳細取得 → 除外フィルタ → D1保存 →
- * AI整理 → 通知要否判定 → LINE通知送信、を一連で実行し結果を返す。開発者が手動でアクセスして確認する想定。
+ * Gmail連携チェック1回分の実行結果。access token取得・Gmail検索・詳細取得以降のいずれかの段階で
+ * 想定外のエラーが起きた場合は"aborted"となる。検索結果が0件の場合は"no_messages"、
+ * 最後まで実行できた場合は"completed"（D1保存・AI整理・通知要否判定・LINE通知・通知履歴記録のすべてを含む）。
  */
-async function handleGmailCheck(env: Env): Promise<Response> {
+type GmailCheckRunResult =
+  | { outcome: "aborted"; stage: "token" | "search" | "detail"; error: unknown }
+  | { outcome: "no_messages" }
+  | {
+      outcome: "completed";
+      /** Gmail検索でヒットしたメッセージ件数（除外フィルタ適用前） */
+      searchHitCount: number;
+      passed: GmailMessageDetail[];
+      excluded: { message: GmailMessageDetail; reason: string }[];
+      saveSummary: Awaited<ReturnType<typeof saveEmails>> | { insertedCount: number; duplicateCount: number; failedCount: number; results: [] };
+      insertedEmails: GmailMessageDetail[];
+      aiOrganizeResults: AiOrganizeResult[];
+      notificationDecisionSummary: ReturnType<typeof decideNotifications>;
+      lineNotifySummary: LineNotifySummary;
+      notifyRecordSummary: Awaited<ReturnType<typeof recordNotifications>> | { targetCount: number; succeededCount: number; failedCount: number; results: [] };
+    };
+
+/**
+ * 処理本体: access token取得 → Gmail検索 → 各メール詳細取得 → 除外フィルタ → D1保存 →
+ * AI整理 → 通知要否判定 → LINE通知送信 → 通知履歴記録、を一連で実行し結果オブジェクトを返す。
+ * HTTPレスポンスは組み立てない（`/debug/gmail-check`とCron（CRON_EVERY_5_MIN）の両方から呼び出す）。
+ */
+async function runGmailCheck(env: Env): Promise<GmailCheckRunResult> {
   let accessToken: string;
   try {
     accessToken = await fetchAccessToken(env);
   } catch (error) {
-    return gmailCheckErrorResponse(error, "token");
+    return { outcome: "aborted", stage: "token", error };
   }
 
   let messageIds: string[];
   try {
     messageIds = await searchMessageIds(accessToken);
   } catch (error) {
-    return gmailCheckErrorResponse(error, "search");
+    return { outcome: "aborted", stage: "search", error };
   }
 
   if (messageIds.length === 0) {
-    return Response.json({
-      status: "ok",
-      message: "該当するメールは0件でした",
-      count: 0,
-      messages: [],
-    });
+    return { outcome: "no_messages" };
   }
 
   try {
@@ -107,7 +126,7 @@ async function handleGmailCheck(env: Env): Promise<Response> {
     const saveSummary =
       passed.length > 0
         ? await saveEmails(env.DB, passed)
-        : { insertedCount: 0, duplicateCount: 0, failedCount: 0, results: [] };
+        : { insertedCount: 0, duplicateCount: 0, failedCount: 0, results: [] as [] };
 
     // D1へ新規保存された（outcome: "inserted"）メールのみをAI整理の対象とする。
     // 重複スキップ・保存失敗の行は対象外。
@@ -149,62 +168,99 @@ async function handleGmailCheck(env: Env): Promise<Response> {
     const notifyRecordSummary =
       notifiedGmailIds.length > 0
         ? await recordNotifications(env.DB, notifiedGmailIds)
-        : { targetCount: 0, succeededCount: 0, failedCount: 0, results: [] };
+        : { targetCount: 0, succeededCount: 0, failedCount: 0, results: [] as [] };
 
+    return {
+      outcome: "completed",
+      searchHitCount: messageIds.length,
+      passed,
+      excluded,
+      saveSummary,
+      insertedEmails,
+      aiOrganizeResults,
+      notificationDecisionSummary,
+      lineNotifySummary,
+      notifyRecordSummary,
+    };
+  } catch (error) {
+    return { outcome: "aborted", stage: "detail", error };
+  }
+}
+
+/**
+ * 動作確認用: runGmailCheckを実行し、結果オブジェクトからこれまでと全く同じ構造のレスポンスを組み立てて返す。
+ * 開発者が手動でアクセスして確認する想定。レスポンスのJSON形式・ステータスコード（すべて200）は従来通り。
+ */
+async function handleGmailCheck(env: Env): Promise<Response> {
+  const result = await runGmailCheck(env);
+
+  if (result.outcome === "aborted") {
+    return gmailCheckErrorResponse(result.error, result.stage);
+  }
+
+  if (result.outcome === "no_messages") {
     return Response.json({
       status: "ok",
-      count: passed.length,
-      messages: passed.map((d) => ({
-        id: d.id,
-        threadId: d.threadId,
-        subject: d.subject,
-        from: d.from,
-        receivedAt: d.receivedAt,
-        bodyPreview: d.body.slice(0, 200),
-        bodyLength: d.body.length,
-      })),
-      excludedCount: excluded.length,
-      excludedMessages: excluded.map(({ message, reason }) => ({
-        id: message.id,
-        threadId: message.threadId,
-        subject: message.subject,
-        from: message.from,
-        reason,
-      })),
-      dbSave: {
-        insertedCount: saveSummary.insertedCount,
-        duplicateCount: saveSummary.duplicateCount,
-        failedCount: saveSummary.failedCount,
-        results: saveSummary.results,
-      },
-      aiOrganize: {
-        targetCount: insertedEmails.length,
-        succeededCount: aiOrganizeResults.filter((r) => r.outcome === "succeeded").length,
-        failedCount: aiOrganizeResults.filter((r) => r.outcome === "failed").length,
-        results: aiOrganizeResults,
-      },
-      notificationDecision: {
-        targetCount: notificationDecisionSummary.targetCount,
-        shouldNotifyCount: notificationDecisionSummary.shouldNotifyCount,
-        skipCount: notificationDecisionSummary.skipCount,
-        results: notificationDecisionSummary.results,
-      },
-      lineNotify: {
-        targetCount: lineNotifySummary.targetCount,
-        succeededCount: lineNotifySummary.succeededCount,
-        failedCount: lineNotifySummary.failedCount,
-        results: lineNotifySummary.results,
-      },
-      notifyRecord: {
-        targetCount: notifyRecordSummary.targetCount,
-        succeededCount: notifyRecordSummary.succeededCount,
-        failedCount: notifyRecordSummary.failedCount,
-        results: notifyRecordSummary.results,
-      },
+      message: "該当するメールは0件でした",
+      count: 0,
+      messages: [],
     });
-  } catch (error) {
-    return gmailCheckErrorResponse(error, "detail");
   }
+
+  const { passed, excluded, saveSummary, insertedEmails, aiOrganizeResults, notificationDecisionSummary, lineNotifySummary, notifyRecordSummary } =
+    result;
+
+  return Response.json({
+    status: "ok",
+    count: passed.length,
+    messages: passed.map((d) => ({
+      id: d.id,
+      threadId: d.threadId,
+      subject: d.subject,
+      from: d.from,
+      receivedAt: d.receivedAt,
+      bodyPreview: d.body.slice(0, 200),
+      bodyLength: d.body.length,
+    })),
+    excludedCount: excluded.length,
+    excludedMessages: excluded.map(({ message, reason }) => ({
+      id: message.id,
+      threadId: message.threadId,
+      subject: message.subject,
+      from: message.from,
+      reason,
+    })),
+    dbSave: {
+      insertedCount: saveSummary.insertedCount,
+      duplicateCount: saveSummary.duplicateCount,
+      failedCount: saveSummary.failedCount,
+      results: saveSummary.results,
+    },
+    aiOrganize: {
+      targetCount: insertedEmails.length,
+      succeededCount: aiOrganizeResults.filter((r) => r.outcome === "succeeded").length,
+      failedCount: aiOrganizeResults.filter((r) => r.outcome === "failed").length,
+      results: aiOrganizeResults,
+    },
+    notificationDecision: {
+      targetCount: notificationDecisionSummary.targetCount,
+      shouldNotifyCount: notificationDecisionSummary.shouldNotifyCount,
+      skipCount: notificationDecisionSummary.skipCount,
+      results: notificationDecisionSummary.results,
+    },
+    lineNotify: {
+      targetCount: lineNotifySummary.targetCount,
+      succeededCount: lineNotifySummary.succeededCount,
+      failedCount: lineNotifySummary.failedCount,
+      results: lineNotifySummary.results,
+    },
+    notifyRecord: {
+      targetCount: notifyRecordSummary.targetCount,
+      succeededCount: notifyRecordSummary.succeededCount,
+      failedCount: notifyRecordSummary.failedCount,
+      results: notifyRecordSummary.results,
+    },
+  });
 }
 
 /** 1件のAI整理を試みた結果 */
@@ -799,14 +855,45 @@ export default {
     });
   },
 
-  /** Cron（scheduled）実行時: どのCronが発火したかログ出力し、CRON_MORNING_DIGESTには朝のまとめ通知処理を割り当てる */
+  /**
+   * Cron（scheduled）実行時: どのCronが発火したかログ出力し、
+   * CRON_EVERY_5_MINにはGmail連携チェック処理、CRON_MORNING_DIGESTには朝のまとめ通知処理を割り当てる
+   */
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const firedAt = new Date(event.scheduledTime).toISOString();
 
     switch (event.cron) {
       case CRON_EVERY_5_MIN:
-        // 後続スプリント: Gmail取得 → AI要約 → LINE通知 をここに割り当てる
         console.log(`[mail-watch] 5分毎Cron発火 (cron="${event.cron}", scheduledTime=${firedAt})`);
+        // access token取得 → Gmail検索 → 詳細取得 → 除外フィルタ → D1保存 → AI整理 → 通知要否判定 →
+        // LINE通知送信 → 通知履歴記録、の一連処理。Cron実行を待たせないためwaitUntilでラップする
+        ctx.waitUntil(
+          runGmailCheck(env).then((result) => {
+            if (result.outcome === "aborted") {
+              const errorMessage =
+                result.error instanceof GmailApiError
+                  ? result.error.message
+                  : result.error instanceof Error
+                    ? result.error.message
+                    : String(result.error);
+              console.error(`[mail-watch] Gmail連携Cron: 処理を打ち切りました (stage=${result.stage}): ${errorMessage}`);
+              return;
+            }
+            if (result.outcome === "no_messages") {
+              console.log("[mail-watch] Gmail連携Cron完了: 該当するメールは0件でした");
+              return;
+            }
+            console.log(
+              `[mail-watch] Gmail連携Cron完了: searchHitCount=${result.searchHitCount}, ` +
+                `filter(passed=${result.passed.length}, excluded=${result.excluded.length}), ` +
+                `dbSave(inserted=${result.saveSummary.insertedCount}, duplicate=${result.saveSummary.duplicateCount}, failed=${result.saveSummary.failedCount}), ` +
+                `aiOrganize(target=${result.insertedEmails.length}, succeeded=${result.aiOrganizeResults.filter((r) => r.outcome === "succeeded").length}, failed=${result.aiOrganizeResults.filter((r) => r.outcome === "failed").length}), ` +
+                `notificationDecision(target=${result.notificationDecisionSummary.targetCount}, shouldNotify=${result.notificationDecisionSummary.shouldNotifyCount}), ` +
+                `lineNotify(target=${result.lineNotifySummary.targetCount}, succeeded=${result.lineNotifySummary.succeededCount}, failed=${result.lineNotifySummary.failedCount}), ` +
+                `notifyRecord(target=${result.notifyRecordSummary.targetCount}, succeeded=${result.notifyRecordSummary.succeededCount}, failed=${result.notifyRecordSummary.failedCount})`
+            );
+          })
+        );
         break;
       case CRON_MORNING_DIGEST:
         console.log(`[mail-watch] 毎朝8時JST Cron発火 (cron="${event.cron}", scheduledTime=${firedAt})`);
