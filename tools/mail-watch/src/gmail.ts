@@ -54,12 +54,12 @@ export const SENDER_EXCLUDE_LIST: SenderExcludeRule[] = [
 ];
 
 /** 詳細取得を連続実行する際、Gmail APIのレート制限を誘発しないための間隔（ミリ秒） */
-const DETAIL_FETCH_INTERVAL_MS = 150;
+export const DETAIL_FETCH_INTERVAL_MS = 150;
 
 /** Gmail APIとのやり取り中に起きたエラーを、どの段階で起きたか分かる形で表す */
 export class GmailApiError extends Error {
   /** どの段階で起きたエラーか */
-  stage: "token" | "search" | "detail";
+  stage: "token" | "search" | "detail" | "thread";
   /** Gmail/Google側から返ってきたHTTPステータス（あれば） */
   status?: number;
   /** レート制限エラーと判別できた場合 true */
@@ -68,7 +68,7 @@ export class GmailApiError extends Error {
   detail?: unknown;
 
   constructor(
-    stage: "token" | "search" | "detail",
+    stage: "token" | "search" | "detail" | "thread",
     message: string,
     options?: { status?: number; rateLimited?: boolean; detail?: unknown }
   ) {
@@ -203,6 +203,46 @@ export async function fetchMessageDetails(accessToken: string, messageIds: strin
   return details;
 }
 
+/** スレッド内の1メッセージについて、返信判定に必要な情報のみを取り出したもの */
+export interface GmailThreadMessage {
+  /** GmailメッセージID */
+  id: string;
+  /** このメッセージに付与されているラベルID一覧（"SENT"を含むかで代表からの送信か判定する） */
+  labelIds: string[];
+  /** メッセージの日時（ISO 8601。Gmail APIのinternalDateから変換） */
+  internalDate: string;
+}
+
+/**
+ * 指定したスレッドIDに含まれる全メッセージを取得する。
+ * ラベルIDと日時（internalDate）のみ取り出せればよいため、format=metadataで取得し本文は取らない。
+ * スレッドが存在しない場合（404等）はGmailApiErrorを投げる（未返信と誤判定させないため、呼び出し側で「判定失敗」として扱う）。
+ */
+export async function fetchThreadMessages(accessToken: string, threadId: string): Promise<GmailThreadMessage[]> {
+  const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}`);
+  url.searchParams.set("format", "metadata");
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  const json = await res.json<GmailApiThreadResponse>();
+
+  if (!res.ok) {
+    throw new GmailApiError("thread", `スレッドの取得に失敗しました (threadId=${threadId}, status=${res.status})`, {
+      status: res.status,
+      rateLimited: res.status === 429,
+      detail: json,
+    });
+  }
+
+  return (json.messages ?? []).map((m) => ({
+    id: m.id,
+    labelIds: m.labelIds ?? [],
+    internalDate: m.internalDate ? new Date(Number(m.internalDate)).toISOString() : new Date().toISOString(),
+  }));
+}
+
 /**
  * 本文を先頭から一定文字数に切り詰める。
  * 具体的な閾値は後続スプリントで確定させる想定のため、呼び出し側でmaxCharsを指定できる形にしている。
@@ -259,6 +299,11 @@ interface GmailApiMessageResponse {
   threadId: string;
   internalDate?: string;
   payload?: GmailApiPart;
+}
+
+/** GET .../threads/{threadId} のレスポンス形（返信判定に必要な範囲のみ） */
+interface GmailApiThreadResponse {
+  messages?: { id: string; labelIds?: string[]; internalDate?: string }[];
 }
 
 interface GmailApiPart {

@@ -381,6 +381,83 @@ export async function updateEmailStatus(
   }
 }
 
+/** 返信判定対象1件分のメール情報（emailsテーブルからの抜粋） */
+export interface ReplyCheckTargetEmail {
+  /** GmailメッセージID */
+  gmailId: string;
+  /** スレッドID */
+  threadId: string;
+  /** 受信日時（ISO 8601） */
+  receivedAt: string;
+  /** 件名（動作確認レスポンスの見やすさのために取得） */
+  subject: string;
+  /** 送信者（動作確認レスポンスの見やすさのために取得） */
+  fromAddr: string;
+}
+
+/**
+ * status <> 'done' のメール（返信判定の対象）を、受信日時の新しい順で取得する。
+ * 既にstatus = 'done'のメールは対象外とする。
+ */
+export async function getReplyCheckTargetEmails(db: D1Database): Promise<ReplyCheckTargetEmail[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT gmail_id, thread_id, received_at, subject, from_addr
+       FROM emails WHERE status <> 'done' ORDER BY received_at DESC`
+    )
+    .all<{ gmail_id: string; thread_id: string; received_at: string; subject: string; from_addr: string }>();
+
+  return results.map((row) => ({
+    gmailId: row.gmail_id,
+    threadId: row.thread_id,
+    receivedAt: row.received_at,
+    subject: row.subject,
+    fromAddr: row.from_addr,
+  }));
+}
+
+/** 返信検出によるステータス更新1件を試みた結果 */
+export type MarkEmailAsRepliedResult = UpdateEmailStatusResult;
+
+/**
+ * 返信を検出したメールについて、statusを"done"に更新しつつaction_logsには"replied"を記録する。
+ * updateEmailStatusと同様、emails.statusのUPDATEとaction_logsへのINSERTはdb.batch()でアトミックに実行する。
+ *
+ * 現在のステータスより後ろ（"done"）への遷移のみ許可する。
+ * 既にstatus = 'done'だった場合（判定処理の実行中に別経路で完了していた場合を含む）は、
+ * 更新・ログ記録とも行わず outcome: "already_at_or_past" を返す（updateEmailStatusと同じ二重更新防止ガード）。
+ */
+export async function markEmailAsReplied(db: D1Database, gmailId: string): Promise<MarkEmailAsRepliedResult> {
+  const row = await db
+    .prepare(`SELECT id, status FROM emails WHERE gmail_id = ?`)
+    .bind(gmailId)
+    .first<{ id: number; status: EmailStatus }>();
+
+  if (!row) {
+    console.error(`[mail-watch] 返信検出によるステータス更新エラー: 対象のメールがemailsテーブルに見つかりませんでした (gmail_id=${gmailId})`);
+    return { outcome: "not_found", status: null };
+  }
+
+  const currentIndex = EMAIL_STATUSES.indexOf(row.status);
+  const doneIndex = EMAIL_STATUSES.indexOf("done");
+
+  if (doneIndex <= currentIndex) {
+    return { outcome: "already_at_or_past", status: row.status };
+  }
+
+  try {
+    await db.batch([
+      db.prepare(`UPDATE emails SET status = 'done' WHERE id = ?`).bind(row.id),
+      db.prepare(`INSERT INTO action_logs (email_id, action) VALUES (?, 'replied')`).bind(row.id),
+    ]);
+    return { outcome: "updated", status: "done" };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[mail-watch] 返信検出によるステータス更新の書き込みに失敗しました (gmail_id=${gmailId}): ${errorMessage}`);
+    return { outcome: "failed", status: row.status };
+  }
+}
+
 /** 指定したgmail_idの一覧について、emailsテーブルの内部id(id)をまとめて1回のIN句クエリで引き当てる */
 async function lookupEmailIdsByGmailIds(db: D1Database, gmailIds: string[]): Promise<Map<string, number>> {
   const placeholders = gmailIds.map(() => "?").join(", ");

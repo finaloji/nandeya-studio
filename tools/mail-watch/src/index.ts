@@ -9,17 +9,27 @@
  * - Cron: どのCronが発火したかログ出力するのみ（Gmail連携呼び出し・AI整理・LINE通知の自動組み込みはまだ行わない）
  */
 
-import { GmailApiError, fetchAccessToken, fetchMessageDetails, filterExcludedSenders, searchMessageIds } from "./gmail";
-import type { GmailMessageDetail } from "./gmail";
+import {
+  DETAIL_FETCH_INTERVAL_MS,
+  GmailApiError,
+  fetchAccessToken,
+  fetchMessageDetails,
+  fetchThreadMessages,
+  filterExcludedSenders,
+  searchMessageIds,
+} from "./gmail";
+import type { GmailMessageDetail, GmailThreadMessage } from "./gmail";
 import {
   EMAIL_STATUSES,
   getDashboardData,
+  getReplyCheckTargetEmails,
+  markEmailAsReplied,
   recordNotifications,
   saveEmails,
   updateEmailAiFields,
   updateEmailStatus,
 } from "./db";
-import type { EmailStatus, UpdatableEmailStatus } from "./db";
+import type { EmailStatus, ReplyCheckTargetEmail, UpdatableEmailStatus } from "./db";
 import { GEMINI_CALL_INTERVAL_MS, GeminiApiError, classifyEmail } from "./gemini";
 import type { EmailAiFields } from "./gemini";
 import { decideNotifications } from "./notification";
@@ -425,6 +435,129 @@ async function handleUpdateEmailStatus(env: Env, gmailId: string, request: Reque
   }
 }
 
+/** 1件の返信判定を試みた結果 */
+interface ReplyCheckResult {
+  /** GmailメッセージID */
+  gmailId: string;
+  /** スレッドID */
+  threadId: string;
+  /** 件名（動作確認レスポンスの見やすさのために含める） */
+  subject: string;
+  /** "replied": 返信を検出した / "not_replied": 返信は検出されなかった / "failed": 判定処理自体が失敗した（未返信と誤判定しない） */
+  outcome: "replied" | "not_replied" | "failed";
+  /** outcomeが"replied"の場合、根拠となったSENTメッセージの日時（最も古いもの） */
+  repliedAt?: string;
+  /** outcomeが"failed"の場合のエラーメッセージ */
+  errorMessage?: string;
+  /** outcomeが"replied"の場合のステータス更新結果（markEmailAsRepliedの結果） */
+  statusUpdate?: { outcome: MarkEmailAsRepliedOutcome; status: string | null };
+}
+
+/** markEmailAsRepliedのoutcome型（db.tsのUpdateEmailStatusOutcomeと同一だがここでは表示用に文字列として扱う） */
+type MarkEmailAsRepliedOutcome = "updated" | "already_at_or_past" | "not_found" | "failed";
+
+/**
+ * status <> 'done' の対象メール1件について、スレッド内のSENTメッセージを確認し、
+ * 受信日時より後のSENTメッセージが1件でもあれば返信済みと判定し、markEmailAsRepliedでstatusをdoneへ進める。
+ * スレッド取得に失敗した場合は「判定失敗」とし、未返信と誤判定しない（ステータス更新・action_logs記録は行わない）。
+ */
+async function checkReplyForEmail(env: Env, accessToken: string, target: ReplyCheckTargetEmail): Promise<ReplyCheckResult> {
+  let threadMessages: GmailThreadMessage[];
+  try {
+    threadMessages = await fetchThreadMessages(accessToken, target.threadId);
+  } catch (error) {
+    const errorMessage =
+      error instanceof GmailApiError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    console.error(`[mail-watch] 返信判定でスレッド取得に失敗しました (gmail_id=${target.gmailId}, thread_id=${target.threadId}): ${errorMessage}`);
+    return { gmailId: target.gmailId, threadId: target.threadId, subject: target.subject, outcome: "failed", errorMessage };
+  }
+
+  // ラベルにSENTを含み、かつ受信日時より後のメッセージを、日時の古い順に探す
+  const sentAfterReceived = threadMessages
+    .filter((m) => m.labelIds.includes("SENT") && new Date(m.internalDate).getTime() > new Date(target.receivedAt).getTime())
+    .sort((a, b) => new Date(a.internalDate).getTime() - new Date(b.internalDate).getTime());
+
+  if (sentAfterReceived.length === 0) {
+    return { gmailId: target.gmailId, threadId: target.threadId, subject: target.subject, outcome: "not_replied" };
+  }
+
+  const repliedAt = sentAfterReceived[0].internalDate;
+
+  try {
+    const updateResult = await markEmailAsReplied(env.DB, target.gmailId);
+    return {
+      gmailId: target.gmailId,
+      threadId: target.threadId,
+      subject: target.subject,
+      outcome: "replied",
+      repliedAt,
+      statusUpdate: { outcome: updateResult.outcome, status: updateResult.status },
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[mail-watch] 返信検出後のステータス更新で想定外のエラー (gmail_id=${target.gmailId}): ${errorMessage}`);
+    return {
+      gmailId: target.gmailId,
+      threadId: target.threadId,
+      subject: target.subject,
+      outcome: "replied",
+      repliedAt,
+      statusUpdate: { outcome: "failed", status: null },
+    };
+  }
+}
+
+/**
+ * 動作確認用: status <> 'done' の対象メールについて、Gmailスレッドを確認して返信検出を行い、
+ * 返信を検出したメールはstatusをdoneへ自動更新する（開発者向けエンドポイント）。
+ * 対象0件の場合はGmail APIへの問い合わせ自体を行わない。access token取得の失敗のみ全体を打ち切る。
+ * 各メールの判定は逐次処理（並列実行しない）し、スレッド取得の間にはDETAIL_FETCH_INTERVAL_MSの間隔を空ける。
+ */
+async function handleReplyCheck(env: Env): Promise<Response> {
+  const targets = await getReplyCheckTargetEmails(env.DB);
+
+  if (targets.length === 0) {
+    return Response.json({
+      status: "ok",
+      message: "判定対象のメール（status <> 'done'）は0件でした",
+      targetCount: 0,
+      results: [],
+      summary: { repliedCount: 0, notRepliedCount: 0, failedCount: 0, autoCompletedCount: 0 },
+    });
+  }
+
+  let accessToken: string;
+  try {
+    accessToken = await fetchAccessToken(env);
+  } catch (error) {
+    return gmailCheckErrorResponse(error, "token");
+  }
+
+  const results: ReplyCheckResult[] = [];
+  for (let i = 0; i < targets.length; i++) {
+    if (i > 0) {
+      await sleep(DETAIL_FETCH_INTERVAL_MS);
+    }
+    results.push(await checkReplyForEmail(env, accessToken, targets[i]));
+  }
+
+  const repliedCount = results.filter((r) => r.outcome === "replied").length;
+  const notRepliedCount = results.filter((r) => r.outcome === "not_replied").length;
+  const failedCount = results.filter((r) => r.outcome === "failed").length;
+  const autoCompletedCount = results.filter((r) => r.outcome === "replied" && r.statusUpdate?.outcome === "updated").length;
+
+  return Response.json({
+    status: "ok",
+    targetCount: targets.length,
+    results,
+    summary: { repliedCount, notRepliedCount, failedCount, autoCompletedCount },
+  });
+}
+
 /** Gmail連携エラーを、どの段階で・何が起きたか分かる形でレスポンスにする */
 function gmailCheckErrorResponse(error: unknown, fallbackStage: "token" | "search" | "detail"): Response {
   if (error instanceof GmailApiError) {
@@ -464,6 +597,10 @@ export default {
 
     if (url.pathname === "/debug/gmail-check") {
       return await handleGmailCheck(env);
+    }
+
+    if (url.pathname === "/debug/reply-check") {
+      return await handleReplyCheck(env);
     }
 
     const statusUpdateMatch = url.pathname.match(/^\/emails\/([^/]+)\/status$/);
