@@ -34,7 +34,8 @@ import { GEMINI_CALL_INTERVAL_MS, GeminiApiError, classifyEmail } from "./gemini
 import type { EmailAiFields } from "./gemini";
 import { decideNotifications } from "./notification";
 import type { NotificationCandidate, NotificationDecisionResult } from "./notification";
-import { LINE_CALL_INTERVAL_MS, LineApiError, pushLineNotification } from "./line";
+import { LINE_CALL_INTERVAL_MS, LineApiError, pushLineNotification, pushMorningDigestNotification } from "./line";
+import type { MorningDigestItem } from "./line";
 import { renderDashboardHtml } from "./dashboard";
 
 /** バインディングとシークレットの型定義（値の設定は後続スプリント） */
@@ -62,6 +63,13 @@ export interface Env {
 /** Cron 発火パターン（wrangler.jsonc の triggers.crons と一致させること） */
 const CRON_EVERY_5_MIN = "*/5 * * * *";
 const CRON_MORNING_DIGEST = "0 23 * * *"; // UTC 23:00 = JST 8:00
+
+/**
+ * 朝のまとめ通知で「管理画面を開く」ボタンのリンク先に使うベースURL。
+ * Cron実行時（scheduledハンドラ）はHTTPリクエストが存在しないため、この固定値を使う。
+ * TODO: 本番デプロイ後、実際のWorkers公開URL（*.workers.dev）へ更新すること。
+ */
+const MORNING_DIGEST_DASHBOARD_BASE_URL = "https://mail-watch.example.workers.dev";
 
 /**
  * 動作確認用: access token取得 → Gmail検索 → 各メール詳細取得 → 除外フィルタ → D1保存 →
@@ -511,6 +519,54 @@ async function checkReplyForEmail(env: Env, accessToken: string, target: ReplyCh
   }
 }
 
+/** 返信済み判定を対象メール全件に対して実行した結果のサマリ */
+interface ReplyCheckRunSummary {
+  /** 返信を検出した件数 */
+  repliedCount: number;
+  /** 返信を検出しなかった件数 */
+  notRepliedCount: number;
+  /** 判定自体に失敗した件数（未返信と誤判定しないため、対象からは除外しない） */
+  failedCount: number;
+  /** 返信検出によりstatusが自動でdoneに更新された件数 */
+  autoCompletedCount: number;
+}
+
+/** 返信済み判定を対象メール全件に対して実行した結果 */
+interface ReplyCheckRunResult {
+  /** 判定対象件数 */
+  targetCount: number;
+  /** メールごとの判定結果一覧 */
+  results: ReplyCheckResult[];
+  summary: ReplyCheckRunSummary;
+}
+
+/**
+ * 判定対象（targets）について、Gmailスレッドを確認して返信検出を行い、
+ * 返信を検出したメールはstatusをdoneへ自動更新する。access tokenの取得は呼び出し元が行う。
+ * 各メールの判定は逐次処理（並列実行しない）し、スレッド取得の間にはDETAIL_FETCH_INTERVAL_MSの間隔を空ける。
+ * `/debug/reply-check`（handleReplyCheck）と朝のまとめ通知（runMorningDigest）の両方から共通で使う。
+ */
+async function runReplyCheck(env: Env, accessToken: string, targets: ReplyCheckTargetEmail[]): Promise<ReplyCheckRunResult> {
+  const results: ReplyCheckResult[] = [];
+  for (let i = 0; i < targets.length; i++) {
+    if (i > 0) {
+      await sleep(DETAIL_FETCH_INTERVAL_MS);
+    }
+    results.push(await checkReplyForEmail(env, accessToken, targets[i]));
+  }
+
+  const repliedCount = results.filter((r) => r.outcome === "replied").length;
+  const notRepliedCount = results.filter((r) => r.outcome === "not_replied").length;
+  const failedCount = results.filter((r) => r.outcome === "failed").length;
+  const autoCompletedCount = results.filter((r) => r.outcome === "replied" && r.statusUpdate?.outcome === "updated").length;
+
+  return {
+    targetCount: targets.length,
+    results,
+    summary: { repliedCount, notRepliedCount, failedCount, autoCompletedCount },
+  };
+}
+
 /**
  * 動作確認用: status <> 'done' の対象メールについて、Gmailスレッドを確認して返信検出を行い、
  * 返信を検出したメールはstatusをdoneへ自動更新する（開発者向けエンドポイント）。
@@ -537,24 +593,145 @@ async function handleReplyCheck(env: Env): Promise<Response> {
     return gmailCheckErrorResponse(error, "token");
   }
 
-  const results: ReplyCheckResult[] = [];
-  for (let i = 0; i < targets.length; i++) {
-    if (i > 0) {
-      await sleep(DETAIL_FETCH_INTERVAL_MS);
-    }
-    results.push(await checkReplyForEmail(env, accessToken, targets[i]));
-  }
-
-  const repliedCount = results.filter((r) => r.outcome === "replied").length;
-  const notRepliedCount = results.filter((r) => r.outcome === "not_replied").length;
-  const failedCount = results.filter((r) => r.outcome === "failed").length;
-  const autoCompletedCount = results.filter((r) => r.outcome === "replied" && r.statusUpdate?.outcome === "updated").length;
+  const run = await runReplyCheck(env, accessToken, targets);
 
   return Response.json({
     status: "ok",
-    targetCount: targets.length,
-    results,
-    summary: { repliedCount, notRepliedCount, failedCount, autoCompletedCount },
+    targetCount: run.targetCount,
+    results: run.results,
+    summary: run.summary,
+  });
+}
+
+/** LINE送信の結果（対象0件で送信しなかった場合はattempted: false） */
+interface MorningDigestLineSendResult {
+  attempted: boolean;
+  succeeded?: boolean;
+  errorMessage?: string;
+}
+
+/** 朝のまとめ通知1回分の実行結果。access token取得に失敗した場合は"aborted"となり、それ以外は最後まで実行される（LINE送信の成否は問わない） */
+type MorningDigestRunResult =
+  | {
+      outcome: "aborted";
+      /** 打ち切りの原因となった段階 */
+      stage: "token";
+      errorMessage: string;
+    }
+  | {
+      outcome: "completed";
+      /** 返信済み判定の実行結果 */
+      replyCheck: ReplyCheckRunResult;
+      /** まとめ通知対象件数（返信済み判定完了後に再取得した、status <> 'done'の件数） */
+      digestTargetCount: number;
+      /** まとめ通知に含めた項目（件名・送信者一覧。上限適用前の全件） */
+      digestItems: MorningDigestItem[];
+      lineSend: MorningDigestLineSendResult;
+    };
+
+/**
+ * 朝のまとめ通知1回分の処理本体。以下の順序を必ず守る。
+ * 1. status <> 'done' の対象メール全件に対して返信済み判定を先に実行する（0件ならGmail APIには触れない）。
+ * 2. 判定完了後、あらためて status <> 'done' のメールを再取得し、まとめ通知の対象とする。
+ * 3. 対象が1件以上あれば1通のLINE Flex Messageにまとめてpushする。0件ならLINE APIは一切呼び出さない。
+ * access token取得自体が失敗した場合は、対象抽出・まとめ通知の段階に進まず処理全体を打ち切る。
+ * LINE送信の成否と、既に行われた返信済み判定によるstatus更新・action_logs記録は独立して扱う（ロールバックしない）。
+ */
+async function runMorningDigest(env: Env, dashboardUrl: string): Promise<MorningDigestRunResult> {
+  // 1. 返信済み判定（status <> 'done' 全件が対象）
+  const replyCheckTargets = await getReplyCheckTargetEmails(env.DB);
+
+  let replyCheck: ReplyCheckRunResult;
+  if (replyCheckTargets.length === 0) {
+    replyCheck = {
+      targetCount: 0,
+      results: [],
+      summary: { repliedCount: 0, notRepliedCount: 0, failedCount: 0, autoCompletedCount: 0 },
+    };
+  } else {
+    let accessToken: string;
+    try {
+      accessToken = await fetchAccessToken(env);
+    } catch (error) {
+      const errorMessage =
+        error instanceof GmailApiError ? error.message : error instanceof Error ? error.message : String(error);
+      console.error(`[mail-watch] 朝のまとめ通知: access token取得に失敗したため処理全体を打ち切りました: ${errorMessage}`);
+      return { outcome: "aborted", stage: "token", errorMessage };
+    }
+
+    replyCheck = await runReplyCheck(env, accessToken, replyCheckTargets);
+  }
+
+  // 2. 返信済み判定完了後、あらためて対象を再取得する（同じ条件で再クエリする）
+  const digestTargets = await getReplyCheckTargetEmails(env.DB);
+  const digestItems: MorningDigestItem[] = digestTargets.map((t) => ({ subject: t.subject, from: t.fromAddr }));
+
+  // 3. まとめ通知の送信（対象0件ならLINE APIを一切呼び出さない）
+  if (digestItems.length === 0) {
+    console.log("[mail-watch] 朝のまとめ通知: 対象0件のため送信スキップ");
+    return {
+      outcome: "completed",
+      replyCheck,
+      digestTargetCount: 0,
+      digestItems: [],
+      lineSend: { attempted: false },
+    };
+  }
+
+  try {
+    await pushMorningDigestNotification(env.LINE_CHANNEL_ACCESS_TOKEN, env.LINE_TARGET_USER_ID, digestItems, dashboardUrl);
+    return {
+      outcome: "completed",
+      replyCheck,
+      digestTargetCount: digestItems.length,
+      digestItems,
+      lineSend: { attempted: true, succeeded: true },
+    };
+  } catch (error) {
+    const errorMessage =
+      error instanceof LineApiError ? error.message : error instanceof Error ? error.message : String(error);
+    console.error(`[mail-watch] 朝のまとめ通知のLINE送信に失敗しました: ${errorMessage}`);
+    return {
+      outcome: "completed",
+      replyCheck,
+      digestTargetCount: digestItems.length,
+      digestItems,
+      lineSend: { attempted: true, succeeded: false, errorMessage },
+    };
+  }
+}
+
+/**
+ * 開発者向けエンドポイント: Cronを待たずに朝のまとめ通知（返信済み判定→対象抽出→まとめ通知）を手動実行する。
+ * 管理画面ボタンのリンク先には、このリクエスト自体のoriginを使う（Cron実行時と異なりリクエストが存在するため）。
+ */
+async function handleMorningDigest(env: Env, url: URL): Promise<Response> {
+  const dashboardUrl = `${url.origin}/`;
+  const result = await runMorningDigest(env, dashboardUrl);
+
+  if (result.outcome === "aborted") {
+    return Response.json(
+      {
+        status: "error",
+        stage: result.stage,
+        message: result.errorMessage,
+        replyCheck: null,
+        digestTargetCount: 0,
+        lineSend: { attempted: false },
+      },
+      { status: 200 }
+    );
+  }
+
+  return Response.json({
+    status: "ok",
+    replyCheck: {
+      targetCount: result.replyCheck.targetCount,
+      summary: result.replyCheck.summary,
+    },
+    digestTargetCount: result.digestTargetCount,
+    digestItems: result.digestItems,
+    lineSend: result.lineSend,
   });
 }
 
@@ -603,6 +780,10 @@ export default {
       return await handleReplyCheck(env);
     }
 
+    if (url.pathname === "/debug/morning-digest") {
+      return await handleMorningDigest(env, url);
+    }
+
     const statusUpdateMatch = url.pathname.match(/^\/emails\/([^/]+)\/status$/);
     if (statusUpdateMatch) {
       if (request.method !== "PUT") {
@@ -618,8 +799,8 @@ export default {
     });
   },
 
-  /** Cron（scheduled）実行時: どのCronが発火したかログ出力する */
-  async scheduled(event: ScheduledController, _env: Env, _ctx: ExecutionContext): Promise<void> {
+  /** Cron（scheduled）実行時: どのCronが発火したかログ出力し、CRON_MORNING_DIGESTには朝のまとめ通知処理を割り当てる */
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const firedAt = new Date(event.scheduledTime).toISOString();
 
     switch (event.cron) {
@@ -628,8 +809,19 @@ export default {
         console.log(`[mail-watch] 5分毎Cron発火 (cron="${event.cron}", scheduledTime=${firedAt})`);
         break;
       case CRON_MORNING_DIGEST:
-        // 後続スプリント: 毎朝8時(JST)のダイジェスト通知をここに割り当てる
         console.log(`[mail-watch] 毎朝8時JST Cron発火 (cron="${event.cron}", scheduledTime=${firedAt})`);
+        // 返信済み判定 → 対象抽出 → まとめ通知 の一連処理。Cron実行を待たせないためwaitUntilでラップする
+        ctx.waitUntil(
+          runMorningDigest(env, `${MORNING_DIGEST_DASHBOARD_BASE_URL}/`).then((result) => {
+            if (result.outcome === "aborted") {
+              console.error(`[mail-watch] 朝のまとめ通知Cron: 処理を打ち切りました (stage=${result.stage}): ${result.errorMessage}`);
+              return;
+            }
+            console.log(
+              `[mail-watch] 朝のまとめ通知Cron完了: replyCheck.targetCount=${result.replyCheck.targetCount}, digestTargetCount=${result.digestTargetCount}, lineSend=${JSON.stringify(result.lineSend)}`
+            );
+          })
+        );
         break;
       default:
         // 想定外のパターンでもエラーにはしない（ログのみ）

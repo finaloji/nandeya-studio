@@ -172,3 +172,146 @@ function buildFlexMessage(input: LineNotificationInput): object {
     },
   };
 }
+
+/** 朝のまとめ通知1件（1通の箇条書きに含める1メール分）の情報。件名・送信者のみを持つ */
+export interface MorningDigestItem {
+  /** 件名。空文字の場合はカード側で「(件名なし)」と表示する */
+  subject: string;
+  /** 送信者（Fromヘッダーの表示内容） */
+  from: string;
+}
+
+/** 朝のまとめ通知で箇条書き表示する件数の上限。超過分は「他N件」として省略表示する */
+const MORNING_DIGEST_MAX_ITEMS = 20;
+
+/**
+ * 「未対応メールN件」の朝のまとめ通知を1通のFlex MessageとしてLINE Messaging APIへpush送信する。
+ * 個別メールごとのGmailリンクは含めず、代わりに管理画面（dashboardUrl）を開くボタンを1つ含める。
+ * itemsの件数がMORNING_DIGEST_MAX_ITEMSを超える場合は、上限件数まで表示し「他N件」と省略件数を明示する
+ * （全件を複数通に分割して送ることはしない）。
+ * 呼び出し自体の失敗・LINE側からのエラー応答（レート制限含む）はいずれもLineApiErrorとして投げる。
+ */
+export async function pushMorningDigestNotification(
+  channelAccessToken: string,
+  targetUserId: string,
+  items: MorningDigestItem[],
+  dashboardUrl: string
+): Promise<void> {
+  const message = buildMorningDigestFlexMessage(items, dashboardUrl);
+
+  let res: Response;
+  try {
+    res = await fetch(LINE_PUSH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${channelAccessToken}`,
+      },
+      body: JSON.stringify({
+        to: targetUserId,
+        messages: [message],
+      }),
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new LineApiError(`LINE APIの呼び出しに失敗しました: ${errorMessage}`, { detail: error });
+  }
+
+  if (!res.ok) {
+    let detail: unknown;
+    try {
+      detail = await res.json();
+    } catch {
+      detail = undefined;
+    }
+    throw new LineApiError(`LINE APIの呼び出しに失敗しました (status=${res.status})`, {
+      status: res.status,
+      rateLimited: res.status === 429,
+      detail,
+    });
+  }
+}
+
+/**
+ * まとめ通知のFlex Messageのメッセージオブジェクト（messages配列の1要素分）を組み立てる。
+ * 上限件数（MORNING_DIGEST_MAX_ITEMS）まで箇条書きし、超過分は「他N件」の1行にまとめる。
+ */
+function buildMorningDigestFlexMessage(items: MorningDigestItem[], dashboardUrl: string): object {
+  const displayItems = items.slice(0, MORNING_DIGEST_MAX_ITEMS);
+  const omittedCount = items.length - displayItems.length;
+
+  const itemContents: object[] = displayItems.map((item) => ({
+    type: "box",
+    layout: "vertical",
+    margin: "md",
+    contents: [
+      {
+        type: "text",
+        text: item.subject === "" ? "(件名なし)" : item.subject,
+        weight: "bold",
+        size: "sm",
+        wrap: true,
+      },
+      {
+        type: "text",
+        text: `送信者: ${item.from}`,
+        size: "xs",
+        color: "#666666",
+        wrap: true,
+      },
+    ],
+  }));
+
+  if (omittedCount > 0) {
+    itemContents.push({
+      type: "box",
+      layout: "vertical",
+      margin: "md",
+      contents: [
+        {
+          type: "text",
+          text: `他${omittedCount}件`,
+          size: "xs",
+          color: "#666666",
+        },
+      ],
+    });
+  }
+
+  return {
+    type: "flex",
+    altText: `未対応メール ${items.length}件`,
+    contents: {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        contents: [
+          {
+            type: "text",
+            text: `未対応メール ${items.length}件`,
+            weight: "bold",
+            size: "md",
+          },
+          ...itemContents,
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "button",
+            style: "primary",
+            action: {
+              type: "uri",
+              label: "管理画面を開く",
+              uri: dashboardUrl,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
