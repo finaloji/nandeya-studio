@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>勤怠管理 - なんで屋</title>
+<meta name="theme-color" content="#2e9e73">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="勤怠管理">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif; background: #f0f2f5; color: #333; }
+
+  /* ===== ヘッダー ===== */
+  .app-header { position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: #2e9e73; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .app-header-inner { max-width: 900px; margin: 0 auto; padding: 0 12px; height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .app-title { font-size: 16px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 将来「ログイン中の利用者名」が入る枠。今は空だが幅と高さを確保しておく */
+  .app-user { flex: none; width: 96px; min-height: 20px; font-size: 13px; text-align: right; white-space: nowrap; overflow: hidden; }
+
+  /* ===== 画面切替ナビ ===== */
+  .app-nav { position: fixed; top: 48px; left: 0; right: 0; z-index: 19; background: #fff; border-bottom: 1px solid #ddd; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .app-nav-inner { max-width: 900px; margin: 0 auto; display: flex; }
+  .nav-btn { flex: 1 1 0; min-width: 0; min-height: 52px; padding: 6px 2px; border: none; border-bottom: 3px solid transparent; background: transparent; color: #666; font-family: inherit; font-size: 13px; font-weight: normal; line-height: 1.3; cursor: pointer; white-space: nowrap; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .nav-btn.active { color: #2e9e73; font-weight: bold; border-bottom-color: #2e9e73; }
+  .nav-note { font-size: 10px; font-weight: normal; color: #999; }
+  .nav-btn.active .nav-note { color: #2e9e73; }
+
+  /* ===== コンテンツ領域 ===== */
+  .app-main { max-width: 900px; margin: 0 auto; padding: 12px; padding-top: 112px; }
+  .screen-card { background: #fff; border-radius: 8px; padding: 16px 14px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .screen-title { font-size: 15px; font-weight: bold; color: #555; margin-bottom: 8px; }
+  .screen-note { font-size: 13px; color: #999; line-height: 1.6; }
+
+  /* ===== PC・タブレット ===== */
+  @media (min-width: 700px) {
+    .app-title { font-size: 18px; }
+    .app-nav-inner { justify-content: flex-start; padding: 0 12px; }
+    .nav-btn { flex: 0 0 auto; padding: 6px 20px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== ヘッダー ===== -->
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="app-title">勤怠管理</div>
+    <div class="app-user" id="headerUser"></div>
+  </div>
+</header>
+
+<!-- ===== 画面切替ナビ ===== -->
+<nav class="app-nav">
+  <div class="app-nav-inner">
+    <button type="button" class="nav-btn active" id="navAttendance" onclick="showScreen('attendance')">勤怠一覧</button>
+    <button type="button" class="nav-btn" id="navCorrection" onclick="showScreen('correction')">修正申請</button>
+    <button type="button" class="nav-btn" id="navAuditLog" onclick="showScreen('auditLog')">操作履歴</button>
+    <button type="button" class="nav-btn" id="navMaster" onclick="showScreen('master')">マスタ管理<span class="nav-note">管理者のみ</span></button>
+  </div>
+</nav>
+
+<!-- ===== コンテンツ領域 ===== -->
+<main class="app-main">
+
+  <section class="screen-card" id="screenAttendance">
+    <div class="screen-title">準備中</div>
+    <div class="screen-note">この画面は次のスプリントで作ります。</div>
+  </section>
+
+  <section class="screen-card" id="screenCorrection" style="display:none;">
+    <div class="screen-title">準備中</div>
+    <div class="screen-note">この画面は次のスプリントで作ります。</div>
+  </section>
+
+  <section class="screen-card" id="screenAuditLog" style="display:none;">
+    <div class="screen-title">準備中</div>
+    <div class="screen-note">この画面は次のスプリントで作ります。</div>
+  </section>
+
+  <section class="screen-card" id="screenMaster" style="display:none;">
+    <div class="screen-title">準備中</div>
+    <div class="screen-note">この画面は次のスプリントで作ります。</div>
+  </section>
+
+</main>
+
+<script>
+/* ===== 画面切替 ===== */
+var screenKeys = ["attendance", "correction", "auditLog", "master"];
+var currentScreen = "attendance";
+
+function screenElement(key) {
+  return document.getElementById("screen" + key.charAt(0).toUpperCase() + key.slice(1));
+}
+
+function navElement(key) {
+  return document.getElementById("nav" + key.charAt(0).toUpperCase() + key.slice(1));
+}
+
+function showScreen(key) {
+  if (key === currentScreen) return;
+  var i, k;
+  for (i = 0; i < screenKeys.length; i++) {
+    k = screenKeys[i];
+    screenElement(k).style.display = (k === key) ? "" : "none";
+    if (k === key) {
+      navElement(k).classList.add("active");
+    } else {
+      navElement(k).classList.remove("active");
+    }
+  }
+  currentScreen = key;
+  window.scrollTo(0, 0);
+}
+</script>
+
+</body>
+</html>
