@@ -13,10 +13,12 @@ import type { Env } from "./index";
 
 /**
  * Gmail検索クエリ。
- * 「橋本大輝」または「代表取締役」を件名・本文どちらかに含み、直近2日以内、送信済みは除外する。
+ * 代表に関わりそうなキーワードのいずれかを件名・本文に含み、直近2日以内、送信済みは除外する。
+ * 検索は広めに取り、実際に代表宛かどうかの絞り込みはAI（target判定）に任せる方針。
  * 運用しながら調整しやすいよう、ここに集約しておく。
  */
-export const GMAIL_SEARCH_QUERY = '("橋本大輝" OR "代表取締役") newer_than:2d -in:sent';
+export const GMAIL_SEARCH_QUERY =
+  '("橋本大輝" OR "代表取締役" OR "社長" OR "橋本様" OR "橋本代表" OR "オーナー" OR "代表") newer_than:2d -in:sent';
 
 /** 送信者除外リストの1項目。addressはメールアドレスの完全一致、domainは@以降のドメインの完全一致で判定する */
 export interface SenderExcludeRule {
