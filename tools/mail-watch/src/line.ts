@@ -14,10 +14,10 @@ export const LINE_CALL_INTERVAL_MS = 150;
 /** LINE Messaging APIのpush送信エンドポイント */
 const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
 
-/** urgency値を通知カード表示用の日本語ラベルに変換する。通知対象はhigh/midのみのため、それ以外は想定しない */
-const URGENCY_LABELS: Partial<Record<NonNullable<EmailAiFields["urgency"]>, string>> = {
-  high: "至急",
-  mid: "要対応",
+/** importance値を通知カード表示用の日本語ラベルに変換する。通知対象はhigh/midのみのため、それ以外は想定しない */
+const IMPORTANCE_LABELS: Partial<Record<NonNullable<EmailAiFields["importance"]>, string>> = {
+  high: "重要",
+  mid: "中程度",
 };
 
 /** LINE API呼び出し中に起きたエラーを、何が起きたか分かる形で表す */
@@ -50,8 +50,8 @@ export interface LineNotificationInput {
   summary: EmailAiFields["summary"];
   /** 期限（ISO形式文字列）。nullの場合はカード側で「期限なし」と表示する */
   deadline: EmailAiFields["deadline"];
-  /** 緊急度。判定基準上ここに来るのはhigh/midのみを想定 */
-  urgency: EmailAiFields["urgency"];
+  /** 重要度。判定基準上ここに来るのはhigh/midのみを想定 */
+  importance: EmailAiFields["importance"];
 }
 
 /**
@@ -104,12 +104,12 @@ function buildFlexMessage(input: LineNotificationInput): object {
   const subjectText = input.subject === "" ? "(件名なし)" : input.subject;
   const summaryText = input.summary ?? "要約なし";
   const deadlineText = input.deadline ?? "期限なし";
-  const urgencyText = input.urgency ? URGENCY_LABELS[input.urgency] ?? input.urgency : "";
+  const importanceText = input.importance ? IMPORTANCE_LABELS[input.importance] ?? input.importance : "";
   const gmailUrl = `https://mail.google.com/mail/u/0/#all/${input.threadId}`;
 
   return {
     type: "flex",
-    altText: `【${urgencyText}】${subjectText}`,
+    altText: `【${importanceText}】${subjectText}`,
     contents: {
       type: "bubble",
       body: {
@@ -119,10 +119,10 @@ function buildFlexMessage(input: LineNotificationInput): object {
         contents: [
           {
             type: "text",
-            text: urgencyText,
+            text: importanceText,
             weight: "bold",
             size: "sm",
-            color: input.urgency === "high" ? "#e53935" : "#fb8c00",
+            color: input.importance === "high" ? "#e53935" : "#fb8c00",
           },
           {
             type: "text",

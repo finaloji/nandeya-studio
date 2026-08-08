@@ -21,11 +21,11 @@ const STATUS_LABELS: Record<EmailStatus, string> = {
   done: "完了",
 };
 
-/** 緊急度ごとの表示名 */
-const URGENCY_LABELS: Record<"high" | "mid" | "low", string> = {
-  high: "緊急",
-  mid: "中",
-  low: "低",
+/** 重要度ごとの表示名 */
+const IMPORTANCE_LABELS: Record<"high" | "mid" | "low", string> = {
+  high: "重要",
+  mid: "中程度",
+  low: "重要度低",
 };
 
 /** 宛先分類ごとの表示名 */
@@ -107,8 +107,8 @@ function renderEmailList(emails: DashboardEmailRow[], status: EmailStatus): stri
 
 /** 1件分のメールをカード状のHTMLとして組み立てる */
 function renderEmailCard(email: DashboardEmailRow): string {
-  const urgencyClass = email.urgency ? `urgency-${email.urgency}` : "urgency-unknown";
-  const urgencyLabel = email.urgency ? URGENCY_LABELS[email.urgency] : "未判定";
+  const importanceClass = email.importance ? `importance-${email.importance}` : "importance-unknown";
+  const importanceLabel = email.importance ? IMPORTANCE_LABELS[email.importance] : "未判定";
   const targetLabel = email.target ? TARGET_LABELS[email.target] : "未判定";
   const targetClass = email.target && email.target !== "rep" ? "target-nonrep" : "target-rep";
   const summaryText = email.summary ?? "要約待ち";
@@ -118,7 +118,7 @@ function renderEmailCard(email: DashboardEmailRow): string {
   return `
     <article class="email-card">
       <div class="email-card-top">
-        <span class="badge ${urgencyClass}">${escapeHtml(urgencyLabel)}</span>
+        <span class="badge ${importanceClass}">${escapeHtml(importanceLabel)}</span>
         <span class="badge ${targetClass}">${escapeHtml(targetLabel)}</span>
         <span class="badge status-badge">${escapeHtml(STATUS_LABELS[email.status])}</span>
       </div>
@@ -304,10 +304,10 @@ const DASHBOARD_CSS = `
     background: #eee;
     color: #333;
   }
-  .urgency-high { background: #fde0e0; color: #b3261e; font-weight: bold; }
-  .urgency-mid { background: #fff2cc; color: #8a6d00; }
-  .urgency-low { background: #e2f0e2; color: #1e7a1e; }
-  .urgency-unknown { background: #eee; color: #666; }
+  .importance-high { background: #fde0e0; color: #b3261e; font-weight: bold; }
+  .importance-mid { background: #fff2cc; color: #8a6d00; }
+  .importance-low { background: #e2f0e2; color: #1e7a1e; }
+  .importance-unknown { background: #eee; color: #666; }
   .target-nonrep { background: #ffe0f0; color: #a3005c; font-weight: bold; }
   .target-rep { background: #e6eefc; color: #1a4fa0; }
   .status-badge { background: #eee; color: #555; }

@@ -6,7 +6,7 @@
  * - gmail_idのUNIQUE制約により、既に保存済みのメールは重複としてスキップする
  *
  * このスプリントで追加した範囲:
- * - Geminiで整理したAI項目（summary/deadline/urgency/target）を、gmail_idで特定した行にUPDATEする
+ * - Geminiで整理したAI項目（summary/deadline/importance/target）を、gmail_idで特定した行にUPDATEする
  *
  * LINE通知・Cronからの自動呼び出しは対象外（後続スプリント）。
  */
@@ -77,7 +77,7 @@ export async function saveEmails(db: D1Database, emails: GmailMessageDetail[]): 
 /**
  * 1件のメールをemailsテーブルへINSERTする。
  * status/notify_count/created_atはテーブル側のデフォルト値に任せ、
- * summary/deadline/urgency/target/last_notified_atはNULLのまま（後続スプリントで埋める）。
+ * summary/deadline/importance/target/last_notified_atはNULLのまま（後続スプリントで埋める）。
  */
 async function insertEmail(db: D1Database, email: GmailMessageDetail): Promise<void> {
   await db
@@ -97,17 +97,17 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 /**
  * Geminiで整理したAI項目（EmailAiFields）を、gmail_idで一意に特定したemails行へUPDATEする。
- * summary/deadline/urgency/targetのうちnullの項目は、そのままNULLとしてD1に反映する
+ * summary/deadline/importance/targetのうちnullの項目は、そのままNULLとしてD1に反映する
  * （代替文言・デフォルト値は補わない）。
  */
 export async function updateEmailAiFields(db: D1Database, gmailId: string, fields: EmailAiFields): Promise<void> {
   await db
     .prepare(
       `UPDATE emails
-       SET summary = ?, deadline = ?, urgency = ?, target = ?
+       SET summary = ?, deadline = ?, importance = ?, target = ?
        WHERE gmail_id = ?`
     )
-    .bind(fields.summary, fields.deadline, fields.urgency, fields.target, gmailId)
+    .bind(fields.summary, fields.deadline, fields.importance, fields.target, gmailId)
     .run();
 }
 
@@ -220,7 +220,7 @@ export interface DashboardEmailRow {
   receivedAt: string;
   summary: string | null;
   deadline: string | null;
-  urgency: "high" | "mid" | "low" | null;
+  importance: "high" | "mid" | "low" | null;
   target: "rep" | "staff" | "other" | null;
   status: EmailStatus;
   /** このメールに紐づくaction_logsの直近10件（新しい順） */
@@ -252,7 +252,7 @@ export async function getDashboardData(db: D1Database): Promise<DashboardData> {
   for (const status of EMAIL_STATUSES) {
     const { results } = await db
       .prepare(
-        `SELECT id, gmail_id, thread_id, subject, from_addr, received_at, summary, deadline, urgency, target, status
+        `SELECT id, gmail_id, thread_id, subject, from_addr, received_at, summary, deadline, importance, target, status
          FROM emails WHERE status = ? ORDER BY received_at DESC`
       )
       .bind(status)
@@ -265,7 +265,7 @@ export async function getDashboardData(db: D1Database): Promise<DashboardData> {
         received_at: string;
         summary: string | null;
         deadline: string | null;
-        urgency: "high" | "mid" | "low" | null;
+        importance: "high" | "mid" | "low" | null;
         target: "rep" | "staff" | "other" | null;
         status: EmailStatus;
       }>();
@@ -279,7 +279,7 @@ export async function getDashboardData(db: D1Database): Promise<DashboardData> {
         receivedAt: row.received_at,
         summary: row.summary,
         deadline: row.deadline,
-        urgency: row.urgency,
+        importance: row.importance,
         target: row.target,
         status: row.status,
         actionLogs: [],

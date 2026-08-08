@@ -2,7 +2,7 @@
  * mail-watch: Gemini API連携ロジック（メールのAI整理）
  *
  * D1へ新規保存されたメール1件について、件名・送信者・本文をGeminiへ渡し、
- * summary/deadline/urgency/targetをJSON形式で受け取る。
+ * summary/deadline/importance/targetをJSON形式で受け取る。
  * LINE通知・通知要否判定・Cronからの呼び出しは対象外（後続スプリント）。
  */
 
@@ -18,8 +18,8 @@ export const GEMINI_CALL_INTERVAL_MS = 150;
 /** 使用するGeminiモデル名 */
 const GEMINI_MODEL = "gemini-flash-latest";
 
-/** urgencyカラムが取りうる値（D1のCHECK制約と一致させること） */
-const VALID_URGENCY_VALUES = ["high", "mid", "low"] as const;
+/** importanceカラムが取りうる値（D1のCHECK制約と一致させること） */
+const VALID_IMPORTANCE_VALUES = ["high", "mid", "low"] as const;
 /** targetカラムが取りうる値（D1のCHECK制約と一致させること） */
 const VALID_TARGET_VALUES = ["rep", "staff", "other"] as const;
 
@@ -27,7 +27,7 @@ const VALID_TARGET_VALUES = ["rep", "staff", "other"] as const;
 export interface EmailAiFields {
   summary: string | null;
   deadline: string | null;
-  urgency: "high" | "mid" | "low" | null;
+  importance: "high" | "mid" | "low" | null;
   target: "rep" | "staff" | "other" | null;
 }
 
@@ -102,7 +102,10 @@ function buildPrompt(subject: string, from: string, body: string): string {
 出力項目:
 - summary: メール内容の要約（日本語、1〜2文程度）。判断できない場合はnull
 - deadline: 返信・対応の期限（メール本文に明記されている場合のみ、可能な範囲でISO 8601形式の日付。言及がない・読み取れない場合はnull）
-- urgency: 緊急度。"high"（至急対応が必要）/ "mid"（数日以内に対応）/ "low"（急ぎではない）のいずれか。判断できない場合はnull
+- importance: 重要度。「対応を誤る・見落とすと会社にとって実害や信用問題につながるか」を軸に判定すること（返信の速さや期限の近さでは判断しないこと）。"high"（重要）/ "mid"（中程度）/ "low"（重要度低）のいずれか。判断できない場合はnull
+  - high（重要）: 金銭・契約・法的責任が絡む、または対応漏れが会社の信用・売上に直結する内容。例: 見積書、請求書、契約書・発注書、支払い督促、クレーム・苦情、取引先からの重要な確認依頼、行政・金融機関からの通知
+  - mid（中程度）: 業務上の対応は必要だが、high ほど致命的ではない内容。例: 一般的な業務連絡、日程調整・打ち合わせ依頼、資料送付・確認依頼、社内外からの問い合わせ
+  - low（重要度低）: 対応不要または軽微な内容。例: 広告・メールマガジン、システムからの自動送信通知、お礼・儀礼的な挨拶メール、参考情報の共有のみのメール
 - target: 誰宛の内容か。"rep"（代表者本人が対応すべき）/ "staff"（担当者・スタッフが対応すべき）/ "other"（どちらでもない・判断不要）のいずれか。判断できない場合はnull
 
 不明な項目は必ずnullとしてください。無理に値を埋めないでください。
@@ -113,13 +116,13 @@ function buildPrompt(subject: string, from: string, body: string): string {
 ${body}
 
 出力形式の例:
-{"summary": "...", "deadline": "2026-07-20", "urgency": "high", "target": "rep"}`;
+{"summary": "...", "deadline": "2026-07-20", "importance": "high", "target": "rep"}`;
 }
 
 /**
  * Geminiのテキスト応答をパースし、EmailAiFieldsとして取り出す。
  * - JSONとしてパースできない場合はGeminiApiError(stage="parse")を投げる
- * - urgency/targetが許容値以外の場合は、その項目のみnullとして扱う（他の項目は活かす）
+ * - importance/targetが許容値以外の場合は、その項目のみnullとして扱う（他の項目は活かす）
  * - Markdownのコードブロック記法（```json ... ```）で囲まれている場合は取り除いてからパースする
  */
 function parseAiFields(text: string): EmailAiFields {
@@ -141,7 +144,7 @@ function parseAiFields(text: string): EmailAiFields {
   return {
     summary: typeof record.summary === "string" ? record.summary : null,
     deadline: typeof record.deadline === "string" ? record.deadline : null,
-    urgency: isValidUrgency(record.urgency) ? record.urgency : null,
+    importance: isValidImportance(record.importance) ? record.importance : null,
     target: isValidTarget(record.target) ? record.target : null,
   };
 }
@@ -152,8 +155,8 @@ function stripCodeFence(text: string): string {
   return match ? match[1] : text;
 }
 
-function isValidUrgency(value: unknown): value is "high" | "mid" | "low" {
-  return typeof value === "string" && (VALID_URGENCY_VALUES as readonly string[]).includes(value);
+function isValidImportance(value: unknown): value is "high" | "mid" | "low" {
+  return typeof value === "string" && (VALID_IMPORTANCE_VALUES as readonly string[]).includes(value);
 }
 
 function isValidTarget(value: unknown): value is "rep" | "staff" | "other" {

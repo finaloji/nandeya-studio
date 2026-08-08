@@ -140,7 +140,7 @@ async function runGmailCheck(env: Env): Promise<GmailCheckRunResult> {
     // AI整理全体（対象メール全件のループ）が完了した後、まとめて1回で判定する。
     const notificationCandidates: NotificationCandidate[] = aiOrganizeResults
       .filter((r) => r.outcome === "succeeded")
-      .map((r) => ({ gmailId: r.gmailId, target: r.target ?? null, urgency: r.urgency ?? null }));
+      .map((r) => ({ gmailId: r.gmailId, target: r.target ?? null, importance: r.importance ?? null }));
     const notificationDecisionSummary = decideNotifications(notificationCandidates);
 
     // 通知要否判定でshouldNotify: trueとなったメールについて、1件ずつLINEへpush送信する。
@@ -273,8 +273,8 @@ interface AiOrganizeResult {
   stage?: "call" | "parse" | "db";
   /** outcomeが"failed"の場合のエラーメッセージ */
   errorMessage?: string;
-  /** outcomeが"succeeded"の場合のGeminiによる緊急度判定（通知要否判定に使う） */
-  urgency?: EmailAiFields["urgency"];
+  /** outcomeが"succeeded"の場合のGeminiによる重要度判定（通知要否判定に使う） */
+  importance?: EmailAiFields["importance"];
   /** outcomeが"succeeded"の場合のGeminiによる宛先分類（通知要否判定に使う） */
   target?: EmailAiFields["target"];
   /** outcomeが"succeeded"の場合のGeminiによる要約（LINE通知に使う） */
@@ -284,7 +284,7 @@ interface AiOrganizeResult {
 }
 
 /**
- * D1へ新規保存されたメールについて、1件ずつGemini APIでAI整理（summary/deadline/urgency/target）を行い、
+ * D1へ新規保存されたメールについて、1件ずつGemini APIでAI整理（summary/deadline/importance/target）を行い、
  * emails行へUPDATEする。Gemini呼び出しは並列実行せず、GEMINI_CALL_INTERVAL_MSの間隔を空けて逐次実行する。
  * 対象が0件の場合はGemini APIを一切呼び出さない。
  * 1件の失敗（呼び出し失敗・パース失敗・DB更新失敗）が他のメールの処理を止めることはない。
@@ -307,7 +307,7 @@ async function organizeEmailsWithAi(env: Env, emails: GmailMessageDetail[]): Pro
         results.push({
           gmailId: email.id,
           outcome: "succeeded",
-          urgency: fields.urgency,
+          importance: fields.importance,
           target: fields.target,
           summary: fields.summary,
           deadline: fields.deadline,
@@ -393,7 +393,7 @@ async function sendLineNotifications(
         threadId: email.threadId,
         summary: aiFields?.summary ?? null,
         deadline: aiFields?.deadline ?? null,
-        urgency: decision.urgency,
+        importance: decision.importance,
       });
       results.push({ gmailId: decision.gmailId, outcome: "succeeded" });
     } catch (error) {

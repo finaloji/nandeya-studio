@@ -1,7 +1,7 @@
 /**
  * mail-watch: LINE通知要否の判定ロジック
  *
- * Gemini AIで整理済み（summary/deadline/urgency/targetが確定した）メールについて、
+ * Gemini AIで整理済み（summary/deadline/importance/targetが確定した）メールについて、
  * LINE通知すべきかどうかを判定する。実際のLINE push送信は対象外（後続スプリント）。
  */
 
@@ -13,8 +13,8 @@ export interface NotificationCandidate {
   gmailId: string;
   /** 宛先分類 */
   target: EmailAiFields["target"];
-  /** 緊急度 */
-  urgency: EmailAiFields["urgency"];
+  /** 重要度 */
+  importance: EmailAiFields["importance"];
 }
 
 /** 1件の通知要否判定結果 */
@@ -23,17 +23,17 @@ export interface NotificationDecisionResult {
   gmailId: string;
   /** 判定に使った宛先分類 */
   target: EmailAiFields["target"];
-  /** 判定に使った緊急度 */
-  urgency: EmailAiFields["urgency"];
+  /** 判定に使った重要度 */
+  importance: EmailAiFields["importance"];
   /** LINE通知すべきかどうか */
   shouldNotify: boolean;
 }
 
 /**
  * 1件のメールについて、LINE通知すべきかどうかを判定する。
- * 判定基準: target === "rep" かつ urgencyが"low"でない（"high"または"mid"）場合のみ通知すべき。
+ * 判定基準: target === "rep" かつ importanceが"low"でない（"high"または"mid"）場合のみ通知すべき。
  * targetがnull、または"rep"以外（"staff"/"other"）の場合は通知不要。
- * urgencyがnullの場合は"low"と同等（緊急ではない）とみなし、通知不要とする（過剰通知を避ける側に倒す）。
+ * importanceがnullの場合は"low"と同等（重要ではない）とみなし、通知不要とする（過剰通知を避ける側に倒す）。
  * AI整理自体が失敗したメールはこの関数の対象外（呼び出し元でフィルタ済みであることを前提とする）。
  */
 export function shouldNotify(candidate: NotificationCandidate): boolean {
@@ -41,7 +41,7 @@ export function shouldNotify(candidate: NotificationCandidate): boolean {
     return false;
   }
 
-  return candidate.urgency === "high" || candidate.urgency === "mid";
+  return candidate.importance === "high" || candidate.importance === "mid";
 }
 
 /** 複数件の通知要否判定結果をまとめたサマリ */
@@ -65,7 +65,7 @@ export function decideNotifications(candidates: NotificationCandidate[]): Notifi
   const results: NotificationDecisionResult[] = candidates.map((candidate) => ({
     gmailId: candidate.gmailId,
     target: candidate.target,
-    urgency: candidate.urgency,
+    importance: candidate.importance,
     shouldNotify: shouldNotify(candidate),
   }));
 
