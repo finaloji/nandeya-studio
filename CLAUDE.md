@@ -14,6 +14,7 @@
 | `apps/lockscreen/` | ロック画面アプリ（CIPHER） |
 | `apps/proxy-magician/` | 代打マジシャン（毒舌AIマジシャン） |
 | `apps/magcharge/` | VOLT（鼻で充電・MagSafeフォース） |
+| `apps/wifi-prediction/` | WiFi予言ギミック（ESP32-S3ファームウェア＋ローカルWeb UI。開発中。他アプリと異なりハードウェア前提） |
 | `tools/invoice/` | 見積書・請求書作成ツール v2 |
 | `tools/mail-watch/` | 代表宛メール見落とし防止AI秘書（Gmail→Gemini要約→LINE通知。Cloudflare Workers＋D1で無料運用） |
 | `tools/payroll/` | 勤怠管理・給与計算補助・コミッション明細システム（開発中。仕様は `tools/payroll/README.md`。payroll専用のFirebaseプロジェクトを使う） |
