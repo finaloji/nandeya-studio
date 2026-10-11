@@ -6,10 +6,10 @@
 
 | グループ | # | 作業内容 | 状態 |
 |---------|---|---------|------|
-| 環境構築 | 0-1 | PC側ソフト準備・Arduino IDEインストール | 未着手 |
-| 環境構築 | 0-2 | ESP32 Board Manager設定・ボード選定 | 未着手 |
-| 環境構築 | 0-3 | USB接続・COMポート確認・最初の書き込みテスト | 未着手 |
-| Phase1 単一SSID | 1-1 | NANDEYA_TEST をSoftApで発信・iPhoneで確認 | 未着手 |
+| 環境構築 | 0-1 | PC側ソフト準備・Arduino IDEインストール | 完了 |
+| 環境構築 | 0-2 | ESP32 Board Manager設定・ボード選定 | 完了 |
+| 環境構築 | 0-3 | USB接続・COMポート確認・最初の書き込みテスト | 完了（USB-A→USB-Cケーブル使用で安定。仕様書の既知の不具合に記載） |
+| Phase1 単一SSID | 1-1 | NANDEYA_TEST をSoftApで発信・iPhoneで確認 | 作業中 |
 | Phase2 WebUI | 2-1 | ESP32内ローカルWebサーバーの最小表示 | 未着手 |
 | Phase2 WebUI | 2-2 | 予言文入力フォーム→ESP32へ送信（SEND） | 未着手 |
 | Phase2 WebUI | 2-3 | STOPボタンでSoftAP停止 | 未着手 |
@@ -21,4 +21,4 @@
 | Phase4 本番UI | 4-3 | マジシャン向け最終デザイン（ダーク・大ボタン・片手操作） | 未着手 |
 
 ## 次に着手するスプリント
-0-1: PC側ソフト準備・Arduino IDEインストール
+1-1: NANDEYA_TEST をSoftApで発信・iPhoneで確認
