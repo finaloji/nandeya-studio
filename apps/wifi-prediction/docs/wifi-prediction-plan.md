@@ -9,7 +9,7 @@
 | 環境構築 | 0-1 | PC側ソフト準備・Arduino IDEインストール | 完了 |
 | 環境構築 | 0-2 | ESP32 Board Manager設定・ボード選定 | 完了 |
 | 環境構築 | 0-3 | USB接続・COMポート確認・最初の書き込みテスト | 完了（USB-A→USB-Cケーブル使用で安定。仕様書の既知の不具合に記載） |
-| Phase1 単一SSID | 1-1 | NANDEYA_TEST をSoftApで発信・iPhoneで確認 | 作業中 |
+| Phase1 単一SSID | 1-1 | NANDEYA_TEST をSoftApで発信・iPhoneで確認 | 作業中（コードpush済み・実機書き込み待ち） |
 | Phase2 WebUI | 2-1 | ESP32内ローカルWebサーバーの最小表示 | 未着手 |
 | Phase2 WebUI | 2-2 | 予言文入力フォーム→ESP32へ送信（SEND） | 未着手 |
 | Phase2 WebUI | 2-3 | STOPボタンでSoftAP停止 | 未着手 |
